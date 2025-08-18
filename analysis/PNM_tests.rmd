@@ -1,0 +1,196 @@
+---
+title: 'PNM model'
+author: "B. Karina Montero and M. Gillingham "
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+## LOAD LIBRARIES
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+rm(list = ls())
+
+library(ggplot2)
+library(ggrepel)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(vegan)
+library(speedyseq)
+library(phangorn)
+
+
+#phyloseq section
+library(phyloseq)
+library(magrittr)
+library(tidyverse)
+#library(dada2); packageVersio
+library(microbiome)
+#library(MicEco)
+library(tyRa)
+library(microViz)
+
+
+#https://danielsprockett.github.io/tyRa/articles/tyRa.html
+#library(tyRa)
+library(minpack.lm)
+library(Hmisc)
+library(stats4)
+
+```
+
+## WORKING DIRECTORIES
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, results="hide"}
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/workingDirectories.R")
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/CleanScripts/graphics_param.R")
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/PNM_functions_tyralibrary.r")
+
+```
+
+
+Rarefied phyloseq
+
+
+```{r psObject, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+microb_fr_fix <- readRDS(paste0(dataDir, "/microb_overlap_OTU99_fr_taxFix.rds"))
+
+```
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+microb_fr_otu <-  microb_fr_fix 
+microb_fr_genus <- speedyseq::tax_glom(microb_fr_fix, "Genus",  NArm = FALSE)
+microb_fr_family <- speedyseq::tax_glom(microb_fr_fix, "Family",  NArm = FALSE)
+microb_fr_order <- speedyseq::tax_glom(microb_fr_fix, "Order",  NArm = FALSE)
+microb_fr_class <- speedyseq::tax_glom(microb_fr_fix, "Class",  NArm = FALSE)
+microb_fr_phylum <- speedyseq::tax_glom(microb_fr_fix, "Phylum",  NArm = FALSE)
+
+
+# add OTU_ID to tax tables
+#genus
+tax_table(microb_fr_otu) 
+
+# add OTU_ID to tax tables
+#genus
+tax_table(microb_fr_genus) <- tax_table(microb_fr_genus)[,1:6]
+tax_table(microb_fr_genus) <- cbind(tax_table(microb_fr_genus), rownames(tax_table(microb_fr_genus)))
+colnames(tax_table(microb_fr_genus)) <- c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus","OTU_ID")
+
+#family
+tax_table(microb_fr_family) <- tax_table(microb_fr_family)[,1:5]
+tax_table(microb_fr_family) <- cbind(tax_table(microb_fr_family), rownames(tax_table(microb_fr_family)))
+colnames(tax_table(microb_fr_family)) <- c("Kingdom", "Phylum", "Class", "Order", "Family", "OTU_ID")
+
+#order
+tax_table(microb_fr_order) <- tax_table(microb_fr_order)[,1:4]
+tax_table(microb_fr_order) <- cbind(tax_table(microb_fr_order), rownames(tax_table(microb_fr_order)))
+colnames(tax_table(microb_fr_order)) <- c("Kingdom", "Phylum", "Class", "Order", "OTU_ID")
+
+#class
+tax_table(microb_fr_class) <- tax_table(microb_fr_class)[,1:3]
+tax_table(microb_fr_class) <- cbind(tax_table(microb_fr_class), rownames(tax_table(microb_fr_class)))
+colnames(tax_table(microb_fr_class)) <- c("Kingdom", "Phylum", "Class", "OTU_ID")
+
+#phylum
+tax_table(microb_fr_phylum) <- tax_table(microb_fr_phylum)[,1:2]
+tax_table(microb_fr_phylum) <- cbind(tax_table(microb_fr_phylum), rownames(tax_table(microb_fr_phylum)))
+colnames(tax_table(microb_fr_phylum)) <- c("Kingdom", "Phylum", "OTU_ID")
+
+
+#write.csv(tax_table(microb_fr_family), paste0(dataDir, "/microb_fr_familyFix_taxtable.csv"))
+# TipId 
+
+# meta
+microb_fr_meta_otu <- sample_data(microb_fr_otu) %>% data.frame
+microb_fr_meta_genus <- sample_data(microb_fr_genus) %>% data.frame
+microb_fr_meta_family <- sample_data(microb_fr_family) %>% data.frame
+microb_fr_meta_order <- sample_data(microb_fr_order) %>% data.frame
+microb_fr_meta_class <- sample_data(microb_fr_class) %>% data.frame
+microb_fr_meta_phylum <- sample_data(microb_fr_phylum) %>% data.frame
+```
+
+
+
+
+# fit neutral model OVERLAP DATA 
+https://github.com/DanielSprockett/tyRa/blob/master/R/modeling.R
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# tyRa function OTUs in columns and samples in rows
+
+pnm_otu <- tyRa::fit_sncm(spp = otu_table(microb_fr_otu)@.Data, pool=NULL, taxon=data.frame(tax_table(microb_fr_otu)))
+pnm_genus <- tyRa::fit_sncm(spp = otu_table(microb_fr_genus)@.Data, pool=NULL, taxon=data.frame(tax_table(microb_fr_genus)))
+pnm_family <- tyRa::fit_sncm(spp = otu_table(microb_fr_family)@.Data, pool=NULL, taxon=data.frame(tax_table(microb_fr_family)))
+pnm_order <- tyRa::fit_sncm(spp = otu_table(microb_fr_order)@.Data, pool=NULL, taxon=data.frame(tax_table(microb_fr_order)))
+pnm_class <- tyRa::fit_sncm(spp = otu_table(microb_fr_class)@.Data, pool=NULL, taxon=data.frame(tax_table(microb_fr_class)))
+pnm_phylum <- tyRa::fit_sncm(spp = otu_table(microb_fr_phylum)@.Data, pool=NULL, taxon=data.frame(tax_table(microb_fr_phylum)))
+
+
+(pnm_otu_plot <- plot_sncm_fit_col(pnm_otu, fill = NULL) + pca_theme +  ggtitle("OTU") +guides(shape = guide_legend(override.aes = list(size = 5)), fill = guide_legend(override.aes = list(size = 5)), size = guide_legend(override.aes = list(size = c(5, 3) , fill= c("black")))))
+
+
+(pnm_genus_plot <- plot_sncm_fit_col(pnm_genus, fill = NULL) + pca_theme + ggtitle("Genus") + guides(shape = guide_legend(override.aes = list(size = 5)), fill = guide_legend(override.aes = list(size = 5)), size = guide_legend(override.aes = list(size = c(5, 3) , fill= c("black")))))
+
+(pnm_family_plot <- plot_sncm_fit_col(pnm_family, fill = NULL) + pca_theme + ggtitle("Family") + guides(shape = guide_legend(override.aes = list(size = 5)), fill = guide_legend(override.aes = list(size = 5)), size = guide_legend(override.aes = list(size = c(5, 3) , fill= c("black")))))
+
+(pnm_order_plot <- plot_sncm_fit_col(pnm_order, fill = NULL) + pca_theme + ggtitle("Order") + guides(shape = guide_legend(override.aes = list(size = 5)), fill = guide_legend(override.aes = list(size = 5)), size = guide_legend(override.aes = list(size = c(5, 3) , fill= c("black")))))
+
+(pnm_class_plot <- plot_sncm_fit_col(pnm_class, fill = NULL) + pca_theme + ggtitle("Class") + guides(shape = guide_legend(override.aes = list(size = 5)), fill = guide_legend(override.aes = list(size = 5)), size = guide_legend(override.aes = list(size = c(5, 3) , fill= c("black")))))
+
+(pnm_phylum_plot <- plot_sncm_fit_col(pnm_phylum, fill = NULL) + pca_theme + ggtitle("Phylum") + guides(shape = guide_legend(override.aes = list(size = 5)), fill = guide_legend(override.aes = list(size = 5)), size = guide_legend(override.aes = list(size = c(5, 3) , fill= c("black")))))
+
+
+
+library(ggpubr)
+
+png(paste0(outputDir, "/Figures/PNM_acrossCore_allTaxa.png") ,width=3000, height=2000,res=110)
+ggarrange(pnm_otu_plot, pnm_genus_plot, pnm_family_plot, pnm_order_plot, pnm_class_plot, pnm_phylum_plot) 
+#pnm_plot + theme( legend.position= "none")
+dev.off()
+
+
+```
+
+Predictions
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+
+pred_df_otu <- pnm_otu$predictions
+pred_df_genus <- pnm_genus$predictions
+pred_df_family <- pnm_family$predictions
+pred_df_order <- pnm_order$predictions
+pred_df_class <- pnm_class$predictions
+pred_df_phylum <- pnm_phylum$predictions
+
+
+# subsets of predicted class
+
+##NEUTRAL
+
+
+# add OTU_ID to tax tables
+#genus
+tax_table(microb_fr_otu) <- cbind(tax_table(microb_fr_otu), rownames(tax_table(microb_fr_otu)))
+colnames(tax_table(microb_fr_otu)) <- c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species", "Core_across", "OTU_ID")
+
+#all neutral
+neutral_otus <- pred_df_otu %>% filter(fit_class == "As predicted")
+keep_neutral <- rownames(neutral_otus)
+ps_neutral_otu <- prune_taxa(keep_neutral, microb_fr_otu)
+tax_table(microb_fr_otu)
+saveRDS(ps_neutral_otu, paste0(dataDir, "/ps_neutral_otu.rds"))
+
+##NON-NEUTRAL
+
+nonneutral_otus <- pred_df_otu %>% filter(fit_class != "As predicted")
+keep_nonneutral <- rownames(nonneutral_otus)
+ps_nonneutral_otu <- prune_taxa(keep_nonneutral, microb_fr_otu)
+saveRDS(ps_nonneutral_otu, paste0(dataDir, "/ps_nonneutral_otu.rds"))
+
+```
+

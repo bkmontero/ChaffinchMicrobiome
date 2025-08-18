@@ -1,0 +1,312 @@
+---
+title: 'OTU clustering at 99%'
+author: "B. K. Montero and M. Gillingham"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+## LOAD LIBRARIES
+
+
+```{r loadLibraries, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+rm(list = ls())
+
+# basics
+library(stringr)
+library(dplyr)
+library(tidyr)
+library(magrittr)
+library(data.table)
+library(ggplot2)
+library(ggpubr)
+library(tibble)
+
+# phyloseq section
+library(phyloseq)
+library(Biostrings)
+library(DECIPHER)
+library(speedyseq)
+library(metagMisc)
+library(seqateurs)
+
+```
+
+
+## WORKING DIRECTORIES
+```{r source, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, results="hide"}
+
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/workingDirectories.R")
+
+```
+
+## LOAD DATA
+
+### 1. Clean phyloseq object
+```{r cleanPS, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+ps_rbcL <- readRDS(paste0(dataDir, "/ps.clean_rbcL.rds" ))
+ps_rbcL
+
+ps_COI <- readRDS(paste0(dataDir, "/ps.clean_COI.rds" ))
+ps_COI <- subset_samples(ps_COI, Seq_depth_COI > 0)
+ps_COI
+
+```
+
+### 2. Tables
+```{r tables, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+seqtab_rbcL <- otu_table(ps_rbcL)
+asv_sequences_rbcL <- colnames(seqtab_rbcL)
+#sample_names <- rownames(seqtab)
+
+class(seqtab_rbcL)
+
+seqtab_COI <- otu_table(ps_COI)
+asv_sequences_COI <- colnames(seqtab_COI)
+#sample_names <- rownames(seqtab)
+
+class(seqtab_COI)
+
+#ps_to_fasta(ps_rbcL, out.file = paste0(dataDir, "/ps_rbcL.fasta"), width = 1800, seqnames = "OTU_ID")
+
+#ps_to_fasta(ps_COI, out.file = paste0(dataDir, "/ps_COI.fasta"), width = 1800, seqnames = "OTU_ID")
+```
+
+### 3. Alignment
+
+```{r alignm, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, echo=FALSE, eval=FALSE}
+
+aln_rbcL <- readDNAStringSet(file = paste0(dataDir, "/ps_rbcL_aln.fas"), format = "fasta", nrec = -1L, skip = 0L, seek.first.rec = FALSE,  use.names = TRUE)
+
+aln_COI <- readDNAStringSet(file = paste0(dataDir, "/ps_COI_aln.fas"), format = "fasta", nrec = -1L, skip = 0L, seek.first.rec = FALSE,  use.names = TRUE)
+```
+
+## CLUSTER
+
+Run in cluster
+```{r cluster, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, echo=FALSE, eval=FALSE}
+
+# 
+#nproc <- 18 # set to number of cpus/processors to use for the clustering
+#d_rbcL <- DECIPHER::DistanceMatrix(aln_rbcL, processors = nproc)
+#d_COI <- DECIPHER::DistanceMatrix(aln_COI, processors = nproc)
+
+#
+#clusters_rbcL <- DECIPHER::IdClusters(d_rbcL, method = "complete", cutoff = 0.01, processors = nproc) # use `cutoff = 0.01` for a 99% OTU 
+#head(clusters_rbcL)
+
+nproc <- 16 # set to number of cpus/processors to use for the clustering
+d_rbcL <- DECIPHER::DistanceMatrix(aln_rbcL, processors = nproc, type = "matrix")
+class(d_rbcL)
+
+d_COI <- DECIPHER::DistanceMatrix(aln_COI, processors = nproc, type = "matrix")
+class(d_COI)
+
+d_matrix_rbcL <- as.matrix(d_rbcL)
+class(d_matrix_rbcL)
+
+d_matrix_COI <- as.matrix(d_COI)
+class(d_matrix_COI)
+
+
+clusters_rbcL <- DECIPHER::TreeLine(myDistMatrix = d_rbcL, method = "complete", cutoff = 0.01, processors = nproc, type="clusters") # use cutoff = 0.01 for a 99% OTU 
+
+clusters_COI <- DECIPHER::TreeLine(myDistMatrix = d_COI, method = "complete", cutoff = 0.01, processors = nproc, type="clusters") # use cutoff = 0.01 for a 99% OTU 
+
+
+head(clusters_rbcL)
+clusters_rbcL <- clusters_rbcL %>%
+  add_column(sequence = asv_sequences_rbcL)
+head(clusters_rbcL)
+merged_seqtab_rbcL <- seqtab_rbcL %>% 
+  t %>%
+  rowsum(clusters_rbcL$cluster) %>%
+  t
+
+
+head(clusters_COI)
+clusters_COI <- clusters_COI %>%
+  add_column(sequence = asv_sequences_COI)
+head(clusters_COI)
+merged_seqtab_COI <- seqtab_COI %>% 
+  t %>%
+  rowsum(clusters_COI$cluster) %>%
+  t
+
+#head(merged_seqtab)
+
+# Optional renaming of clusters to OTU<cluster #>
+colnames(merged_seqtab_rbcL) <- paste0("OTU", colnames(merged_seqtab_rbcL))
+#head(merged_seqtab)
+
+colnames(merged_seqtab_COI) <- paste0("OTU", colnames(merged_seqtab_COI))
+
+
+saveRDS(clusters_rbcL, paste0(dataDir, "/clusters_rbcL_", Sys.Date(), ".rds"))
+saveRDS(clusters_COI, paste0(dataDir, "/clusters_COI_", Sys.Date(), ".rds"))
+saveRDS(merged_seqtab_rbcL, paste0(dataDir, "/merged_seqtab_rbcL_", Sys.Date(), ".rds"))
+saveRDS(merged_seqtab_COI, paste0(dataDir, "/merged_seqtab_COI_", Sys.Date(), ".rds"))
+```
+
+
+# TEMP
+
+Load OTU objects 
+```{r otuObj, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+clusters_rbcL <- readRDS(paste0(dataDir, "/clusters_rbcL_2024-09-26.rds"))
+merged_seqtab_rbcL <- readRDS(paste0(dataDir, "/merged_seqtab_rbcL_2024-09-26.rds"))
+
+
+clusters_COI <- readRDS(paste0(dataDir, "/clusters_COI_2024-09-26.rds"))
+merged_seqtab_COI <- readRDS(paste0(dataDir, "/merged_seqtab_COI_2024-09-26.rds"))
+```
+
+## OTU PS OBJECT
+
+Replace ASVs with OTUs in ps_clean object 
+
+```{r otuPS, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+
+ps_rbcL_OTU_99 <- merge_taxa_vec(
+  ps_rbcL, 
+  group = clusters_rbcL$cluster,
+  tax_adjust = 1
+)
+
+ps_COI_OTU_99 <- merge_taxa_vec(
+  ps_COI, 
+  group = clusters_COI$cluster,
+  tax_adjust = 1
+)
+
+
+tax_table(ps_rbcL_OTU_99) <- tax_table(ps_rbcL_OTU_99)[,1:7]
+tax_table(ps_rbcL_OTU_99)
+
+tax_table(ps_COI_OTU_99) <- tax_table(ps_COI_OTU_99)[,1:7]
+tax_table(ps_COI_OTU_99)
+
+
+#tree <- read_tree(paste0(dataDir, "/ps_OTU_99_2023-05-21_trim.fasta.treefile"))
+
+rbcL_OTU_99<- data.frame(tax_table(ps_rbcL_OTU_99))
+rbcL_OTU_99[is.na(rbcL_OTU_99)] <- ""
+
+for (i in 1:7){ rbcL_OTU_99[,i] <- as.character(rbcL_OTU_99[,i])}
+rbcL_OTU_99[is.na(rbcL_OTU_99)] <- ""
+
+for (i in 1:nrow(rbcL_OTU_99)){if (rbcL_OTU_99[i,2] == "")
+  {
+    kingdom <- paste("Kingdom_", rbcL_OTU_99[i,1], sep = "")
+    rbcL_OTU_99[i, 2:7] <- kingdom
+  } else if (rbcL_OTU_99[i,3] == ""){
+    phylum <- paste("Phylum_", rbcL_OTU_99[i,2], sep = "")
+    rbcL_OTU_99[i, 3:7] <- phylum
+  } else if (rbcL_OTU_99[i,4] == ""){
+    class <- paste("Class_", rbcL_OTU_99[i,3], sep = "")
+    rbcL_OTU_99[i, 4:7] <- class
+  } else if (rbcL_OTU_99[i,5] == ""){
+    order <- paste("Order_", rbcL_OTU_99[i,4], sep = "")
+    rbcL_OTU_99[i, 5:7] <- order
+  } else if (rbcL_OTU_99[i,6] == ""){
+    family <- paste("Family_", rbcL_OTU_99[i,5], sep = "")
+    rbcL_OTU_99[i, 6:7] <- family
+  } else if (rbcL_OTU_99[i,7] == ""){
+    rbcL_OTU_99$Species[i] <- paste("Genus",rbcL_OTU_99$Genus[i], sep = "_")
+  }
+}
+
+rbcL_OTU_99
+
+
+tax_table(ps_rbcL_OTU_99)<-as.matrix(rbcL_OTU_99)
+tax_table(ps_rbcL_OTU_99)
+
+
+COI_OTU_99<- data.frame(tax_table(ps_COI_OTU_99))
+COI_OTU_99[is.na(COI_OTU_99)] <- ""
+
+for (i in 1:7){ COI_OTU_99[,i] <- as.character(COI_OTU_99[,i])}
+COI_OTU_99[is.na(COI_OTU_99)] <- ""
+
+for (i in 1:nrow(COI_OTU_99)){if (COI_OTU_99[i,2] == "")
+  {
+    kingdom <- paste("Kingdom_", COI_OTU_99[i,1], sep = "")
+    COI_OTU_99[i, 2:7] <- kingdom
+  } else if (COI_OTU_99[i,3] == ""){
+    phylum <- paste("Phylum_", COI_OTU_99[i,2], sep = "")
+    COI_OTU_99[i, 3:7] <- phylum
+  } else if (COI_OTU_99[i,4] == ""){
+    class <- paste("Class_", COI_OTU_99[i,3], sep = "")
+    COI_OTU_99[i, 4:7] <- class
+  } else if (COI_OTU_99[i,5] == ""){
+    order <- paste("Order_", COI_OTU_99[i,4], sep = "")
+    COI_OTU_99[i, 5:7] <- order
+  } else if (COI_OTU_99[i,6] == ""){
+    family <- paste("Family_", COI_OTU_99[i,5], sep = "")
+    COI_OTU_99[i, 6:7] <- family
+  } else if (COI_OTU_99[i,7] == ""){
+    COI_OTU_99$Species[i] <- paste("Genus",COI_OTU_99$Genus[i], sep = "_")
+  }
+}
+
+COI_OTU_99
+
+
+tax_table(ps_COI_OTU_99)<-as.matrix(COI_OTU_99)
+tax_table(ps_COI_OTU_99)
+
+
+ps_rbcL_OTU_99 <- phyloseq_filter_sample_wise_abund_trim(ps_rbcL_OTU_99, minabund = 10)
+
+ps_COI_OTU_99 <- phyloseq_filter_sample_wise_abund_trim(ps_COI_OTU_99, minabund = 10)
+
+
+ps_rbcL_OTU_99 
+tax_table(ps_rbcL_OTU_99)
+
+# Rename ASVs
+taxa_names(ps_rbcL_OTU_99) <- paste0("OTU", seq(ntaxa(ps_rbcL_OTU_99)))
+
+# add ASV and ASV_SEQ columns to taxonomy table
+tax_table(ps_rbcL_OTU_99) <- cbind(tax_table(ps_rbcL_OTU_99), 
+    rownames(tax_table(ps_rbcL_OTU_99)))
+colnames(tax_table(ps_rbcL_OTU_99)) <- 
+  c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species", "OTU_ID")
+
+
+ps_COI_OTU_99 
+tax_table(ps_COI_OTU_99)
+
+# Rename ASVs
+taxa_names(ps_COI_OTU_99) <- paste0("OTU", seq(ntaxa(ps_COI_OTU_99)))
+
+# add ASV and ASV_SEQ columns to taxonomy table
+tax_table(ps_COI_OTU_99) <- cbind(tax_table(ps_COI_OTU_99), 
+    rownames(tax_table(ps_COI_OTU_99)))
+colnames(tax_table(ps_COI_OTU_99)) <- 
+  c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species", "OTU_ID")
+
+
+```
+
+
+## SAVE OTU PS OBJECT
+
+```{r save, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+saveRDS(ps_rbcL_OTU_99, paste0(dataDir, "/ps_rbcL_OTU_99.rds"))
+saveRDS(ps_COI_OTU_99, paste0(dataDir, "/ps_COI_OTU_99.rds"))
+
+#saveRDS(ps_OTU_treeglom, paste0(dataDir, "/ps_treeglom_OTU.rds"))
+```
+
+
+## Session Info
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+sessioninfo::session_info()%>%
+  details::details(summary = 'Current session info', open = FALSE)
+```

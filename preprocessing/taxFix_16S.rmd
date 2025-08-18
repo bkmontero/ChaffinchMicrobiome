@@ -1,0 +1,307 @@
+---
+title: 'Correct assignments'
+author: "B. K. Montero and M. Gillingham"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+## LOAD LIBRARIES
+
+```{r loadLibraries, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=(width.cutoff=45), paged.print=FALSE}
+
+
+rm(list = ls())
+
+#general
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+library(stringr)
+library(vegan)
+library(magrittr)
+library(ggplot2)
+library(ggpubr)
+library(MicEco)
+library(rlist) 
+library(grid)
+library(tsiR) 
+library(ape)
+library(treedataverse)
+library(ggh4x)
+library(biohelper)
+
+# phyloseq section
+library(phyloseq)
+library(Biostrings)
+library(DECIPHER)
+library(speedyseq)
+library(microbiome)
+library(metagMisc)
+library(phylosmith)
+library(seqateurs)
+library(treedata.table)
+library(microViz)
+
+#rmd
+library(details)
+library(knitr)
+library(kableExtra)
+
+# PACo 
+library(ape)
+library(paco)
+library(future)
+library(doParallel)
+library(future)
+library(future.apply)
+library(multcomp)
+
+```
+
+## WORKING DIRECTORIES
+
+```{r source, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, results="hide"}
+
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/workingDirectories.R")
+
+
+```
+
+## PREPARE DATA
+
+Microbiome 
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+#microb_fr <- readRDS(paste0(dataDir, "/ps_fringilla_across_island_core_genus.rds" ))
+#microb_fr <- readRDS(paste0(dataDir, "/ps_core_overlap.rds" ))
+#microb_fr <- microb_fr[[4]]
+
+microb_fr <- readRDS(paste0(dataDir, "/microb_overlap_OTU99_fr.rds"))
+tax_table(microb_fr)
+microb_fr_filter <-  microb_fr %>% subset_taxa(Class != "NA" & Order != "NA" & Family != "NA")
+microb_fr_filter <-  microb_fr %>% subset_taxa(!is.na(Family))
+
+sequences <- Biostrings::DNAStringSet(refseq(microb_fr_filter))
+names(sequences) <- refseq(microb_fr_filter)
+microb_fr_filter <- merge_phyloseq(microb_fr_filter, sequences)
+tax_table(microb_fr_filter) <- cbind(tax_table(microb_fr_filter), 
+    rownames(tax_table(microb_fr_filter)), names(sequences))
+#write.csv(tax_table(microb_fr_filter), paste0(outputDir, "/01_Exploration/microb_rhiz_familyFix_taxtable.csv"))
+
+# remove Rhizobiaceae_chloroplast
+#rhiz <- read.table(paste0(dataDir,"/Rhizobiaceae_chloroplast.tsv"), header = TRUE, sep = "\t", row.names = 1)
+
+# list of chloroplasts (variants classified as Rhizobiaceae + others)
+chloro <- read.table(paste0(dataDir,"/Remove_chloroplast.tsv"), header = TRUE, sep = "\t", row.names = 1)
+chloro
+
+str(chloro)
+remove <- rownames(chloro)
+
+# edit 1: remove the cloroplast variants
+goodTaxa <- setdiff(taxa_names(microb_fr_filter), rownames(chloro))
+microb_fr_edit1 <- prune_taxa(goodTaxa, microb_fr_filter)
+
+misassigned <- read.csv(paste0(dataDir,"/misassigned_taxa.csv"), row.names = 1)
+head(misassigned,20)
+tax_table(microb_fr_edit1)
+
+# edit 2: remove the taxa that were missasigned from phyloseq
+taxa_to_replace <- setdiff(taxa_names(microb_fr_edit1), rownames(misassigned))
+microb_fr_edit2 <- prune_taxa(taxa_to_replace, microb_fr_edit1)
+
+# remove the extra columns absent from the table "misassigned"
+tax_table(microb_fr_edit1) <- tax_table(microb_fr_edit1)[, 1:8]
+colnames(misassigned)
+colnames(tax_table(microb_fr_edit1))
+
+# ps object with the missasigned subset 
+ps1 <- prune_taxa(rownames(misassigned), microb_fr_edit1)
+tax_table(ps1)
+setdiff(rownames(tax_table(ps1)), rownames(misassigned))
+setdiff(rownames(misassigned), rownames(tax_table(ps1)))
+
+tax_table(ps1) <- as.matrix(misassigned)
+tax_table(ps1)
+
+microb_fr_edit2
+ps1
+
+
+table_edit3 <- cbind(otu_table(microb_fr_edit2),otu_table(ps1))
+tax_edit3 <- (rbind(tax_table(microb_fr_edit2)[, 1:8],tax_table(ps1)[, 1:8]))
+
+
+microb_fr_edit3 <- merge_phyloseq(sample_data(ps1),otu_table(table_edit3,taxa_are_rows=FALSE),tax_table(tax_edit3),phy_tree(microb_fr_edit1),refseq(microb_fr_edit1))
+
+microb_fr_edit3 <-  microb_fr_edit3 %>% subset_taxa(Class != "NA" & Order != "NA" & Family != "NA")
+
+microb_fr_edit3 <- microViz::tax_fix(microb_fr_edit3)
+head(data.frame(tax_table(microb_fr_edit3)))
+tail(data.frame(tax_table(microb_fr_edit3)))
+
+# merge
+saveRDS(microb_fr_edit3, paste0(dataDir, "/microb_overlap_OTU99_fr_taxFix.rds"))
+
+
+
+```
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+#microb_fr <- readRDS(paste0(dataDir, "/ps_fringilla_across_island_core_genus.rds" ))
+#microb_fr <- readRDS(paste0(dataDir, "/ps_core_overlap.rds" ))
+#microb_fr <- microb_fr[[4]]
+
+microb_fr <- readRDS(paste0(dataDir, "/ps_OTU99_wAlpha.rds"))
+tax_table(microb_fr)
+microb_fr_filter <-  microb_fr %>% subset_taxa(Class != "NA" & Order != "NA" & Family != "NA")
+microb_fr_filter <-  microb_fr %>% subset_taxa(!is.na(Family))
+
+sequences <- Biostrings::DNAStringSet(refseq(microb_fr_filter))
+names(sequences) <- refseq(microb_fr_filter)
+microb_fr_filter <- merge_phyloseq(microb_fr_filter, sequences)
+tax_table(microb_fr_filter) <- cbind(tax_table(microb_fr_filter), 
+    rownames(tax_table(microb_fr_filter)), names(sequences))
+#write.csv(tax_table(microb_fr_filter), paste0(outputDir, "/01_Exploration/microb_rhiz_familyFix_taxtable.csv"))
+
+# remove Rhizobiaceae_chloroplast
+#rhiz <- read.table(paste0(dataDir,"/Rhizobiaceae_chloroplast.tsv"), header = TRUE, sep = "\t", row.names = 1)
+
+# list of chloroplasts (variants classified as Rhizobiaceae + others)
+chloro <- read.table(paste0(dataDir,"/Remove_chloroplast.tsv"), header = TRUE, sep = "\t", row.names = 1)
+chloro
+
+str(chloro)
+remove <- rownames(chloro)
+
+# edit 1: remove the cloroplast variants
+goodTaxa <- setdiff(taxa_names(microb_fr_filter), rownames(chloro))
+microb_fr_edit1 <- prune_taxa(goodTaxa, microb_fr_filter)
+
+misassigned <- read.csv(paste0(dataDir,"/misassigned_taxa.csv"), row.names = 1)
+head(misassigned,20)
+tax_table(microb_fr_edit1)
+
+# edit 2: remove the taxa that were missasigned from phyloseq
+taxa_to_replace <- setdiff(taxa_names(microb_fr_edit1), rownames(misassigned))
+microb_fr_edit2 <- prune_taxa(taxa_to_replace, microb_fr_edit1)
+
+# remove the extra columns absent from the table "misassigned"
+tax_table(microb_fr_edit1) <- tax_table(microb_fr_edit1)[, 1:8]
+colnames(misassigned)
+colnames(tax_table(microb_fr_edit1))
+
+# ps object with the missasigned subset 
+ps1 <- prune_taxa(rownames(misassigned), microb_fr_edit1)
+tax_table(ps1)
+setdiff(rownames(tax_table(ps1)), rownames(misassigned))
+setdiff(rownames(misassigned), rownames(tax_table(ps1)))
+
+tax_table(ps1) <- as.matrix(misassigned)
+tax_table(ps1)
+
+microb_fr_edit2
+ps1
+
+
+table_edit3 <- cbind(otu_table(microb_fr_edit2),otu_table(ps1))
+tax_edit3 <- (rbind(tax_table(microb_fr_edit2)[, 1:8],tax_table(ps1)[, 1:8]))
+
+
+microb_fr_edit3 <- merge_phyloseq(sample_data(ps1),otu_table(table_edit3,taxa_are_rows=FALSE),tax_table(tax_edit3),refseq(microb_fr_edit1))
+
+microb_fr_edit3 <-  microb_fr_edit3 %>% subset_taxa(Class != "NA" & Order != "NA" & Family != "NA")
+
+microb_fr_edit3 <- microViz::tax_fix(microb_fr_edit3)
+head(data.frame(tax_table(microb_fr_edit3)))
+tail(data.frame(tax_table(microb_fr_edit3)))
+
+# merge
+saveRDS(microb_fr_edit3, paste0(dataDir, "/ps_OTU99_wAlpha_taxFix.rds"))
+
+
+
+```
+
+
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+#microb_fr <- readRDS(paste0(dataDir, "/ps_fringilla_across_island_core_genus.rds" ))
+#microb_fr <- readRDS(paste0(dataDir, "/ps_core_overlap.rds" ))
+#microb_fr <- microb_fr[[4]]
+
+microb_fr <- readRDS(paste0(dataDir, "/ps_OTU99_wAlpha_fr.rds"))
+tax_table(microb_fr)
+microb_fr_filter <-  microb_fr %>% subset_taxa(Class != "NA" & Order != "NA" & Family != "NA")
+microb_fr_filter <-  microb_fr %>% subset_taxa(!is.na(Family))
+
+sequences <- Biostrings::DNAStringSet(refseq(microb_fr_filter))
+names(sequences) <- refseq(microb_fr_filter)
+microb_fr_filter <- merge_phyloseq(microb_fr_filter, sequences)
+tax_table(microb_fr_filter) <- cbind(tax_table(microb_fr_filter), 
+    rownames(tax_table(microb_fr_filter)), names(sequences))
+#write.csv(tax_table(microb_fr_filter), paste0(outputDir, "/01_Exploration/microb_rhiz_familyFix_taxtable.csv"))
+
+# remove Rhizobiaceae_chloroplast
+#rhiz <- read.table(paste0(dataDir,"/Rhizobiaceae_chloroplast.tsv"), header = TRUE, sep = "\t", row.names = 1)
+
+# list of chloroplasts (variants classified as Rhizobiaceae + others)
+chloro <- read.table(paste0(dataDir,"/Remove_chloroplast.tsv"), header = TRUE, sep = "\t", row.names = 1)
+chloro
+
+str(chloro)
+remove <- rownames(chloro)
+
+# edit 1: remove the cloroplast variants
+goodTaxa <- setdiff(taxa_names(microb_fr_filter), rownames(chloro))
+microb_fr_edit1 <- prune_taxa(goodTaxa, microb_fr_filter)
+
+misassigned <- read.csv(paste0(dataDir,"/misassigned_taxa.csv"), row.names = 1)
+head(misassigned,20)
+tax_table(microb_fr_edit1)
+
+# edit 2: remove the taxa that were missasigned from phyloseq
+taxa_to_replace <- setdiff(taxa_names(microb_fr_edit1), rownames(misassigned))
+microb_fr_edit2 <- prune_taxa(taxa_to_replace, microb_fr_edit1)
+
+# remove the extra columns absent from the table "misassigned"
+tax_table(microb_fr_edit1) <- tax_table(microb_fr_edit1)[, 1:8]
+colnames(misassigned)
+colnames(tax_table(microb_fr_edit1))
+
+# ps object with the missasigned subset 
+ps1 <- prune_taxa(rownames(misassigned), microb_fr_edit1)
+tax_table(ps1)
+setdiff(rownames(tax_table(ps1)), rownames(misassigned))
+setdiff(rownames(misassigned), rownames(tax_table(ps1)))
+
+tax_table(ps1) <- as.matrix(misassigned)
+tax_table(ps1)
+
+microb_fr_edit2
+ps1
+
+
+table_edit3 <- cbind(otu_table(microb_fr_edit2),otu_table(ps1))
+tax_edit3 <- (rbind(tax_table(microb_fr_edit2)[, 1:8],tax_table(ps1)[, 1:8]))
+
+
+microb_fr_edit3 <- merge_phyloseq(sample_data(ps1),otu_table(table_edit3,taxa_are_rows=FALSE),tax_table(tax_edit3),phy_tree(microb_fr_edit1),refseq(microb_fr_edit1))
+
+microb_fr_edit3 <-  microb_fr_edit3 %>% subset_taxa(Class != "NA" & Order != "NA" & Family != "NA")
+
+microb_fr_edit3 <- microViz::tax_fix(microb_fr_edit3)
+head(data.frame(tax_table(microb_fr_edit3)))
+tail(data.frame(tax_table(microb_fr_edit3)))
+
+
+# merge
+saveRDS(microb_fr_edit3, paste0(dataDir, "/ps_OTU99_wAlpha_fr_taxFix.rds"))
+
+
+
+```
+

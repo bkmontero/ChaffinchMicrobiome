@@ -1,0 +1,1536 @@
+---
+title: 'MRM microbiome '
+author: "B. K. Montero and M. Gillingham"
+date: "`r Sys.Date()`"
+output: html_document
+
+---
+
+
+## LOAD LIBRARIES
+
+```{r libraries, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+rm(list = ls())
+
+# basics
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+library(stringr)
+library(vegan)
+library(magrittr)
+library(ggplot2)
+library(ggpubr)
+library(MicEco)
+library(rlist) 
+library(grid)
+library(tsiR) 
+library(ape)
+library(ggh4x)
+# phyloseq section
+library(phyloseq)
+library(microViz)
+library(biomeUtils)
+library(patchwork)
+
+# dist
+library(treedataverse)
+library(geosphere)
+library(treedata.table)
+
+
+# MRM 
+library(sf)
+library(ecodist)
+library(modEvA)
+library(eulerr)
+
+
+```
+
+
+## WORKING DIRECTORIES
+```{r source, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/workingDirectories.R")
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/CleanScripts/graphics_param.R")
+
+```
+
+
+## LOAD DATA
+
+Rarefied 16S
+
+```{r psObject, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+microb_fr_otu <- readRDS(paste0(dataDir, "/microb_overlap_OTU99_fr_taxFix.rds"))
+microb_fr_species <- speedyseq::tax_glom(microb_fr_otu, "Species")
+microb_fr_genus <- speedyseq::tax_glom(microb_fr_otu, "Genus")
+microb_fr_family <- speedyseq::tax_glom(microb_fr_otu, "Family")
+microb_fr_order <- speedyseq::tax_glom(microb_fr_otu, "Order")
+microb_fr_class <- speedyseq::tax_glom(microb_fr_otu, "Class")
+microb_fr_phylum <- speedyseq::tax_glom(microb_fr_otu, "Phylum")
+
+# check for NAs
+tax_micro <- tax_table(microb_fr_otu) %>% data.frame
+table(is.na(tax_micro$Genus))
+
+# TipId 
+sample_data(microb_fr_otu)$TipID_microbiome <- paste(sample_data(microb_fr_otu)$Lab_Code, sample_data(microb_fr_otu)$Species_Label, sep = "_")
+sample_data(microb_fr_species)$TipID_microbiome <- paste(sample_data(microb_fr_species)$Lab_Code, sample_data(microb_fr_species)$Species_Label, sep = "_")
+sample_data(microb_fr_genus)$TipID_microbiome <- paste(sample_data(microb_fr_genus)$Lab_Code, sample_data(microb_fr_genus)$Species_Label, sep = "_")
+sample_data(microb_fr_family)$TipID_microbiome <- paste(sample_data(microb_fr_family)$Lab_Code, sample_data(microb_fr_family)$Species_Label, sep = "_")
+sample_data(microb_fr_order)$TipID_microbiome <- paste(sample_data(microb_fr_order)$Lab_Code, sample_data(microb_fr_order)$Species_Label, sep = "_")
+sample_data(microb_fr_class)$TipID_microbiome <- paste(sample_data(microb_fr_class)$Lab_Code, sample_data(microb_fr_class)$Species_Label, sep = "_")
+sample_data(microb_fr_phylum)$TipID_microbiome <- paste(sample_data(microb_fr_phylum)$Lab_Code, sample_data(microb_fr_phylum)$Species_Label, sep = "_")
+
+# meta
+microb_fr_meta_otu <- sample_data(microb_fr_otu) %>% data.frame
+microb_fr_meta_species <- sample_data(microb_fr_species) %>% data.frame
+microb_fr_meta_genus <- sample_data(microb_fr_genus) %>% data.frame
+microb_fr_meta_family <- sample_data(microb_fr_family) %>% data.frame
+microb_fr_meta_order <- sample_data(microb_fr_order) %>% data.frame
+microb_fr_meta_class <- sample_data(microb_fr_class) %>% data.frame
+microb_fr_meta_phylum <- sample_data(microb_fr_phylum) %>% data.frame
+
+```
+
+
+Diet data
+
+```{r psObject, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+diet_fr <- readRDS(paste0(dataDir, "/diet_overlap_OTU99_fr.rds"))
+
+```
+
+
+## Overlap all datasets
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+microb_overlap_otu <- microb_fr_otu %>% subset_samples(Genus == "Fringilla" & WGS_data == 1 & Lab_Code != "132" & Lab_Code != "252" & Lab_Code != "89")
+microb_overlap_species <- microb_fr_species %>% subset_samples(Genus == "Fringilla" & WGS_data == 1 & Lab_Code != "132" & Lab_Code != "252" & Lab_Code != "89")
+microb_overlap_genus <- microb_fr_genus %>% subset_samples(Genus == "Fringilla" & WGS_data == 1 & Lab_Code != "132" & Lab_Code != "252" & Lab_Code != "89")
+microb_overlap_family <- microb_fr_family %>% subset_samples(Genus == "Fringilla" & WGS_data == 1 & Lab_Code != "132" & Lab_Code != "252" & Lab_Code != "89")
+microb_overlap_class <- microb_fr_class %>% subset_samples(Genus == "Fringilla" & WGS_data == 1 & Lab_Code != "132" & Lab_Code != "252" & Lab_Code != "89")
+microb_overlap_order <- microb_fr_order %>% subset_samples(Genus == "Fringilla" & WGS_data == 1 & Lab_Code != "132" & Lab_Code != "252" & Lab_Code != "89")
+microb_overlap_phylum <- microb_fr_phylum %>% subset_samples(Genus == "Fringilla" & WGS_data == 1 & Lab_Code != "132" & Lab_Code != "252" & Lab_Code != "89")
+
+microb_overlap_meta <- microb_overlap_otu %>% sample_data %>% data.frame 
+nrow(microb_overlap_meta)
+
+
+```
+
+
+## Distance matrix
+
+Geographic distance
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# lat long data
+my_points <- data.frame(longitude = sample_data(microb_overlap_otu)$Xdec, latitude = sample_data(microb_overlap_otu)$Ydec, Island_Mainland = sample_data(microb_overlap_otu)$Island_Mainland, row.names = sample_names(microb_overlap_otu))
+head(my_points)
+
+# distance based Moran's eigenvectors
+#cartesian <- cbind(my_points$longitude, my_points$latitude)
+#geo_MEM<-dbmem(cartesian,  thresh = NULL,  MEM.autocor = c("positive"), store.listw = TRUE,silent = TRUE )
+#summary(geo_MEM)
+dist_mat <- distm(cbind(my_points$longitude, my_points$latitude), fun = distGeo)  # Vector of distances in meters
+dist_mat <-dist_mat/1000 #Vector of distances in km
+rownames(dist_mat) <- rownames(my_points)
+colnames(dist_mat) <- rownames(my_points)
+geo_dist <- as.dist(dist_mat)
+str(dist_mat)
+
+```
+
+
+Microbiome distance
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+## OTU
+# Bray
+microb_otu_tab <- otu_table(microb_overlap_otu)
+microb_otu_tab_order <- microb_otu_tab[rownames(dist_mat),]
+bray_dist_otu <- vegdist(microb_otu_tab_order, method = "bray")
+
+# Jaccard 
+microb_otu_tab <- otu_table(microb_overlap_otu)
+microb_otu_tab_order <- microb_otu_tab[rownames(dist_mat),]
+jaccard_dist_otu <- vegdist(microb_otu_tab_order, method = "jaccard", binary = TRUE)
+
+
+## species
+# Bray
+microb_species_tab <- otu_table(microb_overlap_species)
+microb_species_tab_order <- microb_species_tab[rownames(dist_mat),]
+bray_dist_species <- vegdist(microb_species_tab_order, method = "bray")
+
+# Jaccard 
+microb_species_tab <- otu_table(microb_overlap_species)
+microb_species_tab_order <- microb_species_tab[rownames(dist_mat),]
+jaccard_dist_species <- vegdist(microb_species_tab_order, method = "jaccard", binary = TRUE)
+
+## genus
+# Bray
+microb_otu_tab <- otu_table(microb_overlap_genus)
+microb_otu_tab_order <- microb_otu_tab[rownames(dist_mat),]
+bray_dist_genus <- vegdist(microb_otu_tab_order, method = "bray")
+
+# Jaccard 
+microb_otu_tab <- otu_table(microb_overlap_genus)
+microb_otu_tab_order <- microb_otu_tab[rownames(dist_mat),]
+jaccard_dist_genus <- vegdist(microb_otu_tab_order, method = "jaccard", binary = TRUE)
+
+## family
+# Bray
+microb_otu_tab <- otu_table(microb_overlap_family)
+microb_otu_tab_order <- microb_otu_tab[rownames(dist_mat),]
+bray_dist_family <- vegdist(microb_otu_tab_order, method = "bray")
+
+# Jaccard 
+microb_otu_tab <- otu_table(microb_overlap_family)
+microb_otu_tab_order <- microb_otu_tab[rownames(dist_mat),]
+jaccard_dist_family <- vegdist(microb_otu_tab_order, method = "jaccard", binary = TRUE)
+
+## order
+# Bray
+microb_otu_tab <- otu_table(microb_overlap_order)
+microb_otu_tab_order <- microb_otu_tab[rownames(dist_mat),]
+bray_dist_order <- vegdist(microb_otu_tab_order, method = "bray")
+
+# Jaccard 
+microb_otu_tab <- otu_table(microb_overlap_order)
+microb_otu_tab_order <- microb_otu_tab[rownames(dist_mat),]
+jaccard_dist_order <- vegdist(microb_otu_tab_order, method = "jaccard", binary = TRUE)
+
+## class
+# Bray
+microb_otu_tab <- otu_table(microb_overlap_class)
+microb_otu_tab_order <- microb_otu_tab[rownames(dist_mat),]
+bray_dist_class <- vegdist(microb_otu_tab_order, method = "bray")
+
+# Jaccard 
+microb_otu_tab <- otu_table(microb_overlap_class)
+microb_otu_tab_order <- microb_otu_tab[rownames(dist_mat),]
+jaccard_dist_class <- vegdist(microb_otu_tab_order, method = "jaccard", binary = TRUE)
+
+## phylum
+# Bray
+microb_otu_tab <- otu_table(microb_overlap_phylum)
+microb_otu_tab_order <- microb_otu_tab[rownames(dist_mat),]
+bray_dist_phylum <- vegdist(microb_otu_tab_order, method = "bray")
+
+# Jaccard 
+microb_otu_tab <- otu_table(microb_overlap_phylum)
+microb_otu_tab_order <- microb_otu_tab[rownames(dist_mat),]
+jaccard_dist_phylum <- vegdist(microb_otu_tab_order, method = "jaccard", binary = TRUE)
+```
+
+Diet distance
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+diet_overlap <-  prune_samples(sample_names(diet_fr) %in% sample_names(microb_overlap_otu), diet_fr) 
+
+
+# OTU bray
+diet_otu_tab <- otu_table(diet_overlap)
+diet_otu_tab_order <- diet_otu_tab[rownames(dist_mat),]
+diet_bray_dist <- vegdist(diet_otu_tab_order, method = "bray")
+str(diet_bray_dist)
+
+# OTU bray
+diet_otu_tab <- otu_table(diet_overlap)
+diet_otu_tab_order <- diet_otu_tab[rownames(dist_mat),]
+diet_jaccard_dist <- vegdist(diet_otu_tab_order, method = "jaccard", binary = TRUE)
+#str(diet_jaccard_dist)
+
+#diet_ruzicka_dist <- vegdist(diet_otu_tab_order, method = "jaccard", binary = FALSE)
+
+```
+
+Host distance
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# mitogenome tree
+fringilla_tree <-  read.tree(file = paste0(dataDir, "/mtFr_aln.fas.treefile"))
+
+fringilla_tree <- drop.tip(fringilla_tree , "OL629048.1")
+
+str(fringilla_tree)
+#fringilla_tree <- fringilla_tree[[3]]
+
+#fringilla_tree$tip.label <- gsub("\\_.*","", fringilla_tree$tip.label)
+
+#fringilla_tree$tip.label <- gsub("\\_NC_025599.1","", fringilla_tree$tip.label)
+fringilla_tree$tip.label <- gsub("\\_NC","", fringilla_tree$tip.label)
+
+annot <- read_delim(paste0(dataDir, "/WGS_Fringilla_samples.tsv"))
+
+#annot <- read_tsv(paste0(dataDir, "/annot_tree_Fringilla_WGSmt_JCI.tsv"))
+
+annot %>% data.frame %>% tail
+
+table(annot$Microb)
+
+#rename row and col names to match microbiome and diet matrices 
+annot$TipID_microbiome
+
+fringilla_tree$tip.label <- annot[match(fringilla_tree$tip.label, annot$WGS_ID),]$TipID_microbiome
+length(setdiff(fringilla_tree$tip.label, microb_overlap_meta$TipID_microbiome))
+
+
+# subset tree matching IDs with microbiome data 
+fringilla_tree_subset <- as.treedata.table(tree = fringilla_tree, data = microb_overlap_meta, name_column = "TipID_microbiome")
+
+fringilla_tree_subset <- fringilla_tree_subset$phy
+str(fringilla_tree_subset)
+
+fringilla_rootedtree = root(fringilla_tree_subset, outgroup = "149_Tenerife_F_teydea", resolve.root = TRUE)
+
+microb_overlap_meta <- annot %>% dplyr::filter(Microb == 1) %>% as.data.frame
+microb_overlap_meta$label <- microb_overlap_meta$TipID_microbiome 
+microb_overlap_meta %>% names
+microb_overlap_meta %>% head
+class(microb_overlap_meta$label)
+
+tree_microb_overlap_meta <- full_join(fringilla_rootedtree, microb_overlap_meta, by = "label")
+
+plot(fringilla_rootedtree)
+
+host_tree <- list(fringilla_tree_subset)
+summary(host_tree)
+
+# Host distance matrix
+host_dist <- fringilla_tree_subset %>% cophenetic.phylo 
+host_dist_order <- host_dist[rownames(dist_mat), colnames(dist_mat)]
+head(host_dist)
+host_dist %>% dim
+
+head(host_dist)
+setdiff(rownames(host_dist), rownames(host_matrix))
+
+host_dist <- as.dist(host_dist_order)
+
+```
+
+### Mantel tests
+
+Mantel Bray-Curtis host distance
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+(mantel_bray_phylog_otu <- vegan::mantel(bray_dist_otu, host_dist, method = "pearson", permutations = 9999))
+str(mantel_bray_phylog_otu)
+df_otu <- data.frame(test="mantel", data = "all", taxonomy = "OTU99", dist="Bray-Curtis", r=mantel_bray_phylog_otu$statistic, p=mantel_bray_phylog_otu$signif)
+
+
+(mantel_bray_geo_otu  <- vegan::mantel.partial(bray_dist_otu, host_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+df_otu_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "OTU99", dist="Bray-Curtis", r=mantel_bray_geo_otu$statistic, p=mantel_bray_geo_otu$signif)
+
+
+
+vegan::mantel(host_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999)
+
+#Call:
+#vegan::mantel(xdis = host_dist, ydis = as.dist(log10(geo_dist +#      1)), method = "pearson", permutations = 9999) 
+#
+#Mantel statistic r: 0.2439 
+#      Significance: 1e-04 
+#
+#Upper quantiles of permutations (null model):
+#   90%    95%  97.5%    99% 
+#0.0542 0.0730 0.0900 0.1127 
+#Permutation: free
+#Number of permutations: 9999
+
+
+
+bray = as.vector(bray_dist_otu)
+jacc = as.vector(jaccard_dist_otu)
+host = as.vector(host_dist)
+geo = as.vector(geo_dist)
+#new data frame with vectorized distance matrices
+mat = data.frame(bray, jacc, host, geo)
+#mat_edit <- read.csv(paste0(dataDir, "/host_dist_d
+
+
+(p1 <- ggplot(mat, aes(y = bray, x = host)) + 
+        geom_point(size = 5, alpha = 0.2) + 
+        labs(x = "Host phylogenetic distance", y = "Beta diversity (Bray distance)") +
+        geom_smooth(method = "lm", colour = "red", alpha = 0.2,lwd=3) +
+        theme_classic(base_size = 31)+
+        theme(plot.title = element_text(face = "bold"), panel.border = element_rect(fill = NA, colour = "black"),plot.margin=grid::unit(c(5,5,5,5), "mm"))+
+        ggtitle("")) 
+        #+ 
+        #annotate(geom="text",label=paste0("Mantel statistic r =", round(mantel_phylog_bray$statistic, 3), ";p-value=", round(mantel_phylog_bray$signif, 3)), parse=F,x=0.4,y=0.4,size=10))
+
+(p2 <- ggplot(mat, aes(y = host, x = geo)) + 
+        geom_point(size = 5, alpha = 0.2) + 
+        labs(x = "Geographic distance", y = "Host phylogenetic distance") +
+        geom_smooth(method = "lm", colour = "red", alpha = 0.2,lwd=3) +
+        theme_classic(base_size = 31)+
+        theme(plot.title = element_text(face = "bold"), panel.border = element_rect(fill = NA, colour = "black"),plot.margin=grid::unit(c(5,5,5,5), "mm"))+
+        ggtitle(""))
+
+# Species
+(mantel_bray_phylog_species <- vegan::mantel(bray_dist_species, host_dist, method = "pearson", permutations = 9999))
+
+#Mantel statistic r: 0.1828 
+#      Significance: 1e-04 
+
+#Upper quantiles of permutations (null model):
+#   90%    95%  97.5%    99% 
+#0.0473 0.0615 0.0747 0.0896 
+#Permutation: free
+#Number of permutations: 9999
+
+
+
+(mantel_bray_geo_species  <- vegan::mantel.partial(bray_dist_species, host_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+
+#Mantel statistic r: 0.1506 
+#      Significance: 2e-04 
+
+#Upper quantiles of permutations (null model):
+#   90%    95%  97.5%    99% 
+#0.0495 0.0639 0.0769 0.0927 
+#Permutation: free
+#Number of permutations: 9999
+
+
+# genus
+(mantel_bray_phylog_genus <- vegan::mantel(bray_dist_genus, host_dist, method = "pearson", permutations = 9999))
+
+
+(mantel_bray_geo_genus  <- vegan::mantel.partial(bray_dist_genus, host_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+
+# family
+(mantel_bray_phylog_family <- vegan::mantel(bray_dist_family, host_dist, method = "pearson", permutations = 9999))
+
+(mantel_bray_geo_family  <- vegan::mantel.partial(bray_dist_family, host_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+
+# order
+(mantel_bray_phylog_order <- vegan::mantel(bray_dist_order, host_dist, method = "pearson", permutations = 9999))
+
+(mantel_bray_geo_order  <- vegan::mantel.partial(bray_dist_order, host_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+
+# class
+(mantel_bray_phylog_class <- vegan::mantel(bray_dist_class, host_dist, method = "pearson", permutations = 9999))
+
+(mantel_bray_geo_class  <- vegan::mantel.partial(bray_dist_class, host_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+
+# phylum
+(mantel_bray_phylog_phylum <- vegan::mantel(bray_dist_phylum, host_dist, method = "pearson", permutations = 9999))
+
+(mantel_bray_geo_phylum  <- vegan::mantel.partial(bray_dist_phylum, host_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+
+
+# output df 
+
+# OTU99
+
+df_otu <- data.frame(test="mantel", data = "all", taxonomy = "OTU99", dist="Bray-Curtis", r=mantel_bray_phylog_otu$statistic, p=mantel_bray_phylog_otu$signif)
+
+df_otu_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "OTU99", dist="Bray-Curtis", r=mantel_bray_geo_otu$statistic, p=mantel_bray_geo_otu$signif)
+
+
+# species
+df_species <- data.frame(test="mantel", data = "all", taxonomy = "Species", dist="Bray-Curtis", r=mantel_bray_phylog_species$statistic, p=mantel_bray_phylog_species$signif)
+
+df_species_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "Species", dist="Bray-Curtis", r=mantel_bray_geo_species$statistic, p=mantel_bray_geo_species$signif)
+
+
+# genus
+df_genus <- data.frame(test="mantel", data = "all", taxonomy = "Genus", dist="Bray-Curtis", r=mantel_bray_phylog_genus$statistic, p=mantel_bray_phylog_genus$signif)
+
+df_genus_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "Genus", dist="Bray-Curtis", r=mantel_bray_geo_genus$statistic, p=mantel_bray_geo_genus$signif)
+
+# family
+df_family <- data.frame(test="mantel", data = "all", taxonomy = "Family", dist="Bray-Curtis", r=mantel_bray_phylog_family$statistic, p=mantel_bray_phylog_family$signif)
+
+df_family_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "Family", dist="Bray-Curtis", r=mantel_bray_geo_family$statistic, p=mantel_bray_geo_family$signif)
+
+
+# order
+df_order <- data.frame(test="mantel", data = "all", taxonomy = "Order", dist="Bray-Curtis", r=mantel_bray_phylog_order$statistic, p=mantel_bray_phylog_order$signif)
+
+df_order_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "Order", dist="Bray-Curtis", r=mantel_bray_geo_order$statistic, p=mantel_bray_geo_order$signif)
+
+# class
+df_class <- data.frame(test="mantel", data = "all", taxonomy = "Class", dist="Bray-Curtis", r=mantel_bray_phylog_class$statistic, p=mantel_bray_phylog_class$signif)
+
+df_class_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "Class", dist="Bray-Curtis", r=mantel_bray_geo_class$statistic, p=mantel_bray_geo_class$signif)
+
+# phylum
+df_phylum <- data.frame(test="mantel", data = "all", taxonomy = "Phylum", dist="Bray-Curtis", r=mantel_bray_phylog_phylum$statistic, p=mantel_bray_phylog_phylum$signif)
+
+df_phylum_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "Phylum", dist="Bray-Curtis", r=mantel_bray_geo_phylum$statistic, p=mantel_bray_geo_phylum$signif)
+
+mantel_out_bray <- rbind(df_otu, df_otu_partial, df_species, df_species_partial, df_genus, df_genus_partial, df_family, df_family_partial,  df_order, df_order_partial,df_class, df_class_partial, df_phylum, df_phylum_partial)
+
+```
+
+
+Mantel Jaccard host distance 
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+(mantel_jaccard_phylog_otu <- vegan::mantel(jaccard_dist_otu, host_dist, method = "pearson", permutations = 9999))
+str(mantel_jaccard_phylog_otu)
+df_otu <- data.frame(test="mantel", data = "all", taxonomy = "OTU99", dist="Bray-Curtis", r=mantel_jaccard_phylog_otu$statistic, p=mantel_jaccard_phylog_otu$signif)
+
+(mantel_jaccard_geo_otu  <- vegan::mantel.partial(jaccard_dist_otu, host_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+df_otu_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "OTU99", dist="Bray-Curtis", r=mantel_jaccard_geo_otu$statistic, p=mantel_jaccard_geo_otu$signif)
+
+jacc = as.vector(jaccard_dist_otu)
+host = as.vector(host_dist)
+geo = as.vector(geo_dist)
+#new data frame with vectorized distance matrices
+mat = data.frame(jacc, host, geo)
+
+(p1 <- ggplot(mat, aes(y = jacc, x = host)) + 
+        geom_point(size = 5, alpha = 0.2) + 
+        labs(x = "host", y = "Beta diversity (Bray distance)") +
+        geom_smooth(method = "lm", colour = "red", alpha = 0.2,lwd=3) +
+        theme_classic(base_size = 31)+
+        theme(plot.title = element_text(face = "bold"), panel.border = element_rect(fill = NA, colour = "black"),plot.margin=grid::unit(c(5,5,5,5), "mm"))+
+        ggtitle("")) 
+        #+ 
+        #annotate(geom="text",label=paste0("Mantel statistic r =", round(mantel_phylog_jaccard$statistic, 3), ";p-value=", round(mantel_phylog_jaccard$signif, 3)), parse=F,x=0.4,y=0.4,size=10))
+
+(p2 <- ggplot(mat, aes(y = host, x = geo)) + 
+        geom_point(size = 5, alpha = 0.2) + 
+        labs(x = "Geographic distance", y = "host") +
+        geom_smooth(method = "lm", colour = "red", alpha = 0.2,lwd=3) +
+        theme_classic(base_size = 31)+
+        theme(plot.title = element_text(face = "bold"), panel.border = element_rect(fill = NA, colour = "black"),plot.margin=grid::unit(c(5,5,5,5), "mm"))+
+        ggtitle(""))
+
+
+# species
+(mantel_jaccard_phylog_species <- vegan::mantel(jaccard_dist_species, host_dist, method = "pearson", permutations = 9999))
+
+#Mantel statistic r: 0.09905 
+#      Significance: 0.0406 
+
+#Upper quantiles of permutations (null model):
+#   90%    95%  97.5%    99% 
+#0.0708 0.0931 0.1133 0.1363 
+#Permutation: free
+#Number of permutations: 9999
+
+
+(mantel_jaccard_geo_species  <- vegan::mantel.partial(jaccard_dist_species, host_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+
+
+
+# genus
+(mantel_jaccard_phylog_genus <- vegan::mantel(jaccard_dist_genus, host_dist, method = "pearson", permutations = 9999))
+
+(mantel_jaccard_geo_genus  <- vegan::mantel.partial(jaccard_dist_genus, host_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+
+
+# family
+(mantel_jaccard_phylog_family <- vegan::mantel(jaccard_dist_family, host_dist, method = "pearson", permutations = 9999))
+
+(mantel_jaccard_geo_family  <- vegan::mantel.partial(jaccard_dist_family, host_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+
+# class
+(mantel_jaccard_phylog_class <- vegan::mantel(jaccard_dist_class, host_dist, method = "pearson", permutations = 9999))
+
+(mantel_jaccard_geo_class  <- vegan::mantel.partial(jaccard_dist_class, host_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+
+# order
+(mantel_jaccard_phylog_order <- vegan::mantel(jaccard_dist_order, host_dist, method = "pearson", permutations = 9999))
+
+(mantel_jaccard_geo_order  <- vegan::mantel.partial(jaccard_dist_order, host_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+
+# phylum
+(mantel_jaccard_phylog_phylum <- vegan::mantel(jaccard_dist_phylum, host_dist, method = "pearson", permutations = 9999))
+
+(mantel_jaccard_geo_phylum  <- vegan::mantel.partial(jaccard_dist_phylum, host_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+
+# output df 
+
+# OTU99
+
+df_otu <- data.frame(test="mantel", data = "all", taxonomy = "OTU99", dist="Jaccard", r=mantel_jaccard_phylog_otu$statistic, p=mantel_jaccard_phylog_otu$signif)
+
+df_otu_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "OTU99", dist="Jaccard", r=mantel_jaccard_geo_otu$statistic, p=mantel_jaccard_geo_otu$signif)
+
+
+# species
+df_species <- data.frame(test="mantel", data = "all", taxonomy = "Species", dist="Jaccard", r=mantel_jaccard_phylog_species$statistic, p=mantel_jaccard_phylog_species$signif)
+
+df_species_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "Species", dist="Jaccard", r=mantel_jaccard_geo_species$statistic, p=mantel_jaccard_geo_species$signif)
+
+
+# genus
+df_genus <- data.frame(test="mantel", data = "all", taxonomy = "Genus", dist="Jaccard", r=mantel_jaccard_phylog_genus$statistic, p=mantel_jaccard_phylog_genus$signif)
+
+df_genus_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "Genus", dist="Jaccard", r=mantel_jaccard_geo_genus$statistic, p=mantel_jaccard_geo_genus$signif)
+
+# family
+df_family <- data.frame(test="mantel", data = "all", taxonomy = "Family", dist="Jaccard", r=mantel_jaccard_phylog_family$statistic, p=mantel_jaccard_phylog_family$signif)
+
+df_family_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "Family", dist="Jaccard", r=mantel_jaccard_geo_family$statistic, p=mantel_jaccard_geo_family$signif)
+
+# order
+
+df_order <- data.frame(test="mantel", data = "all", taxonomy = "Order", dist="Jaccard", r=mantel_jaccard_phylog_order$statistic, p=mantel_jaccard_phylog_order$signif)
+
+df_order_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "Order", dist="Jaccard", r=mantel_jaccard_geo_order$statistic, p=mantel_jaccard_geo_order$signif)
+
+# class
+df_class <- data.frame(test="mantel", data = "all", taxonomy = "Class", dist="Jaccard", r=mantel_jaccard_phylog_class$statistic, p=mantel_jaccard_phylog_class$signif)
+
+df_class_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "Class", dist="Jaccard", r=mantel_jaccard_geo_class$statistic, p=mantel_jaccard_geo_class$signif)
+
+# phylum
+df_phylum <- data.frame(test="mantel", data = "all", taxonomy = "Phylum", dist="Jaccard", r=mantel_jaccard_phylog_phylum$statistic, p=mantel_jaccard_phylog_phylum$signif)
+
+df_phylum_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "Phylum", dist="Jaccard", r=mantel_jaccard_geo_phylum$statistic, p=mantel_jaccard_geo_phylum$signif)
+
+mantel_out_jaccard <- rbind(df_otu, df_otu_partial, df_species,  df_species_partial, df_genus,  df_genus_partial, df_family, df_family_partial,  df_order, df_order_partial, df_class, df_class_partial, df_phylum, df_phylum_partial)
+
+
+
+```
+
+Join bray and jaccard output
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+mantel_out <- rbind(mantel_out_bray, mantel_out_jaccard)
+head(mantel_out)
+
+write.csv(mantel_out, paste0(dataDir, "/output_mantel_phylogDistance.csv"), row.names=FALSE)
+
+```
+
+
+
+
+Mantel Bray-Curtis diet
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+(mantel_bray_diet_otu <- vegan::mantel(bray_dist_otu, diet_bray_dist, method = "pearson", permutations = 9999))
+
+str(mantel_bray_diet_otu)
+df_otu <- data.frame(test="mantel", data = "all", taxonomy = "OTU99", dist="Bray-Curtis", r=mantel_bray_diet_otu$statistic, p=mantel_bray_diet_otu$signif)
+
+
+(mantel_bray_diet_otu  <- vegan::mantel.partial(bray_dist_otu, diet_bray_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+
+
+
+(mantel_bray_geo_otu  <- vegan::mantel.partial(bray_dist_otu, diet_bray_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+df_otu_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "OTU99", dist="Bray-Curtis", r=mantel_bray_geo_otu$statistic, p=mantel_bray_geo_otu$signif)
+
+
+df_otu_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "OTU99", dist="Bray-Curtis", r=mantel_bray_diet_otu$statistic, p=mantel_bray_diet_otu$signif)
+
+
+bray = as.vector(bray_dist_otu)
+jacc = as.vector(jaccard_dist_otu)
+diet = as.vector(diet_bray_dist)
+geo = as.vector(geo_dist)
+#new data frame with vectorized distance matrices
+mat = data.frame(bray, jacc, diet, geo)
+#mat_edit <- read.csv(paste0(dataDir, "/diet_bray_dist_d
+
+
+(p1 <- ggplot(mat, aes(y = bray, x = diet)) + 
+        geom_point(size = 5, alpha = 0.2) + 
+        labs(x = "Diet distance", y = "Beta diversity (Bray distance)") +
+        geom_smooth(method = "lm", colour = "red", alpha = 0.2,lwd=3) +
+        theme_classic(base_size = 31)+
+        theme(plot.title = element_text(face = "bold"), panel.border = element_rect(fill = NA, colour = "black"),plot.margin=grid::unit(c(5,5,5,5), "mm"))+
+        ggtitle("")) 
+        #+ 
+        #annotate(geom="text",label=paste0("Mantel statistic r =", round(mantel_phylog_bray$statistic, 3), ";p-value=", round(mantel_phylog_bray$signif, 3)), parse=F,x=0.4,y=0.4,size=10))
+
+(p2 <- ggplot(mat, aes(y = diet, x = geo)) + 
+        geom_point(size = 5, alpha = 0.2) + 
+        labs(x = "Geographic distance", y = "Diet distance") +
+        geom_smooth(method = "lm", colour = "red", alpha = 0.2,lwd=3) +
+        theme_classic(base_size = 31)+
+        theme(plot.title = element_text(face = "bold"), panel.border = element_rect(fill = NA, colour = "black"),plot.margin=grid::unit(c(5,5,5,5), "mm"))+
+        ggtitle(""))
+
+# species
+(mantel_bray_diet_species <- vegan::mantel(bray_dist_species, diet_bray_dist, method = "pearson", permutations = 9999))
+
+#Mantel statistic r: 0.06307 
+#      Significance: 0.0189 
+
+#Upper quantiles of permutations (null model):
+#   90%    95%  97.5%    99% 
+#0.0321 0.0443 0.0577 0.0711 
+#Permutation: free
+#Number of permutations: 9999
+
+
+(mantel_bray_geo_species  <- vegan::mantel.partial(bray_dist_species, diet_bray_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+
+#Mantel statistic r: 0.004969 
+#      Significance: 0.3858 
+
+#Upper quantiles of permutations (null model):
+#   90%    95%  97.5%    99% 
+#0.0300 0.0400 0.0511 0.0650 
+#Permutation: free
+#Number of permutations: 9999
+
+
+
+# genus
+(mantel_bray_diet_genus <- vegan::mantel(bray_dist_genus, diet_bray_dist, method = "pearson", permutations = 9999))
+
+
+(mantel_bray_geo_genus  <- vegan::mantel.partial(bray_dist_genus, diet_bray_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+
+# family
+(mantel_bray_diet_family <- vegan::mantel(bray_dist_family, diet_bray_dist, method = "pearson", permutations = 9999))
+
+(mantel_bray_geo_family  <- vegan::mantel.partial(bray_dist_family, diet_bray_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+
+# order
+(mantel_bray_diet_order <- vegan::mantel(bray_dist_order, diet_bray_dist, method = "pearson", permutations = 9999))
+
+(mantel_bray_geo_order  <- vegan::mantel.partial(bray_dist_order, diet_bray_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+
+# class
+(mantel_bray_diet_class <- vegan::mantel(bray_dist_class, diet_bray_dist, method = "pearson", permutations = 9999))
+
+(mantel_bray_geo_class  <- vegan::mantel.partial(bray_dist_class, diet_bray_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+
+# phylum
+(mantel_bray_diet_phylum <- vegan::mantel(bray_dist_phylum, diet_bray_dist, method = "pearson", permutations = 9999))
+
+(mantel_bray_geo_phylum  <- vegan::mantel.partial(bray_dist_phylum, diet_bray_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+
+
+# output df 
+
+# OTU99
+
+df_otu <- data.frame(test="mantel", data = "all", taxonomy = "OTU99", dist="Bray-Curtis", r=mantel_bray_diet_otu$statistic, p=mantel_bray_diet_otu$signif)
+
+df_otu_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "OTU99", dist="Bray-Curtis", r=mantel_bray_geo_otu$statistic, p=mantel_bray_geo_otu$signif)
+
+# species
+df_species <- data.frame(test="mantel", data = "all", taxonomy = "Species", dist="Bray-Curtis", r=mantel_bray_diet_species$statistic, p=mantel_bray_diet_species$signif)
+
+df_species_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "Species", dist="Bray-Curtis", r=mantel_bray_geo_species$statistic, p=mantel_bray_geo_species$signif)
+
+# genus
+df_genus <- data.frame(test="mantel", data = "all", taxonomy = "Genus", dist="Bray-Curtis", r=mantel_bray_diet_genus$statistic, p=mantel_bray_diet_genus$signif)
+
+df_genus_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "Genus", dist="Bray-Curtis", r=mantel_bray_geo_genus$statistic, p=mantel_bray_geo_genus$signif)
+
+# family
+df_family <- data.frame(test="mantel", data = "all", taxonomy = "Family", dist="Bray-Curtis", r=mantel_bray_diet_family$statistic, p=mantel_bray_diet_family$signif)
+
+df_family_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "Family", dist="Bray-Curtis", r=mantel_bray_geo_family$statistic, p=mantel_bray_geo_family$signif)
+
+
+# order
+df_order <- data.frame(test="mantel", data = "all", taxonomy = "Order", dist="Bray-Curtis", r=mantel_bray_diet_order$statistic, p=mantel_bray_diet_order$signif)
+
+df_order_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "Order", dist="Bray-Curtis", r=mantel_bray_geo_order$statistic, p=mantel_bray_geo_order$signif)
+
+# class
+df_class <- data.frame(test="mantel", data = "all", taxonomy = "Class", dist="Bray-Curtis", r=mantel_bray_diet_class$statistic, p=mantel_bray_diet_class$signif)
+
+df_class_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "Class", dist="Bray-Curtis", r=mantel_bray_geo_class$statistic, p=mantel_bray_geo_class$signif)
+
+# phylum
+df_phylum <- data.frame(test="mantel", data = "all", taxonomy = "Phylum", dist="Bray-Curtis", r=mantel_bray_diet_phylum$statistic, p=mantel_bray_diet_phylum$signif)
+
+df_phylum_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "Phylum", dist="Bray-Curtis", r=mantel_bray_geo_phylum$statistic, p=mantel_bray_geo_phylum$signif)
+
+mantel_out_bray <- rbind(df_otu, df_otu_partial, df_species, df_species_partial, df_genus, df_genus_partial, df_family, df_family_partial,  df_order, df_order_partial,df_class, df_class_partial, df_phylum, df_phylum_partial)
+
+```
+
+
+Mantel Jaccard
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+(mantel_jaccard_diet_otu <- vegan::mantel(jaccard_dist_otu, diet_jaccard_dist, method = "pearson", permutations = 9999))
+str(mantel_jaccard_diet_otu)
+df_otu <- data.frame(test="mantel", data = "all", taxonomy = "OTU99", dist="Bray-Curtis", r=mantel_jaccard_diet_otu$statistic, p=mantel_jaccard_diet_otu$signif)
+
+(mantel_jaccard_geo_otu  <- vegan::mantel.partial(jaccard_dist_otu, diet_jaccard_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+df_otu_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "OTU99", dist="Bray-Curtis", r=mantel_jaccard_geo_otu$statistic, p=mantel_jaccard_geo_otu$signif)
+
+jacc = as.vector(jaccard_dist_otu)
+diet = as.vector(diet_jaccard_dist)
+geo = as.vector(geo_dist)
+#new data frame with vectorized distance matrices
+mat = data.frame(jacc, diet, geo)
+
+(p1 <- ggplot(mat, aes(y = jacc, x = diet)) + 
+        geom_point(size = 5, alpha = 0.2) + 
+        labs(x = "Diet distance", y = "Beta diversity (Bray distance)") +
+        geom_smooth(method = "lm", colour = "red", alpha = 0.2,lwd=3) +
+        theme_classic(base_size = 31)+
+        theme(plot.title = element_text(face = "bold"), panel.border = element_rect(fill = NA, colour = "black"),plot.margin=grid::unit(c(5,5,5,5), "mm"))+
+        ggtitle("")) 
+        #+ 
+        #annotate(geom="text",label=paste0("Mantel statistic r =", round(mantel_diet_jaccard$statistic, 3), ";p-value=", round(mantel_diet_jaccard$signif, 3)), parse=F,x=0.4,y=0.4,size=10))
+
+(p2 <- ggplot(mat, aes(y = diet, x = geo)) + 
+        geom_point(size = 5, alpha = 0.2) + 
+        labs(x = "Geographic distance", y = "Diet distance") +
+        geom_smooth(method = "lm", colour = "red", alpha = 0.2,lwd=3) +
+        theme_classic(base_size = 31)+
+        theme(plot.title = element_text(face = "bold"), panel.border = element_rect(fill = NA, colour = "black"),plot.margin=grid::unit(c(5,5,5,5), "mm"))+
+        ggtitle(""))
+
+
+# species
+(mantel_jaccard_diet_species <- vegan::mantel(jaccard_dist_species, diet_jaccard_dist, method = "pearson", permutations = 9999))
+
+(mantel_jaccard_geo_species  <- vegan::mantel.partial(jaccard_dist_species, diet_jaccard_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+
+
+# genus
+(mantel_jaccard_diet_genus <- vegan::mantel(jaccard_dist_genus, diet_jaccard_dist, method = "pearson", permutations = 9999))
+
+(mantel_jaccard_geo_genus  <- vegan::mantel.partial(jaccard_dist_genus, diet_jaccard_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+
+
+# family
+(mantel_jaccard_diet_family <- vegan::mantel(jaccard_dist_family, diet_jaccard_dist, method = "pearson", permutations = 9999))
+
+(mantel_jaccard_geo_family  <- vegan::mantel.partial(jaccard_dist_family, diet_jaccard_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+
+# class
+(mantel_jaccard_diet_class <- vegan::mantel(jaccard_dist_class, diet_jaccard_dist, method = "pearson", permutations = 9999))
+
+(mantel_jaccard_geo_class  <- vegan::mantel.partial(jaccard_dist_class, diet_jaccard_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+
+# order
+(mantel_jaccard_diet_order <- vegan::mantel(jaccard_dist_order, diet_jaccard_dist, method = "pearson", permutations = 9999))
+
+(mantel_jaccard_geo_order  <- vegan::mantel.partial(jaccard_dist_order, diet_jaccard_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+
+# phylum
+(mantel_jaccard_diet_phylum <- vegan::mantel(jaccard_dist_phylum, diet_jaccard_dist, method = "pearson", permutations = 9999))
+
+(mantel_jaccard_geo_phylum  <- vegan::mantel.partial(jaccard_dist_phylum, diet_jaccard_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
+
+# output df 
+
+# OTU99
+
+df_otu <- data.frame(test="mantel", data = "all", taxonomy = "OTU99", dist="Jaccard", r=mantel_jaccard_diet_otu$statistic, p=mantel_jaccard_diet_otu$signif)
+
+df_otu_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "OTU99", dist="Jaccard", r=mantel_jaccard_geo_otu$statistic, p=mantel_jaccard_geo_otu$signif)
+
+# species
+df_species <- data.frame(test="mantel", data = "all", taxonomy = "Species", dist="Jaccard", r=mantel_jaccard_diet_species$statistic, p=mantel_jaccard_diet_species$signif)
+
+df_species_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "Species", dist="Jaccard", r=mantel_jaccard_geo_species$statistic, p=mantel_jaccard_geo_species$signif)
+
+# genus
+df_genus <- data.frame(test="mantel", data = "all", taxonomy = "Genus", dist="Jaccard", r=mantel_jaccard_diet_genus$statistic, p=mantel_jaccard_diet_genus$signif)
+
+df_genus_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "Genus", dist="Jaccard", r=mantel_jaccard_geo_genus$statistic, p=mantel_jaccard_geo_genus$signif)
+
+# family
+df_family <- data.frame(test="mantel", data = "all", taxonomy = "Family", dist="Jaccard", r=mantel_jaccard_diet_family$statistic, p=mantel_jaccard_diet_family$signif)
+
+df_family_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "Family", dist="Jaccard", r=mantel_jaccard_geo_family$statistic, p=mantel_jaccard_geo_family$signif)
+
+# order
+
+df_order <- data.frame(test="mantel", data = "all", taxonomy = "Order", dist="Jaccard", r=mantel_jaccard_diet_order$statistic, p=mantel_jaccard_diet_order$signif)
+
+df_order_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "Order", dist="Jaccard", r=mantel_jaccard_geo_order$statistic, p=mantel_jaccard_geo_order$signif)
+
+# class
+df_class <- data.frame(test="mantel", data = "all", taxonomy = "Class", dist="Jaccard", r=mantel_jaccard_diet_class$statistic, p=mantel_jaccard_diet_class$signif)
+
+df_class_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "Class", dist="Jaccard", r=mantel_jaccard_geo_class$statistic, p=mantel_jaccard_geo_class$signif)
+
+# phylum
+df_phylum <- data.frame(test="mantel", data = "all", taxonomy = "Phylum", dist="Jaccard", r=mantel_jaccard_diet_phylum$statistic, p=mantel_jaccard_diet_phylum$signif)
+
+df_phylum_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "Phylum", dist="Jaccard", r=mantel_jaccard_geo_phylum$statistic, p=mantel_jaccard_geo_phylum$signif)
+
+mantel_out_jaccard <- rbind(df_otu, df_otu_partial, df_species,  df_species_partial, df_genus,  df_genus_partial, df_family, df_family_partial,  df_order, df_order_partial, df_class, df_class_partial, df_phylum, df_phylum_partial)
+
+
+
+```
+
+Join bray and jaccard output
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+mantel_out_diet <- rbind(mantel_out_bray, mantel_out_jaccard)
+head(mantel_out_diet)
+
+write.csv(mantel_out_diet, paste0(dataDir, "/output_mantel_diet.csv"), row.names=FALSE)
+
+```
+
+Mantel Bray-Curtis geographical distance
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+lgeo_dist <- as.dist(log10(geo_dist+1))
+(mantel_bray_geo_otu <- vegan::mantel(bray_dist_otu, lgeo_dist, method = "pearson", permutations = 9999))
+
+str(mantel_bray_geo_otu)
+df_otu <- data.frame(test="mantel", data = "all", taxonomy = "OTU99", dist="Bray-Curtis", r=mantel_bray_geo_otu$statistic, p=mantel_bray_geo_otu$signif)
+
+
+bray = as.vector(bray_dist_otu)
+jacc = as.vector(jaccard_dist_otu)
+geo = as.vector(lgeo_dist)
+#new data frame with vectorized distance matrices
+mat = data.frame(bray, jacc, geo)
+#mat_edit <- read.csv(paste0(dataDir, "/geo_dist_d
+
+
+(p1 <- ggplot(mat, aes(y = bray, x = geo)) + 
+        geom_point(size = 5, alpha = 0.2) + 
+        labs(x = "Geographical distance", y = "Beta diversity (Bray distance)") +
+        geom_smooth(method = "lm", colour = "red", alpha = 0.2,lwd=3) +
+        theme_classic(base_size = 31)+
+        theme(plot.title = element_text(face = "bold"), panel.border = element_rect(fill = NA, colour = "black"),plot.margin=grid::unit(c(5,5,5,5), "mm"))+
+        ggtitle("")) 
+        #+ 
+        #annotate(geom="text",label=paste0("Mantel statistic r =", round(mantel_phylog_bray$statistic, 3), ";p-value=", round(mantel_phylog_bray$signif, 3)), parse=F,x=0.4,y=0.4,size=10))
+
+
+# species
+(mantel_bray_geo_species <- vegan::mantel(bray_dist_species, lgeo_dist, method = "pearson", permutations = 9999))
+
+
+# genus
+(mantel_bray_geo_genus <- vegan::mantel(bray_dist_genus, lgeo_dist, method = "pearson", permutations = 9999))
+
+
+# family
+(mantel_bray_geo_family <- vegan::mantel(bray_dist_family, lgeo_dist, method = "pearson", permutations = 9999))
+
+# order
+(mantel_bray_geo_order <- vegan::mantel(bray_dist_order, lgeo_dist, method = "pearson", permutations = 9999))
+
+# class
+(mantel_bray_geo_class <- vegan::mantel(bray_dist_class, lgeo_dist, method = "pearson", permutations = 9999))
+
+# phylum
+(mantel_bray_geo_phylum <- vegan::mantel(bray_dist_phylum, lgeo_dist, method = "pearson", permutations = 9999))
+
+
+# output df 
+
+# OTU99
+
+df_otu <- data.frame(test="mantel", data = "all", taxonomy = "OTU99", dist="Bray-Curtis", r=mantel_bray_geo_otu$statistic, p=mantel_bray_geo_otu$signif)
+
+# species
+df_species <- data.frame(test="mantel", data = "all", taxonomy = "Species", dist="Bray-Curtis", r=mantel_bray_geo_species$statistic, p=mantel_bray_geo_species$signif)
+
+# genus
+df_genus <- data.frame(test="mantel", data = "all", taxonomy = "Genus", dist="Bray-Curtis", r=mantel_bray_geo_genus$statistic, p=mantel_bray_geo_genus$signif)
+
+# family
+df_family <- data.frame(test="mantel", data = "all", taxonomy = "Family", dist="Bray-Curtis", r=mantel_bray_geo_family$statistic, p=mantel_bray_geo_family$signif)
+
+
+# order
+df_order <- data.frame(test="mantel", data = "all", taxonomy = "Order", dist="Bray-Curtis", r=mantel_bray_geo_order$statistic, p=mantel_bray_geo_order$signif)
+
+# class
+df_class <- data.frame(test="mantel", data = "all", taxonomy = "Class", dist="Bray-Curtis", r=mantel_bray_geo_class$statistic, p=mantel_bray_geo_class$signif)
+
+# phylum
+df_phylum <- data.frame(test="mantel", data = "all", taxonomy = "Phylum", dist="Bray-Curtis", r=mantel_bray_geo_phylum$statistic, p=mantel_bray_geo_phylum$signif)
+
+mantel_out_bray <- rbind(df_otu, df_species, df_genus, df_family,  df_order, df_class, df_phylum)
+
+```
+
+
+Mantel Jaccard
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+(mantel_jaccard_geo_otu <- vegan::mantel(jaccard_dist_otu, lgeo_dist, method = "pearson", permutations = 9999))
+str(mantel_jaccard_geo_otu)
+
+df_otu <- data.frame(test="mantel", data = "all", taxonomy = "OTU99", dist="Bray-Curtis", r=mantel_jaccard_geo_otu$statistic, p=mantel_jaccard_geo_otu$signif)
+
+df_otu_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "OTU99", dist="Bray-Curtis", r=mantel_jaccard_geo_otu$statistic, p=mantel_jaccard_geo_otu$signif)
+
+jacc = as.vector(jaccard_dist_otu)
+geo = as.vector(lgeo_dist)
+#new data frame with vectorized distance matrices
+mat = data.frame(jacc, geo)
+
+(p1 <- ggplot(mat, aes(y = jacc, x = geo)) + 
+        geom_point(size = 5, alpha = 0.2) + 
+        labs(x = "geo distance", y = "Beta diversity (Bray distance)") +
+        geom_smooth(method = "lm", colour = "red", alpha = 0.2,lwd=3) +
+        theme_classic(base_size = 31)+
+        theme(plot.title = element_text(face = "bold"), panel.border = element_rect(fill = NA, colour = "black"),plot.margin=grid::unit(c(5,5,5,5), "mm"))+
+        ggtitle("")) 
+        #+ 
+        #annotate(geom="text",label=paste0("Mantel statistic r =", round(mantel_geo_jaccard$statistic, 3), ";p-value=", round(mantel_geo_jaccard$signif, 3)), parse=F,x=0.4,y=0.4,size=10))
+
+# species
+(mantel_jaccard_geo_species <- vegan::mantel(jaccard_dist_species, lgeo_dist, method = "pearson", permutations = 9999))
+
+# genus
+(mantel_jaccard_geo_genus <- vegan::mantel(jaccard_dist_genus, lgeo_dist, method = "pearson", permutations = 9999))
+
+
+# family
+(mantel_jaccard_geo_family <- vegan::mantel(jaccard_dist_family, lgeo_dist, method = "pearson", permutations = 9999))
+
+# class
+(mantel_jaccard_geo_class <- vegan::mantel(jaccard_dist_class, lgeo_dist, method = "pearson", permutations = 9999))
+
+# order
+(mantel_jaccard_geo_order <- vegan::mantel(jaccard_dist_order, lgeo_dist, method = "pearson", permutations = 9999))
+
+# phylum
+(mantel_jaccard_geo_phylum <- vegan::mantel(jaccard_dist_phylum, lgeo_dist, method = "pearson", permutations = 9999))
+
+# output df 
+
+# OTU99
+
+df_otu <- data.frame(test="mantel", data = "all", taxonomy = "OTU99", dist="Jaccard", r=mantel_jaccard_geo_otu$statistic, p=mantel_jaccard_geo_otu$signif)
+
+# species
+df_species <- data.frame(test="mantel", data = "all", taxonomy = "Species", dist="Jaccard", r=mantel_jaccard_geo_species$statistic, p=mantel_jaccard_geo_species$signif)
+
+
+# genus
+df_genus <- data.frame(test="mantel", data = "all", taxonomy = "Genus", dist="Jaccard", r=mantel_jaccard_geo_genus$statistic, p=mantel_jaccard_geo_genus$signif)
+
+
+# family
+df_family <- data.frame(test="mantel", data = "all", taxonomy = "Family", dist="Jaccard", r=mantel_jaccard_geo_family$statistic, p=mantel_jaccard_geo_family$signif)
+
+# order
+
+df_order <- data.frame(test="mantel", data = "all", taxonomy = "Order", dist="Jaccard", r=mantel_jaccard_geo_order$statistic, p=mantel_jaccard_geo_order$signif)
+
+# class
+df_class <- data.frame(test="mantel", data = "all", taxonomy = "Class", dist="Jaccard", r=mantel_jaccard_geo_class$statistic, p=mantel_jaccard_geo_class$signif)
+
+# phylum
+df_phylum <- data.frame(test="mantel", data = "all", taxonomy = "Phylum", dist="Jaccard", r=mantel_jaccard_geo_phylum$statistic, p=mantel_jaccard_geo_phylum$signif)
+
+
+mantel_out_jaccard <- rbind(df_otu, df_species, df_genus, df_family,  df_order, df_class, df_phylum)
+
+
+
+```
+
+Join bray and jaccard output
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+mantel_out_geo <- rbind(mantel_out_bray, mantel_out_jaccard)
+mantel_out_geo
+
+write.csv(mantel_out_geo, paste0(dataDir, "/output_mantel_geo.csv"), row.names=FALSE)
+
+```
+
+## MRM test 
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+#OTU
+#test bray
+(out_bray_ind <- MRM(bray_dist_otu ~ host_dist+  diet_bray_dist + as.dist(log10(geo_dist+1)),  nperm=9999))
+BP = out_bray_ind$r.squared[1]
+
+out_host_ind <- MRM(bray_dist_otu ~ host_dist,  nperm=9999)
+H = out_host_ind$r.squared[1]
+
+out_geo_ind <- MRM(bray_dist_otu ~ as.dist(log10(geo_dist+1)),  nperm=9999)
+G = out_geo_ind$r.squared[1]
+
+out_diet_ind <- MRM(bray_dist_otu ~ diet_bray_dist,  nperm=9999)
+D = out_diet_ind$r.squared[1]
+
+out_host_diet <- MRM(bray_dist_otu ~ host_dist + diet_bray_dist,  nperm=9999)
+HD = out_host_diet$r.squared[1]
+
+out_host_geo <- MRM(bray_dist_otu ~ host_dist + as.dist(log10(geo_dist+1)),  nperm=9999)
+HG = out_host_geo$r.squared[1]
+
+out_diet_geo <- MRM(bray_dist_otu ~ diet_bray_dist + as.dist(log10(geo_dist+1)),  nperm=9999)
+DG = out_diet_geo$r.squared[1]
+
+# relative contribution 
+
+(var_bray_ind_otu <- varPart(A = H, B = D, C = G, AB= HD, AC = HG, BC = DG, ABC = BP, A.name = "host", B.name = "diet", C.name = "geo"))
+var_bray_ind_otu$pop_ind <- paste("Individual")
+var_bray_ind_otu$distance <- paste("Bray-Curtis")
+var_bray_ind_otu$tax <- paste("OTU99")
+var_bray_ind_otu$variable <- rownames(var_bray_ind_otu)
+var_bray_ind_otu 
+
+#test jaccard
+(out_jaccard_ind <- MRM(jaccard_dist_otu ~ host_dist+  diet_jaccard_dist + as.dist(log10(geo_dist+1)),  nperm=9999))
+JP = out_jaccard_ind$r.squared[1]
+
+out_host_ind <- MRM(jaccard_dist_otu ~ host_dist,  nperm=9999)
+H = out_host_ind$r.squared[1]
+
+out_geo_ind <- MRM(jaccard_dist_otu ~ as.dist(log10(geo_dist+1)),  nperm=9999)
+G = out_geo_ind$r.squared[1]
+
+out_diet_ind <- MRM(jaccard_dist_otu ~ diet_jaccard_dist,  nperm=9999)
+D = out_diet_ind$r.squared[1]
+
+out_host_diet <- MRM(jaccard_dist_otu ~ host_dist + diet_jaccard_dist,  nperm=9999)
+HD = out_host_diet$r.squared[1]
+
+out_host_geo <- MRM(jaccard_dist_otu ~ host_dist + as.dist(log10(geo_dist+1)),  nperm=9999)
+HG = out_host_geo$r.squared[1]
+
+out_diet_geo <- MRM(jaccard_dist_otu ~ diet_jaccard_dist + as.dist(log10(geo_dist+1)),  nperm=9999)
+DG = out_diet_geo$r.squared[1]
+
+# relative contribution 
+(var_jaccard_ind_otu <- varPart(A = H, B = D, C = G, AB= HD, AC = HG, BC = DG, ABC = JP, A.name = "host", B.name = "diet", C.name = "geo"))
+var_jaccard_ind_otu$pop_ind <- paste("Individual")
+var_jaccard_ind_otu$distance <- paste("Jaccard")
+var_jaccard_ind_otu$tax <- paste("OTU99")
+var_jaccard_ind_otu$variable <- rownames(var_jaccard_ind_otu)
+var_jaccard_ind_otu
+
+#species
+#test bray
+(out_bray_ind <- MRM(bray_dist_species ~ host_dist+  diet_bray_dist + as.dist(log10(geo_dist+1)),  nperm=9999))
+BP = out_bray_ind$r.squared[1]
+
+out_host_ind <- MRM(bray_dist_species ~ host_dist,  nperm=9999)
+H = out_host_ind$r.squared[1]
+
+out_geo_ind <- MRM(bray_dist_species ~ as.dist(log10(geo_dist+1)),  nperm=9999)
+G = out_geo_ind$r.squared[1]
+
+out_diet_ind <- MRM(bray_dist_species ~ diet_bray_dist,  nperm=9999)
+D = out_diet_ind$r.squared[1]
+
+out_host_diet <- MRM(bray_dist_species ~ host_dist + diet_bray_dist,  nperm=9999)
+HD = out_host_diet$r.squared[1]
+
+out_host_geo <- MRM(bray_dist_species ~ host_dist + as.dist(log10(geo_dist+1)),  nperm=9999)
+HG = out_host_geo$r.squared[1]
+
+out_diet_geo <- MRM(bray_dist_species ~ diet_bray_dist + as.dist(log10(geo_dist+1)),  nperm=9999)
+DG = out_diet_geo$r.squared[1]
+
+# relative contribution 
+
+(var_bray_ind_species <- varPart(A = H, B = D, C = G, AB= HD, AC = HG, BC = DG, ABC = BP, A.name = "host", B.name = "diet", C.name = "geo"))
+var_bray_ind_species$pop_ind <- paste("Individual")
+var_bray_ind_species$distance <- paste("Bray-Curtis")
+var_bray_ind_species$tax <- paste("Species")
+var_bray_ind_species$variable <- rownames(var_bray_ind_species)
+var_bray_ind_species 
+
+#test jaccard
+(out_jaccard_ind <- MRM(jaccard_dist_species ~ host_dist+  diet_jaccard_dist + as.dist(log10(geo_dist+1)),  nperm=9999))
+JP = out_jaccard_ind$r.squared[1]
+
+out_host_ind <- MRM(jaccard_dist_species ~ host_dist,  nperm=9999)
+H = out_host_ind$r.squared[1]
+
+out_geo_ind <- MRM(jaccard_dist_species ~ as.dist(log10(geo_dist+1)),  nperm=9999)
+G = out_geo_ind$r.squared[1]
+
+out_diet_ind <- MRM(jaccard_dist_species ~ diet_jaccard_dist,  nperm=9999)
+D = out_diet_ind$r.squared[1]
+
+out_host_diet <- MRM(jaccard_dist_species ~ host_dist + diet_jaccard_dist,  nperm=9999)
+HD = out_host_diet$r.squared[1]
+
+out_host_geo <- MRM(jaccard_dist_species ~ host_dist + as.dist(log10(geo_dist+1)),  nperm=9999)
+HG = out_host_geo$r.squared[1]
+
+out_diet_geo <- MRM(jaccard_dist_species ~ diet_jaccard_dist + as.dist(log10(geo_dist+1)),  nperm=9999)
+DG = out_diet_geo$r.squared[1]
+
+# relative contribution 
+(var_jaccard_ind_species <- varPart(A = H, B = D, C = G, AB= HD, AC = HG, BC = DG, ABC = JP, A.name = "host", B.name = "diet", C.name = "geo"))
+var_jaccard_ind_species$pop_ind <- paste("Individual")
+var_jaccard_ind_species$distance <- paste("Jaccard")
+var_jaccard_ind_species$tax <- paste("Species")
+var_jaccard_ind_species$variable <- rownames(var_jaccard_ind_species)
+
+var_jaccard_ind_species
+
+
+
+
+#Genus
+#test bray
+(out_bray_ind <- MRM(bray_dist_genus ~ host_dist+  diet_bray_dist + as.dist(log10(geo_dist+1)),  nperm=9999))
+BP = out_bray_ind$r.squared[1]
+
+out_host_ind <- MRM(bray_dist_genus ~ host_dist,  nperm=9999)
+H = out_host_ind$r.squared[1]
+
+out_geo_ind <- MRM(bray_dist_genus ~ as.dist(log10(geo_dist+1)),  nperm=9999)
+G = out_geo_ind$r.squared[1]
+
+out_diet_ind <- MRM(bray_dist_genus ~ diet_bray_dist,  nperm=9999)
+D = out_diet_ind$r.squared[1]
+
+out_host_diet <- MRM(bray_dist_genus ~ host_dist + diet_bray_dist,  nperm=9999)
+HD = out_host_diet$r.squared[1]
+
+out_host_geo <- MRM(bray_dist_genus ~ host_dist + as.dist(log10(geo_dist+1)),  nperm=9999)
+HG = out_host_geo$r.squared[1]
+
+out_diet_geo <- MRM(bray_dist_genus ~ diet_bray_dist + as.dist(log10(geo_dist+1)),  nperm=9999)
+DG = out_diet_geo$r.squared[1]
+
+# relative contribution 
+
+(var_bray_ind_genus <- varPart(A = H, B = D, C = G, AB= HD, AC = HG, BC = DG, ABC = BP, A.name = "host", B.name = "diet", C.name = "geo"))
+var_bray_ind_genus$pop_ind <- paste("Individual")
+var_bray_ind_genus$distance <- paste("Bray-Curtis")
+var_bray_ind_genus$tax <- paste("Genus")
+var_bray_ind_genus$variable <- rownames(var_bray_ind_genus)
+var_bray_ind_genus 
+
+#test jaccard
+(out_jaccard_ind <- MRM(jaccard_dist_genus ~ host_dist+  diet_jaccard_dist + as.dist(log10(geo_dist+1)),  nperm=9999))
+JP = out_jaccard_ind$r.squared[1]
+
+out_host_ind <- MRM(jaccard_dist_genus ~ host_dist,  nperm=9999)
+H = out_host_ind$r.squared[1]
+
+out_geo_ind <- MRM(jaccard_dist_genus ~ as.dist(log10(geo_dist+1)),  nperm=9999)
+G = out_geo_ind$r.squared[1]
+
+out_diet_ind <- MRM(jaccard_dist_genus ~ diet_jaccard_dist,  nperm=9999)
+D = out_diet_ind$r.squared[1]
+
+out_host_diet <- MRM(jaccard_dist_genus ~ host_dist + diet_jaccard_dist,  nperm=9999)
+HD = out_host_diet$r.squared[1]
+
+out_host_geo <- MRM(jaccard_dist_genus ~ host_dist + as.dist(log10(geo_dist+1)),  nperm=9999)
+HG = out_host_geo$r.squared[1]
+
+out_diet_geo <- MRM(jaccard_dist_genus ~ diet_jaccard_dist + as.dist(log10(geo_dist+1)),  nperm=9999)
+DG = out_diet_geo$r.squared[1]
+
+# relative contribution 
+(var_jaccard_ind_genus <- varPart(A = H, B = D, C = G, AB= HD, AC = HG, BC = DG, ABC = JP, A.name = "host", B.name = "diet", C.name = "geo"))
+var_jaccard_ind_genus$pop_ind <- paste("Individual")
+var_jaccard_ind_genus$distance <- paste("Jaccard")
+var_jaccard_ind_genus$tax <- paste("Genus")
+var_jaccard_ind_genus$variable <- rownames(var_jaccard_ind_genus)
+
+var_jaccard_ind_genus
+
+
+#Family
+#test bray
+(out_bray_ind <- MRM(bray_dist_family ~ host_dist+  diet_bray_dist + as.dist(log10(geo_dist+1)),  nperm=9999))
+BP = out_bray_ind$r.squared[1]
+
+out_host_ind <- MRM(bray_dist_family ~ host_dist,  nperm=9999)
+H = out_host_ind$r.squared[1]
+
+out_geo_ind <- MRM(bray_dist_family ~ as.dist(log10(geo_dist+1)),  nperm=9999)
+G = out_geo_ind$r.squared[1]
+
+out_diet_ind <- MRM(bray_dist_family ~ diet_bray_dist,  nperm=9999)
+D = out_diet_ind$r.squared[1]
+
+out_host_diet <- MRM(bray_dist_family ~ host_dist + diet_bray_dist,  nperm=9999)
+HD = out_host_diet$r.squared[1]
+
+out_host_geo <- MRM(bray_dist_family ~ host_dist + as.dist(log10(geo_dist+1)),  nperm=9999)
+HG = out_host_geo$r.squared[1]
+
+out_diet_geo <- MRM(bray_dist_family ~ diet_bray_dist + as.dist(log10(geo_dist+1)),  nperm=9999)
+DG = out_diet_geo$r.squared[1]
+
+# relative contribution 
+(var_bray_ind_family <- varPart(A = H, B = D, C = G, AB= HD, AC = HG, BC = DG, ABC = BP, A.name = "host", B.name = "diet", C.name = "geo"))
+var_bray_ind_family$pop_ind <- paste("Individual")
+var_bray_ind_family$distance <- paste("Bray-Curtis")
+var_bray_ind_family$tax <- paste("Family")
+var_bray_ind_family$variable <- rownames(var_bray_ind_family)
+var_bray_ind_family 
+
+#test jaccard
+(out_jaccard_ind <- MRM(jaccard_dist_family ~ host_dist+  diet_jaccard_dist + as.dist(log10(geo_dist+1)),  nperm=9999))
+JP = out_jaccard_ind$r.squared[1]
+
+out_host_ind <- MRM(jaccard_dist_family ~ host_dist,  nperm=9999)
+H = out_host_ind$r.squared[1]
+
+out_geo_ind <- MRM(jaccard_dist_family ~ as.dist(log10(geo_dist+1)),  nperm=9999)
+G = out_geo_ind$r.squared[1]
+
+out_diet_ind <- MRM(jaccard_dist_family ~ diet_jaccard_dist,  nperm=9999)
+D = out_diet_ind$r.squared[1]
+
+out_host_diet <- MRM(jaccard_dist_family ~ host_dist + diet_jaccard_dist,  nperm=9999)
+HD = out_host_diet$r.squared[1]
+
+out_host_geo <- MRM(jaccard_dist_family ~ host_dist + as.dist(log10(geo_dist+1)),  nperm=9999)
+HG = out_host_geo$r.squared[1]
+
+out_diet_geo <- MRM(jaccard_dist_family ~ diet_jaccard_dist + as.dist(log10(geo_dist+1)),  nperm=9999)
+DG = out_diet_geo$r.squared[1]
+
+# relative contribution 
+(var_jaccard_ind_family <- varPart(A = H, B = D, C = G, AB= HD, AC = HG, BC = DG, ABC = JP, A.name = "host", B.name = "diet", C.name = "geo"))
+var_jaccard_ind_family$pop_ind <- paste("Individual")
+var_jaccard_ind_family$distance <- paste("Jaccard")
+var_jaccard_ind_family$tax <- paste("Family")
+var_jaccard_ind_family$variable <- rownames(var_jaccard_ind_family)
+var_jaccard_ind_family
+
+
+# Order
+#test bray
+(out_bray_ind <- MRM(bray_dist_order ~ host_dist+  diet_bray_dist + as.dist(log10(geo_dist+1)),  nperm=9999))
+BP = out_bray_ind$r.squared[1]
+
+out_host_ind <- MRM(bray_dist_order ~ host_dist,  nperm=9999)
+H = out_host_ind$r.squared[1]
+
+out_geo_ind <- MRM(bray_dist_order ~ as.dist(log10(geo_dist+1)),  nperm=9999)
+G = out_geo_ind$r.squared[1]
+
+out_diet_ind <- MRM(bray_dist_order ~ diet_bray_dist,  nperm=9999)
+D = out_diet_ind$r.squared[1]
+
+out_host_diet <- MRM(bray_dist_order ~ host_dist + diet_bray_dist,  nperm=9999)
+HD = out_host_diet$r.squared[1]
+
+out_host_geo <- MRM(bray_dist_order ~ host_dist + as.dist(log10(geo_dist+1)),  nperm=9999)
+HG = out_host_geo$r.squared[1]
+
+out_diet_geo <- MRM(bray_dist_order ~ diet_bray_dist + as.dist(log10(geo_dist+1)),  nperm=9999)
+DG = out_diet_geo$r.squared[1]
+
+# relative contribution 
+(var_bray_ind_order <- varPart(A = H, B = D, C = G, AB= HD, AC = HG, BC = DG, ABC = BP, A.name = "host", B.name = "diet", C.name = "geo"))
+var_bray_ind_order$pop_ind <- paste("Individual")
+var_bray_ind_order$distance <- paste("Bray-Curtis")
+var_bray_ind_order$tax <- paste("Order")
+var_bray_ind_order$variable <- rownames(var_bray_ind_order)
+var_bray_ind_order 
+
+#test jaccard
+(out_jaccard_ind <- MRM(jaccard_dist_order ~ host_dist+  diet_jaccard_dist + as.dist(log10(geo_dist+1)),  nperm=9999))
+JP = out_jaccard_ind$r.squared[1]
+
+out_host_ind <- MRM(jaccard_dist_order ~ host_dist,  nperm=9999)
+H = out_host_ind$r.squared[1]
+
+out_geo_ind <- MRM(jaccard_dist_order ~ as.dist(log10(geo_dist+1)),  nperm=9999)
+G = out_geo_ind$r.squared[1]
+
+out_diet_ind <- MRM(jaccard_dist_order ~ diet_jaccard_dist,  nperm=9999)
+D = out_diet_ind$r.squared[1]
+
+out_host_diet <- MRM(jaccard_dist_order ~ host_dist + diet_jaccard_dist,  nperm=9999)
+HD = out_host_diet$r.squared[1]
+
+out_host_geo <- MRM(jaccard_dist_order ~ host_dist + as.dist(log10(geo_dist+1)),  nperm=9999)
+HG = out_host_geo$r.squared[1]
+
+out_diet_geo <- MRM(jaccard_dist_order ~ diet_jaccard_dist + as.dist(log10(geo_dist+1)),  nperm=9999)
+DG = out_diet_geo$r.squared[1]
+
+# relative contribution 
+(var_jaccard_ind_order <- varPart(A = H, B = D, C = G, AB= HD, AC = HG, BC = DG, ABC = JP, A.name = "host", B.name = "diet", C.name = "geo"))
+var_jaccard_ind_order$pop_ind <- paste("Individual")
+var_jaccard_ind_order$distance <- paste("Jaccard")
+var_jaccard_ind_order$tax <- paste("Order")
+var_jaccard_ind_order$variable <- rownames(var_jaccard_ind_order)
+var_jaccard_ind_order
+
+
+#Class
+#test bray
+(out_bray_ind <- MRM(bray_dist_class ~ host_dist+  diet_bray_dist + as.dist(log10(geo_dist+1)),  nperm=9999))
+BP = out_bray_ind$r.squared[1]
+
+out_host_ind <- MRM(bray_dist_class ~ host_dist,  nperm=9999)
+H = out_host_ind$r.squared[1]
+
+out_geo_ind <- MRM(bray_dist_class ~ as.dist(log10(geo_dist+1)),  nperm=9999)
+G = out_geo_ind$r.squared[1]
+
+out_diet_ind <- MRM(bray_dist_class ~ diet_bray_dist,  nperm=9999)
+D = out_diet_ind$r.squared[1]
+
+out_host_diet <- MRM(bray_dist_class ~ host_dist + diet_bray_dist,  nperm=9999)
+HD = out_host_diet$r.squared[1]
+
+out_host_geo <- MRM(bray_dist_class ~ host_dist + as.dist(log10(geo_dist+1)),  nperm=9999)
+HG = out_host_geo$r.squared[1]
+
+out_diet_geo <- MRM(bray_dist_class ~ diet_bray_dist + as.dist(log10(geo_dist+1)),  nperm=9999)
+DG = out_diet_geo$r.squared[1]
+
+# relative contribution 
+(var_bray_ind_class <- varPart(A = H, B = D, C = G, AB= HD, AC = HG, BC = DG, ABC = BP, A.name = "host", B.name = "diet", C.name = "geo"))
+var_bray_ind_class$pop_ind <- paste("Individual")
+var_bray_ind_class$distance <- paste("Bray-Curtis")
+var_bray_ind_class$tax <- paste("Class")
+var_bray_ind_class$variable <- rownames(var_bray_ind_class)
+var_bray_ind_class 
+
+#test jaccard
+(out_jaccard_ind <- MRM(jaccard_dist_class ~ host_dist+  diet_jaccard_dist + as.dist(log10(geo_dist+1)),  nperm=9999))
+JP = out_jaccard_ind$r.squared[1]
+
+out_host_ind <- MRM(jaccard_dist_class ~ host_dist,  nperm=9999)
+H = out_host_ind$r.squared[1]
+
+out_geo_ind <- MRM(jaccard_dist_class ~ as.dist(log10(geo_dist+1)),  nperm=9999)
+G = out_geo_ind$r.squared[1]
+
+out_diet_ind <- MRM(jaccard_dist_class ~ diet_jaccard_dist,  nperm=9999)
+D = out_diet_ind$r.squared[1]
+
+out_host_diet <- MRM(jaccard_dist_class ~ host_dist + diet_jaccard_dist,  nperm=9999)
+HD = out_host_diet$r.squared[1]
+
+out_host_geo <- MRM(jaccard_dist_class ~ host_dist + as.dist(log10(geo_dist+1)),  nperm=9999)
+HG = out_host_geo$r.squared[1]
+
+out_diet_geo <- MRM(jaccard_dist_class ~ diet_jaccard_dist + as.dist(log10(geo_dist+1)),  nperm=9999)
+DG = out_diet_geo$r.squared[1]
+
+# relative contribution 
+(var_jaccard_ind_class <- varPart(A = H, B = D, C = G, AB= HD, AC = HG, BC = DG, ABC = JP, A.name = "host", B.name = "diet", C.name = "geo"))
+var_jaccard_ind_class$pop_ind <- paste("Individual")
+var_jaccard_ind_class$distance <- paste("Jaccard")
+var_jaccard_ind_class$tax <- paste("Class")
+var_jaccard_ind_class$variable <- rownames(var_jaccard_ind_class)
+var_jaccard_ind_class
+
+
+#Phylum
+#test bray
+(out_bray_ind <- MRM(bray_dist_phylum ~ host_dist+  diet_bray_dist + as.dist(log10(geo_dist+1)),  nperm=9999))
+BP = out_bray_ind$r.squared[1]
+
+out_host_ind <- MRM(bray_dist_phylum ~ host_dist,  nperm=9999)
+H = out_host_ind$r.squared[1]
+
+out_geo_ind <- MRM(bray_dist_phylum ~ as.dist(log10(geo_dist+1)),  nperm=9999)
+G = out_geo_ind$r.squared[1]
+
+out_diet_ind <- MRM(bray_dist_phylum ~ diet_bray_dist,  nperm=9999)
+D = out_diet_ind$r.squared[1]
+
+out_host_diet <- MRM(bray_dist_phylum ~ host_dist + diet_bray_dist,  nperm=9999)
+HD = out_host_diet$r.squared[1]
+
+out_host_geo <- MRM(bray_dist_phylum ~ host_dist + as.dist(log10(geo_dist+1)),  nperm=9999)
+HG = out_host_geo$r.squared[1]
+
+out_diet_geo <- MRM(bray_dist_phylum ~ diet_bray_dist + as.dist(log10(geo_dist+1)),  nperm=9999)
+DG = out_diet_geo$r.squared[1]
+
+
+(var_bray_ind_phylum <- varPart(A = H, B = D, C = G, AB= HD, AC = HG, BC = DG, ABC = BP, A.name = "host", B.name = "diet", C.name = "geo"))
+var_bray_ind_phylum$pop_ind <- paste("Individual")
+var_bray_ind_phylum$distance <- paste("Bray-Curtis")
+var_bray_ind_phylum$tax <- paste("Phylum")
+var_bray_ind_phylum$variable <- rownames(var_bray_ind_phylum)
+var_bray_ind_phylum 
+
+#test jaccard
+(out_jaccard_ind <- MRM(jaccard_dist_phylum ~ host_dist+  diet_jaccard_dist + as.dist(log10(geo_dist+1)),  nperm=9999))
+JP = out_jaccard_ind$r.squared[1]
+
+out_host_ind <- MRM(jaccard_dist_phylum ~ host_dist,  nperm=9999)
+H = out_host_ind$r.squared[1]
+
+out_geo_ind <- MRM(jaccard_dist_phylum ~ as.dist(log10(geo_dist+1)),  nperm=9999)
+G = out_geo_ind$r.squared[1]
+
+out_diet_ind <- MRM(jaccard_dist_phylum ~ diet_jaccard_dist,  nperm=9999)
+D = out_diet_ind$r.squared[1]
+
+out_host_diet <- MRM(jaccard_dist_phylum ~ host_dist + diet_jaccard_dist,  nperm=9999)
+HD = out_host_diet$r.squared[1]
+
+out_host_geo <- MRM(jaccard_dist_phylum ~ host_dist + as.dist(log10(geo_dist+1)),  nperm=9999)
+HG = out_host_geo$r.squared[1]
+
+out_diet_geo <- MRM(jaccard_dist_phylum ~ diet_jaccard_dist + as.dist(log10(geo_dist+1)),  nperm=9999)
+DG = out_diet_geo$r.squared[1]
+
+# relative contribution 
+
+#https://modtools.wordpress.com/2012/11/06/varpart/
+#The outputs are the amounts of variance explained exclusively by each factor, the amounts explained exclusively by the overlapping effects of each pair of factors, and the amount explained by the overlap of the 3 factors if this is the case (e.g. Real et al. 2003)
+
+(var_jaccard_ind_phylum <- varPart(A = H, B = D, C = G, AB= HD, AC = HG, BC = DG, ABC = JP, A.name = "host", B.name = "diet", C.name = "geo"))
+var_jaccard_ind_phylum$pop_ind <- paste("Individual")
+var_jaccard_ind_phylum$distance <- paste("Jaccard")
+var_jaccard_ind_phylum$tax <- paste("Phylum")
+var_jaccard_ind_phylum$variable <- rownames(var_jaccard_ind_phylum)
+var_jaccard_ind_phylum
+
+```
+
+merge output
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+out_varpart_ind <- rbind(var_bray_ind_otu,var_bray_ind_species, var_bray_ind_genus, var_bray_ind_family, var_bray_ind_order, var_bray_ind_class, var_bray_ind_phylum, var_jaccard_ind_otu,var_jaccard_ind_species,var_jaccard_ind_genus, var_jaccard_ind_family, var_jaccard_ind_order, var_jaccard_ind_class, var_jaccard_ind_phylum, make.row.names = FALSE)
+out_varpart_ind$Proportion <- ifelse(out_varpart_ind$Proportion < 0, 0, out_varpart_ind$Proportion) 
+out_varpart_ind$percent <- round(out_varpart_ind$Proportion * 100,  2)
+head(out_varpart_ind)
+str(out_varpart_ind)
+out_varpart_ind$tax <- factor(out_varpart_ind$tax, levels = c("OTU99", "Species" ,"Genus", "Family", "Order", "Class", "Phylum"))
+table(out_varpart_ind$pop_ind)
+var_bray_ind_otu;var_jaccard_ind_otu
+var_bray_ind_genus;var_jaccard_ind_genus
+var_bray_ind_family;var_jaccard_ind_family
+
+check <- out_varpart_ind %>% filter(variable == "diet")
+
+write.csv(out_varpart_ind, paste0(dataDir, "/output_varpart.csv"), row.names=FALSE)
+
+```
+
+
+
+
+
+
+

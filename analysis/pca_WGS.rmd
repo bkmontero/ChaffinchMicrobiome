@@ -1,0 +1,163 @@
+---
+title: 'PCA Fringilla SNPs'
+author: "Karina Montero & Mark Gillingham"
+date: "`r Sys.Date()`"
+#output: pdf_document
+output: html_document
+---
+
+## SETUP WORKING SPACE
+
+```{r setup, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+
+rm(list = ls())
+
+library(tidyverse)
+library(stringr)
+library(ggforce)
+library(ggpubr)
+library(grid)
+library(gtable)
+
+
+# phyloseq section
+library(phyloseq)
+library(Biostrings)
+library(microbiome)
+library(metagMisc)
+library(phylosmith)
+library(microViz)
+library(treedata.table)
+library(ggh4x)
+
+
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/workingDirectories.R")
+
+```
+
+### GRAPHICAL PARAMS
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, results="hide"}
+
+pca_theme <- theme_set(theme_bw(base_size = 6)) + theme( panel.grid.major = element_blank(),panel.grid.minor = element_blank(), panel.background = element_blank(), panel.border=element_rect(fill = NA, colour = "black", linewidth = 2.8), axis.line = element_line(linewidth=0.1), plot.margin=grid::unit(c(5,5,5,5), "mm"), axis.text.x = element_text(colour = "black", size=24), axis.text.y=element_text(size=24, colour="black", margin = margin(0,5,0,0)), axis.title.y = element_text(margin = margin(0,4,0,0),size = 28), axis.title.x = element_text(size = 28), axis.ticks.length=unit(2,"mm"), axis.ticks = element_line(linewidth=1.5))
+
+pca_theme_inset <- theme_set(theme_bw(base_size = 6)) + theme( panel.grid.major = element_blank(),panel.grid.minor = element_blank(), panel.background = element_blank(), panel.border=element_rect(fill = NA, colour = "black", linewidth = 5.8), axis.line = element_line(linewidth=0.1), plot.margin=grid::unit(c(5,5,5,5), "mm"), axis.text.x = element_blank(), axis.text.y=element_blank(), axis.title.y = element_text(size = 56), axis.title.x = element_text(size = 56), axis.ticks = element_blank())
+
+SpeciesLabel.order <- c("FriCoe_Madrid","FriMor_Flores", "FriMor_SaoMig", "FriMad_Madeira", "FriCanOmb_Hierro","FriCanBak_GranCan", "FriCanCan_Gomera", "FriCanPal_Palma", "FriCanCan_Tenerife","FriPol_GranCan", "FriTey_Tenerife")
+
+SpeciesLabel.colors <- c("black", "DarkRed", "DarkRed",  "#E6AB02", "#006D2C", "#31A354", "#708238", "#BAE4B3", "#708238","#1F78B4", "#A6CEE3")
+
+Region_Species.order <- c("Europe", "Azores", "Madeira", "Canary Islands", "Bluefinch")
+
+Region_Species.colors <- c("black", "DarkRed", "#E6AB02", "#006D2C", "#1F78B4")
+
+SpeciesLabel.color <- scale_color_manual(name = "Species_Island/Mainland",
+                                   values = SpeciesLabel.colors,
+                                   limits = SpeciesLabel.order,
+                                   guide = "none")
+SpeciesLabel.fill <- scale_fill_manual(name = "Species_Island/Mainland",
+                                   values = SpeciesLabel.colors,
+                                   limits = SpeciesLabel.order,
+                                   guide = "none"
+                                   )
+```
+
+
+
+## READ DATA (concat vcf all IDS)
+
+
+```{r ps1, message=FALSE, warning=FALSE, tidy=TRUE,  fig.width=18, fig.height=8, paged.print=FALSE}
+
+# noLD
+pca <- read_table(paste0(dataDir,"/chaffinch_bluefinch_miss0.5_mac3_noZ_noLD_microbiomeSamples.eigenvec"), col_names = FALSE)
+
+eigenval <- scan(paste0(dataDir,"/chaffinch_bluefinch_miss0.5_mac3_noZ.eigenval"))
+
+
+# sort out the pca data
+# remove nuisance column
+colnames(pca) <- pca[1,]
+pca <- pca[-1,-1]
+# set names
+
+pca$IID
+names(pca)[1] <- "WGS_ID"
+#names(pca)[1] <- "TipID"
+
+names(pca)[2:ncol(pca)] <- paste0("PC", 1:(ncol(pca)-1))
+
+metadata <- read_delim(paste0(dataDir, "/WGS_Fringilla_samples.tsv"), delim = ",")
+metadata %>% data.frame %>% head
+metadata <- metadata %>% filter(Microb == 1) 
+
+pca <- left_join(pca, metadata, by ="WGS_ID")
+
+pca %>% names
+as.data.frame(table(pca$Region_Species))
+as.data.frame(table(pca$Label))
+
+pca %>% group_by(Species, Label) %>% summarise(Nsamples =n()) %>% data.frame
+
+# relevel
+pca$Species <- as.factor(pca$Species)
+pca$Species <- relevel(pca$Species, "Fringilla coelebs coelebs")
+levels(pca$Species)
+table(pca$Species)
+
+pca$Species_Label <- as.factor(pca$Species_Label)
+pca$Species_Label <- relevel(pca$Species_Label, "Mainland_F_coelebs")
+
+pca$Chaff_Blue <- ifelse(pca$Species == "Fringilla polatzeki" | pca$Species == "Fringilla teydea", "Bluefinch", "Chaffinch")
+table(pca$Chaff_Blue)
+
+# first convert to percentage variance explained
+(pve <- data.frame(PC = 1:10, pve = eigenval/sum(eigenval)*100))
+
+# calculate the cumulative sum of the percentage variance explained
+cumsum(pve$pve)
+
+```
+
+Plot Species Label 
+
+```{r ps1, message=FALSE, warning=FALSE, tidy=TRUE,  fig.width=18, fig.height=8, paged.print=FALSE}
+
+
+(pca_species_pc1_2 <- ggplot(data = pca, mapping = aes(x = as.numeric(PC1), y = as.numeric(PC2),fill = Label, shape = Label), show.legend = FALSE ) +
+ geom_point(size = 10, guide = "none",  color = "black")  +
+scale_shape_manual(values = c(21,23,22,21, 25, 21,21,22, 21, 21, 25),guide = "none")+
+ labs(title = "",
+    x = paste0("PC 1 (",signif(pve$pve[1], 3)," %)"),
+    y = paste0("PC 2 (",signif(pve$pve[2], 3), " %)"))  + SpeciesLabel.color + SpeciesLabel.fill +
+ scale_y_continuous(labels = scales::number_format(accuracy = 0.01))+
+ pca_theme) 
+
+(pca_species_pc1_3 <- ggplot(data = pca, mapping = aes(x = as.numeric(PC1), y = as.numeric(PC3),fill = Label, shape = Label), show.legend = FALSE ) +
+ geom_point(size = 10, guide = "none")  +
+  scale_shape_manual(values = c(21,23,22,21, 25, 21,21,22, 21, 21, 25), guide = "none")+
+ labs(title = "",
+    x = paste0("PC 1 (",signif(pve$pve[1], 3)," %)"),
+    y = paste0("PC 3 (",signif(pve$pve[3], 3), " %)"))  + SpeciesLabel.color + SpeciesLabel.fill +
+   scale_y_continuous(labels = scales::number_format(accuracy = 0.01))+
+ pca_theme) 
+
+(pca_species_pc1_3_inset <- ggplot(data = pca, mapping = aes(x = as.numeric(PC1), y = as.numeric(PC3),fill = Label, shape = Label), show.legend = FALSE ) +
+ geom_point(size = 18, guide = "none")  +
+   scale_shape_manual(values = c(21,23,22,21, 25, 21,21,22, 21, 21, 25), guide = "none")+
+ labs(title = "",
+    x = paste0("PC 1 (",signif(pve$pve[1], 3)," %)"),
+    y = paste0("PC 3 (",signif(pve$pve[3], 3), " %)"))  + SpeciesLabel.color + SpeciesLabel.fill +
+   scale_y_continuous(labels = scales::number_format(accuracy = 0.01), position = "right")+
+ pca_theme_inset) 
+
+png(paste0(outputDir, "/Figures/pca_chaffinch_bluefinch_miss0.5_mac3_noZ_noLD_microbiomeSamples_PCH_PC1_2.png"), width = 320, height = 240, units = "mm", res = 1000)
+pca_species_pc1_2
+dev.off()
+
+png(paste0(outputDir, "/Figures/pca_chaffinch_bluefinch_microbiome_subset_miss0.8_mac3_noZ_noLD_PCH_PC1_3_inset.png"), width = 320, height = 240, units = "mm", res = 1000)
+pca_species_pc1_3_inset
+dev.off()
+
+```

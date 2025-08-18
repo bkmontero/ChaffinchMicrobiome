@@ -1,0 +1,695 @@
+---
+title: 'Plot x'
+author: "B. K. Montero and M. Gillingham"
+date: "`r Sys.Date()`"
+output: html_document
+
+
+
+---
+
+
+## LOAD LIBRARIES
+
+```{r libraries, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+rm(list = ls())
+
+# basics
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+library(stringr)
+library(vegan)
+library(magrittr)
+library(ggplot2)
+library(ggpubr)
+library(MicEco)
+library(rlist) 
+library(grid)
+library(tsiR) 
+library(ape)
+library(ggh4x)
+# phyloseq section
+library(phyloseq)
+library(microViz)
+library(biomeUtils)
+library(patchwork)
+
+# dist
+library(treedataverse)
+library(geosphere)
+library(treedata.table)
+
+
+# MRM 
+library(sf)
+library(ecodist)
+library(modEvA)
+library(eulerr)
+
+#glmm
+library(glmmTMB)
+library(effects)
+
+
+
+```
+
+
+## WORKING DIRECTORIES
+```{r source, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/workingDirectories.R")
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/CleanScripts/graphics_param.R")
+
+```
+
+## LOAD OUTPUTS
+
+Variance partitioning 
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+varpart_out <- read.csv(paste0(dataDir, "/output_varpart_speciesFix.csv"))
+
+```
+
+Mantel test
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+mantel_out <- read.csv(paste0(dataDir, "/output_mantel_weightedfst_speciesFix.csv"))
+
+```
+
+euler plots
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+
+otu_bray_df <- varpart_out %>% filter(distance == "Bray-Curtis" & tax == "OTU99") %>% dplyr::select(variable, percent)
+otu_bray_df
+bray_set <- c("R" = otu_bray_df[8,2], "R&host" = otu_bray_df[1,2], "R&diet" = otu_bray_df[2,2], "R&geo" = otu_bray_df[3,2],
+    "R&host&diet" = otu_bray_df[4,2], "R&diet&geo" = otu_bray_df[5,2], "R&host&geo" = otu_bray_df[6,2],
+    "R&host&diet&geo" = otu_bray_df[7,2])
+
+otu_jaccard_df <- varpart_out %>% filter(distance == "Jaccard" & tax == "OTU99") %>% dplyr::select(variable, percent)
+otu_jaccard_df
+jacc_set <- c("R" = otu_jaccard_df[8,2], "R&host" = otu_jaccard_df[1,2], "R&diet" = otu_jaccard_df[2,2], "R&geo" = otu_jaccard_df[3,2],
+    "R&host&diet" = otu_jaccard_df[4,2], "R&diet&geo" = otu_jaccard_df[5,2], "R&host&geo" = otu_jaccard_df[6,2],
+    "R&host&diet&geo" = otu_jaccard_df[7,2])
+
+genus_bray_df <- varpart_out %>% filter(distance == "Bray-Curtis" & tax == "Genus") %>% dplyr::select(variable, percent)
+genus_bray_df
+bray_set <- c("R" = genus_bray_df[8,2], "R&host" = genus_bray_df[1,2], "R&diet" = genus_bray_df[2,2], "R&geo" = genus_bray_df[3,2],
+    "R&host&diet" = genus_bray_df[4,2], "R&diet&geo" = genus_bray_df[5,2], "R&host&geo" = genus_bray_df[6,2],
+    "R&host&diet&geo" = genus_bray_df[7,2])
+
+genus_jaccard_df <- varpart_out %>% filter(distance == "Jaccard" & tax == "Genus") %>% dplyr::select(variable, percent)
+genus_jaccard_df
+jacc_set <- c("R" = genus_jaccard_df[8,2], "R&host" = genus_jaccard_df[1,2], "R&diet" = genus_jaccard_df[2,2], "R&geo" = genus_jaccard_df[3,2],
+    "R&host&diet" = genus_jaccard_df[4,2], "R&diet&geo" = genus_jaccard_df[5,2], "R&host&geo" = genus_jaccard_df[6,2],
+    "R&host&diet&geo" = genus_jaccard_df[7,2])
+
+
+species_bray_df <- varpart_out %>% filter(distance == "Bray-Curtis" & tax == "Species") %>% dplyr::select(variable, percent)
+species_bray_df
+bray_set <- c("R" = species_bray_df[8,2], "R&host" = species_bray_df[1,2], "R&diet" = species_bray_df[2,2], "R&geo" = species_bray_df[3,2],
+    "R&host&diet" = species_bray_df[4,2], "R&diet&geo" = species_bray_df[5,2], "R&host&geo" = species_bray_df[6,2],
+    "R&host&diet&geo" = species_bray_df[7,2])
+
+species_jaccard_df <- varpart_out %>% filter(distance == "Jaccard" & tax == "Species") %>% dplyr::select(variable, percent)
+species_jaccard_df
+jacc_set <- c("R" = species_jaccard_df[8,2], "R&host" = species_jaccard_df[1,2], "R&diet" = species_jaccard_df[2,2], "R&geo" = species_jaccard_df[3,2],
+    "R&host&diet" = species_jaccard_df[4,2], "R&diet&geo" = species_jaccard_df[5,2], "R&host&geo" = species_jaccard_df[6,2],
+    "R&host&diet&geo" = species_jaccard_df[7,2])
+
+
+
+```
+
+# Variance partitioning plots 
+
+plot euler
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+(euler_bray <- plot(euler(bray_set, input = c("disjoint"),shape =  "ellipse"),
+    fills = list(fill = c("white","#a00000", "#000000", "#59a89c"), alpha = 0.8), quantities = FALSE, edges = list(lwd = c(3,2,2,2)), labels = list(labels = c("","","",""), cex = 1), lwd = 1))
+euler_bray <- gridExtra::grid.arrange(grobs = list(euler_bray), top = textGrob("Species", gp=gpar(fontsize=16)))
+
+(euler_jacc <- plot(euler(jacc_set, input = c("disjoint"),shape =  "ellipse"),
+    fills = list(fill = c("white","#a00000", "#000000", "#59a89c"), alpha = 0.8), quantities = FALSE, edges = list(lwd = c(3,2,2,2)), labels = list(labels = c("","","",""), cex = 1), lwd = 1))
+
+euler_jacc <- gridExtra::grid.arrange(grobs = list(euler_jacc), top = textGrob("Species", gp=gpar(fontsize=16)))
+
+
+```
+
+VarPart barplots
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# calculate overlap 
+names(varpart_out)
+varpart_out$variable2 <- gsub(".*_.*", "overlap", varpart_out$variable)
+ind_sum <- varpart_out %>% group_by(pop_ind, distance, tax, variable2) %>%
+                        summarise(percent2 = sum(percent)) 
+
+ind_sum$order <- factor(ind_sum$variable2, levels = c("host", "diet", "geo", "overlap", "Unexplained"), labels = c("Phylogeny", "Diet","Geography", "Overlap","Unexplained"))
+
+# Add colors 
+ind_sum$varFill <- ind_sum$order
+levels(ind_sum$varFill)[levels(ind_sum$varFill)=="Phylogeny"] <- "#a00000"
+levels(ind_sum$varFill)[levels(ind_sum$varFill)=="Diet"] <- "#000000"
+levels(ind_sum$varFill)[levels(ind_sum$varFill)=="Geography"] <- "#59a89c"
+levels(ind_sum$varFill)[levels(ind_sum$varFill)=="Overlap"] <- "lightgrey"
+levels(ind_sum$varFill)[levels(ind_sum$varFill)=="Unexplained"] <- "white"
+ 
+ind_sum %>% filter(tax == "Genus" & variable2 == "overlap") 
+
+ind_sum$tax <- factor(ind_sum$tax,levels=c("OTU99","Species","Genus","Family","Order","Class","Phylum"))
+
+(varPar <- ggplot(ind_sum, aes(y = tax, x = percent2, fill = order, color = order)) + 
+        geom_bar(position = "stack", stat = "identity", linewidth = 0.25, color = "black") + 
+        geom_bar(position = "stack", stat = "identity", linewidth = 0.5, show_guide = FALSE) +
+        scale_x_continuous("% variance explained",  limits = c(0, 25), expand = c(0,0)) +
+        scale_fill_manual(values = levels(ind_sum$varFill), limits=names(ind_sum$varFill), name="")+ 
+        scale_color_manual(values = c("white", "white","white", "white","white"), limits=names(ind_sum$varFill), name="") + 
+        facet_wrap(.~factor(distance), strip.position = "top", ncol= 2, dir = "v") + 
+        barplot_theme + theme(legend.position="right", panel.spacing = unit(2, "lines"),   panel.grid.major.y = element_blank(), panel.grid.major.x = element_line(colour = "#bababa", linewidth = 1), 
+          axis.title.x = element_text(size = 18), 
+          axis.title.y = element_text(size = 18),
+          axis.text.y = element_text(size = 16),
+          axis.text.x = element_text(angle = 0,  size = 16),
+          axis.line = element_line(colour = 'black', size = 0.5), 
+          legend.title=element_text(size=18), 
+          legend.text=element_text(size=16),
+          strip.text = element_text(size=18)) +
+        xlab("% variance explained") + ylab("")
+        #+ guides(color = guide_legend(override.aes = list(linewidth = 2)))
+        )
+
+```
+
+Data for scatterplot
+
+
+Rarefied 16S
+
+```{r import, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+microb_fr_otu <- readRDS(paste0(dataDir, "/microb_overlap_OTU99_fr_taxFix.rds"))
+microb_fr_species <- speedyseq::tax_glom(microb_fr_otu, "Species")
+
+
+# TipId 
+sample_data(microb_fr_species)$TipID_microbiome <- paste(sample_data(microb_fr_species)$Lab_Code, sample_data(microb_fr_species)$Species_Label, sep = "_")
+
+# meta
+microb_fr_meta_species <- sample_data(microb_fr_species) %>% data.frame
+
+```
+
+
+Diet data
+
+```{r psObject, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+diet_fr <- readRDS(paste0(dataDir, "/diet_overlap_OTU99_fr.rds"))
+
+```
+
+
+Overlap all datasets
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+microb_overlap_species <- microb_fr_species %>% subset_samples(Genus == "Fringilla" & WGS_data == 1 & Lab_Code != "132" & Lab_Code != "252" & Lab_Code != "89")
+
+microb_overlap_meta <- microb_overlap_species %>% sample_data %>% data.frame 
+names(microb_overlap_meta)
+
+
+```
+
+subsample microbiome equal sample size
+
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+sample_ps <- function(ps, FUN = sample, ...){
+  ids <- sample_names(ps)
+  sampled_ids <- FUN(ids, ...)
+  ps <- prune_samples(sampled_ids, ps)
+  return(ps)
+}
+
+levels(factor(sample_data(microb_fr_otu)$Species_Label))
+
+# species
+(ElHierro <- microb_fr_species %>% subset_samples(Species_Label=="El_Hierro_F_c_ombriosa" ))
+(Flores <- microb_fr_species %>% subset_samples(Species_Label=="Flores_F_moreletti" ))
+(GranCanaria <- microb_fr_species %>% subset_samples(Species_Label=="Gran_Canaria_F_c_bakeri" ))
+(Polatzeki <- microb_fr_species %>% subset_samples(Species_Label=="Gran_Canaria_F_polatzeki" ))
+(LaGomera <- microb_fr_species %>% subset_samples(Species_Label=="La_Gomera_F_c_canariensis" ))
+(LaPalma <- microb_fr_species %>% subset_samples(Species_Label=="La_Palma_F_c_palmae" ))
+(Madeira <- microb_fr_species %>% subset_samples(Species_Label=="Madeira_F_maderensis" ))
+(Mainland <- microb_fr_species %>% subset_samples(Species_Label=="Mainland_F_coelebs" ))
+(SaoMiguel <- microb_fr_species %>% subset_samples(Species_Label=="Sao_Miguel_F_moreletti" ))
+(Tenerife <- microb_fr_species %>% subset_samples(Species_Label=="Tenerife_F_c_canariensis" ))
+(Teydea <- microb_fr_species %>% subset_samples(Species_Label=="Tenerife_F_teydea" ))
+
+(ElHierro <- sample_ps(ElHierro, size = 9))
+(Flores <- sample_ps(Flores, size = 9))
+(GranCanaria <- sample_ps(GranCanaria, size = 9))
+(Polatzeki <- sample_ps(Polatzeki, size = 9))
+(LaGomera <- sample_ps(LaGomera, size = 9))
+(LaPalma <- sample_ps(LaPalma, size = 9))
+(Madeira <- sample_ps(Madeira, size = 9))
+(Mainland <- sample_ps(Mainland, size = 9))
+(SaoMiguel <- sample_ps(SaoMiguel, size = 9))
+(Tenerife <- sample_ps(Tenerife, size = 9))
+(Teydea <- sample_ps(Teydea, size = 9))
+
+
+(microb_fr_subsample_species <- merge_phyloseq(ElHierro, Flores, GranCanaria, Polatzeki, LaGomera, LaPalma, Madeira, Mainland, SaoMiguel, Tenerife, Teydea) %>% removeZeros())
+```
+
+merge
+ 
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# merge samples per island / mainland : species
+ps_merged_species <- phyloseq::merge_samples(microb_fr_subsample_species, "Species_Label", fun = sum)
+```
+
+
+Centroids of geographic distance
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# all finches
+# lat long data
+my_points <- data.frame(longitude = sample_data(microb_fr_otu)$Xdec, latitude = sample_data(microb_fr_otu)$Ydec, Island_Mainland = sample_data(microb_fr_otu)$Species_Label, row.names = sample_names(microb_fr_otu))
+str(my_points)
+table(my_points$Island_Mainland)
+df_sf <- st_as_sf(my_points, coords = c('longitude', 'latitude'))
+
+# get centroids per island / mainland 
+centroids_sf <- df_sf %>%
+  group_by(Island_Mainland) %>% 
+  summarize(geometry = st_union(geometry)) %>% 
+  st_centroid %>%   
+  dplyr::mutate(lon = sf::st_coordinates(.)[,1],
+                lat = sf::st_coordinates(.)[,2])
+str(centroids_sf)
+rownames(centroids_sf) <- centroids_sf$Island_Mainland
+
+# dist
+dist_mat <- distm(cbind(centroids_sf$lon, centroids_sf$lat), fun = distGeo)  # Vector of distances in meters
+dist_mat <-dist_mat/1000 #Vector of distances in km
+rownames(dist_mat) <- rownames(centroids_sf)
+colnames(dist_mat) <- rownames(centroids_sf)
+geo_dist <- as.dist(dist_mat)
+str(dist_mat)
+
+```
+
+microbiome distance matrix
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+## species
+# Bray
+microb_otu_tab <- otu_table(ps_merged_species)
+microb_otu_tab_order <- microb_otu_tab[rownames(dist_mat),]
+bray_dist_species <- vegdist(microb_otu_tab_order, method = "bray")
+
+# Jaccard 
+microb_otu_tab <- otu_table(ps_merged_species)
+microb_otu_tab_order <- microb_otu_tab[rownames(dist_mat),]
+jaccard_dist_species <- vegdist(microb_otu_tab_order, method = "jaccard", binary = TRUE)
+```
+
+
+Fst values
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+fst <- read.csv(paste0(dataDir, "/MeanFst_Fr_weighted_estimates.csv"), header = T, row.names = 1)
+str(fst)
+
+fst <- fst %>% as.matrix
+fst1 <- fst[rownames(dist_mat),colnames(dist_mat)] %>% as.matrix
+rownames(fst1)
+fst_dist <- as.dist(fst1)
+str(fst_dist)
+
+```
+
+
+Calculate divergence, microbiome distance matrix
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+## species
+# Bray
+microb_otu_tab <- otu_table(microb_overlap_species)
+bray_dist_ind_species <- vegdist(microb_otu_tab, method = "bray")
+bray_divergence_species <- betadisper(bray_dist_ind_species, microb_overlap_meta$Species_Label, type = "median")$distance %>% data.frame %>% rownames_to_column("TipID_microbiome")
+names(bray_divergence_species)[2] <- "b.beta_median"
+
+# Jaccard 
+microb_otu_tab <- otu_table(microb_overlap_species)
+jaccard_dist_ind_species <- vegdist(microb_otu_tab, method = "jaccard", binary = TRUE)
+jaccard_divergence_species <- betadisper(jaccard_dist_ind_species, microb_overlap_meta$Species_Label, type = "median")$distance %>% data.frame %>% rownames_to_column("TipID_microbiome")
+names(jaccard_divergence_species)[2] <- "j.beta_median"
+
+```
+
+
+Inbreeding coefficients
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+metadata <- read_delim(paste0(dataDir, "/WGS_Fringilla_samples.tsv"), delim = ",")
+
+ind_het <- read_delim(paste0(dataDir, "/chaffinch_bluefinch_miss0.5_mac3_noZ.het"), delim = "\t",
+           col_names = c("WGS_ID","ho", "he", "nsites", "f"), skip = 1)
+ind_het
+
+ind_het_meta <- left_join(ind_het, metadata, by ="WGS_ID")
+ind_het_meta %>% data.frame %>% head
+```
+
+Join df
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+ind_het_meta %>% data.frame %>% head(2)
+ind_het_meta$Region_Species
+
+# species
+het_bray_species <- left_join(ind_het_meta, bray_divergence_species, by = "TipID_microbiome")
+het_bray_species <- subset(het_bray_species, subset = !is.na(het_bray_species$b.beta_median))
+
+het_jacc_species <- left_join(ind_het_meta, jaccard_divergence_species, by = "TipID_microbiome")
+het_jacc_species <- subset(het_jacc_species, subset = !is.na(het_jacc_species$j.beta_median))
+```
+
+# FST and inbreeding plots
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# Fst scatter plot
+bray = as.vector(bray_dist_species)
+jacc = as.vector(jaccard_dist_species)
+fst = as.vector(fst_dist)
+geo = as.vector(geo_dist)
+
+#new data frame with vectorized distance matrices
+mat = data.frame(bray, jacc, fst, geo)
+
+# Mantel r 
+str(mantel_out)
+mantel_out$signif <- ifelse(mantel_out$p < 0.05 & mantel_out$p > 0.005, "< 0.05", ifelse(mantel_out$p < 0.005 & mantel_out$p > 0.0005 , "< 0.005", ifelse(mantel_out$p < 0.0005, "< 0.0005", "n.s.")))
+table(mantel_out$signif)
+check <- mantel_out %>% filter(p < 0.05)
+
+mantel_out$order <- factor(mantel_out$taxonomy, levels = c("OTU99", "Species", "Genus", "Family", "Order", "Class", "Phylum"))
+
+
+```
+
+
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+(p_bray_fst <- ggplot(mat, aes(y = bray, x = fst)) + 
+        geom_point(size = 5, alpha = 0.2) + 
+        labs(x = "Fst", y = "Bray-Curtis distance") +
+        geom_smooth(method = "lm", colour = "darkred", alpha = 0.2,lwd=2) +scatter_theme + ggtitle("") + sl_theme +theme(legend.position="top", 
+          axis.text.x = element_text(angle = 0,  size = 16), axis.text.y = element_text(angle = 0,  size = 16),
+          axis.title = element_text(size = 18),
+          axis.line = element_line(colour = 'black', size = 0.5), 
+          legend.title=element_text(size=18), 
+          legend.text=element_text(size=16), 
+          panel.spacing = unit(2, "lines"),
+          strip.background = element_blank(),
+          strip.text.x = element_blank()))
+
+(p_jacc_fst <- ggplot(mat, aes(y = jacc, x = fst)) + 
+        geom_point(size = 5, alpha = 0.2) + 
+        labs(x = "Fst", y = "Jaccard distance") +
+       geom_smooth(method = "lm", colour = "black", alpha = 0.2,lwd=2) +
+       scatter_theme + 
+       sl_theme +
+       theme(legend.position="top", 
+          axis.text.x = element_text(angle = 0,  size = 16), axis.text.y = element_text(angle = 0,  size = 16),
+          axis.title = element_text(size = 18), 
+          legend.title=element_text(size=18), 
+          legend.text=element_text(size=16),
+          axis.line = element_line(colour = 'black', size = 0.5), 
+          panel.spacing = unit(2, "lines"),
+          strip.background = element_blank(),
+          strip.text.x = element_blank()))
+
+Jaccard_dist_df <- data.frame(cbind(Distance = mat$jacc,fst =mat$fst,Distance_name="Jaccard"))
+Bray_dist_df <- data.frame(cbind(Distance = mat$bray,fst =mat$fst,Distance_name="Bray"))
+
+dist_fst_df <- rbind(Bray_dist_df,Jaccard_dist_df)
+
+dist_fst_df$fst <- as.numeric(dist_fst_df$fst)
+dist_fst_df$Distance <- as.numeric(dist_fst_df$Distance)
+
+
+
+mantel_out$signifFill <- as.factor(mantel_out$signif)
+levels(mantel_out$signifFill)[levels(mantel_out$signifFill)=="< 0.05"] <- "#999999"
+levels(mantel_out$signifFill)[levels(mantel_out$signifFill)=="< 0.005"] <- "#333333"
+levels(mantel_out$signifFill)[levels(mantel_out$signifFill)=="n.s."] <- "white"
+
+(p_mantel <- mantel_out %>% filter(data == "all", test == "partial-mantel") %>% 
+    ggplot(aes(y = r, x = order, fill = signif, color = signif)) + 
+        geom_bar(stat = "identity", linewidth = 0.25) +
+        scale_fill_manual("p-value", values = levels(mantel_out$signifFill), limits=names(mantel_out$signifFill))+ 
+        scale_color_manual("p-value", values = c("black", "black","black", "black","black"), limits=names(mantel_out$signifFill)) +
+        ylab(expression("Mantel"~italic("r"))) + xlab("") + coord_flip()+
+        barplot_theme + 
+         facet_wrap(.~factor(dist), strip.position = "top", ncol= 2, dir = "v") +
+        #guides(color = guide_legend(override.aes = list(linewidth = 2))) +
+        theme(legend.position="right", 
+          axis.title.x = element_text(size = 18),
+          axis.title.y = element_text(size = 18),
+          axis.text.y = element_text(size = 16),
+          axis.text.x = element_text(angle = 0,  size = 16), 
+          legend.title=element_text(size=18), 
+          legend.text=element_text(size=16),
+          axis.line = element_line(colour = 'black', size = 0.5), 
+          panel.spacing = unit(2, "lines"),
+          strip.background = element_blank(),
+          strip.text.x = element_blank()))
+
+(p_bray_het <- ggplot(het_bray_species, aes(y = b.beta_median, x = f)) + 
+        geom_point(size = 5, alpha = 0.2) + 
+        xlab(expression("Inbreeding coef"~italic((f)))) +
+        ylab("Divergence (Bray-Curtis)") + 
+        geom_smooth(method = "lm", colour = "darkred", alpha = 0.2,lwd=2) + scatter_theme + ggtitle("") + sl_theme +
+        theme(legend.position="top", 
+          axis.text.x = element_text(angle = 0,  size = 16), axis.text.y = element_text(angle = 0,  size = 16),
+          axis.title = element_text(size = 18), 
+          legend.title=element_text(size=18), 
+          legend.text=element_text(size=16),
+          axis.line = element_line(colour = 'black', size = 0.5), 
+          panel.spacing = unit(2, "lines"),
+          strip.background = element_blank(),
+          strip.text.x = element_blank()))
+
+(p_jacc_het <- ggplot(het_jacc_species, aes(y = j.beta_median, x = f)) + 
+        geom_point(size = 5, alpha = 0.2) + 
+        xlab(expression("Inbreeding coef"~italic((f)))) +
+        ylab("Divergence (Jaccard)") + 
+        geom_smooth(method = "lm", colour = "black", alpha = 0.2,lwd=2) + scatter_theme + ggtitle("") + 
+        sl_theme +
+        theme(legend.position="top", 
+          axis.text.x = element_text(angle = 0,  size = 16), axis.text.y = element_text(angle = 0,  size = 16),
+          axis.title = element_text(size = 18), 
+          legend.title=element_text(size=18), 
+          legend.text=element_text(size=16),
+          axis.line = element_line(colour = 'black', size = 0.5), 
+          panel.spacing = unit(2, "lines"),
+          strip.background = element_blank(),
+          strip.text.x = element_blank()))
+
+
+Bray_dist_f <- data.frame(cbind(beta_median = het_bray_species$b.beta_median,f =het_bray_species$f,Distance_name="Bray"))
+Jaccard_dist_f <- data.frame(cbind(beta_median = het_jacc_species$j.beta_median,f =het_jacc_species$f,Distance_name="Jaccard"))
+
+dist_f_df <- rbind(Bray_dist_f,Jaccard_dist_f)
+
+dist_f_df$f <- as.numeric(dist_f_df$f)
+dist_f_df$beta_median <- as.numeric(dist_f_df$beta_median)
+
+
+
+het_bray_species$sf <- scale(het_bray_species$f)
+
+glmm_bray_species <- glmmTMB(b.beta_median ~  f + (1|Species_Label), data = het_bray_species, na.action = na.fail, family = gaussian)
+confint(glmm_bray_species)
+
+glmm_jacc_species <- glmmTMB(j.beta_median ~  f + (1|Species_Label), data = het_jacc_species, na.action = na.fail, family = gaussian)
+confint(glmm_jacc_species)
+
+
+(effect_bray <- as.data.frame(effect('f', glmm_bray_species, confint=list(alpha = .95))))
+
+(effect_jac <- as.data.frame(effect('f', glmm_jacc_species, confint=list(alpha = .95))))
+
+(fit_Bray <- ggplot(het_bray_species, aes(y = b.beta_median, x = f))+ 
+        geom_point(size = 5, alpha = 0.2) + 
+        xlab(expression("Inbreeding coef"~italic((f)))) +
+        ylab("Divergence (Bray-Curtis)") +
+        geom_line(data = effect_bray, aes(x = f, y = fit), colour = "darkred",lwd=2) +
+        geom_ribbon(data = effect_bray,aes(x = f, y = fit,ymin = lower, ymax = upper), alpha = .2)+ scatter_theme + ggtitle("") + sl_theme +
+        theme(legend.position="top", 
+          axis.text.x = element_text(angle = 0,  size = 16), axis.text.y = element_text(angle = 0,  size = 16),
+          axis.title = element_text(size = 18), 
+          legend.title=element_text(size=18), 
+          legend.text=element_text(size=16),
+          axis.line = element_line(colour = 'black', size = 0.5), 
+          panel.spacing = unit(2, "lines"),
+          strip.background = element_blank(),
+          strip.text.x = element_blank()))
+
+
+
+(p_jacc_het <- ggplot(het_jacc_species, aes(y = j.beta_median, x = f)) + 
+        geom_point(size = 5, alpha = 0.2) + 
+        xlab(expression("Inbreeding coef"~italic((f)))) +
+        ylab("Divergence (Jaccard)") +
+        geom_line(data = effect_jac, aes(x = f, y = fit), colour = "black",lwd=2) +
+        geom_ribbon(data = effect_jac,aes(x = f, y = fit,ymin = lower, ymax = upper), alpha = .2) + scatter_theme + ggtitle("") + 
+        sl_theme +
+        theme(legend.position="top", 
+          axis.text.x = element_text(angle = 0,  size = 16), axis.text.y = element_text(angle = 0,  size = 16),
+          axis.title = element_text(size = 18), 
+          legend.title=element_text(size=18), 
+          legend.text=element_text(size=16),
+          axis.line = element_line(colour = 'black', size = 0.5), 
+          panel.spacing = unit(2, "lines"),
+          strip.background = element_blank(),
+          strip.text.x = element_blank()))
+
+
+effect_bray$Distance_name <- print("Bray") 
+effect_jac$Distance_name <- print("Jaccard")
+
+effect_df <- rbind(effect_bray, effect_jac)
+
+
+
+
+
+(p_het <- ggplot(dist_f_df, aes(y = beta_median, x = f, color = Distance_name)) + 
+        geom_point(size = 5, alpha = 0.2, colour = 'black') + 
+       scale_color_manual(values = c("darkred","black")) + 
+        xlab(expression("Inbreeding coef"~italic((f)))) +
+        ylab("Divergence") + 
+        geom_line(data = effect_df, aes(x = f, y = fit),lwd=2) +
+        geom_ribbon(data = effect_df,aes(x = f, y = fit,ymin = lower, ymax = upper), alpha = 0.1, colour = NA) + scatter_theme + ggtitle("") + 
+        sl_theme + 
+         facet_wrap(.~factor(Distance_name), strip.position = "top") + 
+        theme(legend.position="none", 
+          axis.text.x = element_text(angle = 0,  size = 16), axis.text.y = element_text(angle = 0,  size = 16),
+          axis.title = element_text(size = 18),
+          axis.line = element_line(colour = 'black', size = 0.5), 
+          legend.title=element_text(size=18), 
+          legend.text=element_text(size=16), 
+          panel.spacing = unit(2, "lines"),
+          strip.background = element_blank(),
+          strip.text.x = element_blank()))
+
+
+
+
+(p_fst <- ggplot(dist_fst_df, aes(y = Distance, x = fst, color=Distance_name)) + 
+        geom_point(size = 5, alpha = 0.2, colour = 'black') + 
+        labs(x = expression(italic("F")[ST]), y = "Distance") +
+       geom_smooth(method = "lm", alpha = 0.2,lwd=2) + 
+       scale_color_manual(values = c("darkred","black"))+
+       scatter_theme + 
+       sl_theme + 
+         facet_wrap(.~factor(Distance_name), strip.position = "top") + 
+       theme(legend.position="none", 
+          axis.text.x = element_text(angle = 0,  size = 16), axis.text.y = element_text(angle = 0,  size = 16),
+          axis.title = element_text(size = 18),
+          axis.line = element_line(colour = 'black', size = 0.5), 
+          legend.title=element_text(size=18), 
+          legend.text=element_text(size=16), 
+          panel.spacing = unit(2, "lines"),
+          strip.background = element_blank(),
+          strip.text.x = element_blank()
+          ))
+
+
+
+
+
+
+glmm_out <- read.csv(paste0(dataDir, "/glmm_fst_het_output_miss0.5_mac3_noZ_speciesFix.csv"))
+head(glmm_out)
+colnames(glmm_out) <- c("term","Estimate","Std_Error","z_value","P","lower","upper","data","taxonomy","dist")
+head(glmm_out)
+
+
+glmm_out$order <- factor(glmm_out$taxonomy, levels = c("OTU99", "species" ,"genus", "family", "order", "class", "phylum"), labels = c("OTU99", "Species", "Genus", "Family", "Order", "Class", "Phylum"))
+
+glmm_out$signif <- ifelse(glmm_out$P < 0.05 & glmm_out$P > 0.005, "< 0.05", ifelse(glmm_out$P < 0.005 & glmm_out$P > 0.0005 , "< 0.005", ifelse(glmm_out$P < 0.0005, "< 0.0005", "n.s.")))
+table(glmm_out$signif)
+check <- glmm_out %>% filter(P < 0.05)
+
+glmm_out$signifFill <- as.factor(glmm_out$signif)
+levels(glmm_out$signifFill)[levels(glmm_out$signifFill)=="< 0.05"] <- "#999999"
+levels(glmm_out$signifFill)[levels(glmm_out$signifFill)=="< 0.005"] <- "#333333"
+levels(glmm_out$signifFill)[levels(glmm_out$signifFill)=="< 0.0005"] <- "#000000"
+levels(glmm_out$signifFill)[levels(glmm_out$signifFill)=="n.s."] <- "white"
+
+glmm_out %>% filter(term == "scale(f)", data == "all")
+
+head(glmm_out)
+head(tail)
+
+
+(p_glmm <- glmm_out %>% filter(term == "scale(f)", data == "all") %>% 
+    ggplot(aes(x = Estimate, y = order)) + 
+      geom_linerange(aes(xmin = lower, xmax = upper), linewidth = 1.5, color = "#000000") +
+      geom_point(aes(fill = signif, color = signif), pch =21, size = 5) +
+      geom_vline(xintercept = 0, linetype = "longdash") + 
+      scale_fill_manual("p-value", values = levels(glmm_out$signifFill), limits=names(glmm_out$signifFill))+ 
+        scale_color_manual("p-value", values = c("black", "black","black", "black","black"), limits=names(glmm_out$signifFill)) +
+        xlab("Estimate") + ylab("")+
+        barplot_theme + 
+        facet_wrap(.~factor(dist), strip.position = "top") +
+        guides(color = guide_legend(override.aes = list(linewidth = 1))) +
+        theme(legend.position="right", 
+          axis.title.y = element_text(size=18),
+          axis.title.x = element_text(size=18),   
+          axis.text.y = element_text(angle = 0,  size = 16),   
+          axis.text.x = element_text(angle = 0,  size = 16),
+          axis.line = element_line(colour = 'black', size = 0.5), 
+          legend.title=element_text(size=18), 
+          legend.text=element_text(size=16), 
+          panel.spacing = unit(2, "lines"),
+          strip.background = element_blank(),
+          strip.text.x = element_blank()))
+
+```
+
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, fig.height = 29.7, fig.width = 21}
+
+((varPar + inset_element(euler_bray, 0.3, 0.18, 0.48, 0.99) + inset_element(euler_jacc, 0.82, 0.18, 1, 0.99)) / (p_fst) / p_mantel / (p_het) / p_glmm ) + plot_annotation(tag_levels= list(c("A", "", "", "B", "", "C", "")))  &  theme(plot.tag = element_text(size = 24))
+
+ggsave(paste0(outputDir, "/Figures/Figure4.png"),width=3000, height=4369.2, units = "px",dpi=300)
+```

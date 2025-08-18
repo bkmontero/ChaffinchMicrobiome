@@ -1,0 +1,543 @@
+---
+title: 'Processing the rbcL output files from the Dubois et al. (2022) pipeline'
+author: "Mark Gillingham and B. Karina Montero"
+date: "`r Sys.Date()`"
+#output: pdf_document
+output: html_document
+---
+
+## Loading libraries
+```{r libraries, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, results="hide"}
+rm(list = ls())
+
+# basics
+library(dplyr)
+library(ggplot2)
+library(stringr)
+library(tidyr)
+library(ggpubr)
+
+# phyloseq section
+library(phyloseq)
+library(decontam)
+
+```
+
+## WORKING DIRECTORIES
+```{r directories, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, results="hide"}
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/workingDirectories.R")
+```
+
+
+## I. LOAD & CHECK DATA
+
+### 1. metadata
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+fringilla <- import_qiime_sample_data(mapfilename = paste0(dataDir, "/metadata_fringilla_diet_03.06.23.csv"))
+
+```
+### 2. Directory containing the fastq files
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+rbcL_path <- "/home/kari/Documents/Raw_data"
+
+paste0(metabarcodingDir, "rbcL_raw_data")  
+list.files(rbcL_path)
+rbcL_files <- sort(list.files(rbcL_path, pattern="rbcL", full.names = TRUE))
+```
+
+### 3. Inspect read quality profiles
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+plotQualityProfile(rbcL_files[c(45,36,33,38,8,46,10,18,17)])
+```
+## II. REMOVE PRIMERS
+
+
+Set patterns to discriminate your forward and reverse read files
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+file_pattern <- c("F" = "_R1_001.fastq", "R" = "_R2_001.fastq")
+fas_Fs_raw <- sort(list.files(rbcL_path, pattern = file_pattern["F"], full.names = TRUE))
+fas_Rs_raw <- sort(list.files(rbcL_path, pattern = file_pattern["R"], full.names = TRUE))
+```
+Primer sequences
+
+For plant library preparation, a fragment of the rbcL gene of around 184 bp was amplified using the following primers::
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+FWD_rbcL <- "TTGGCAGCATTYCGAGTAACTCC" # rbcL1 (Palmieri, Bozza, and Giongo 2009).
+REV_rbcL <-  "AACCYTCTTCAAAAAGGTC" # rbcLB (Palmieri, Bozza, and Giongo 2009).
+```
+
+To ensure we have the right primers, and the correct orientation of the primers on the reads, we will verify the presence and orientation of these primers in the data.
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+allOrients <- function(primer) {
+    # Create all orientations of the input sequence
+    require(Biostrings)
+    dna <- DNAString(primer)  # The Biostrings works w/ DNAString objects rather than character vectors
+    orients <- c(Forward = dna, Complement = complement(dna), Reverse = reverse(dna), 
+        RevComp = reverseComplement(dna))
+    return(sapply(orients, toString))  # Convert back to character vector
+}
+
+FWD_orients_rbcL <- allOrients(FWD_rbcL)
+REV_orients_rbcL <- allOrients(REV_rbcL)
+
+```
+
+Count the number of times the primers appear in the forward and reverse read, while considering all possible primer orientations.
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+primerHits <- function(primer, fn) {
+    # Counts number of reads in which the primer is found
+    nhits <- vcountPattern(primer, sread(readFastq(fn)), fixed = FALSE)
+    return(sum(nhits > 0))
+}
+
+primer_count <- rbind(FWD.ForwardReads_rbcL = sapply(FWD_orients_rbcL, primerHits, fn = fas_Fs_raw[[1]]), 
+    FWD.ReverseReads_rbcL = sapply(FWD_orients_rbcL, primerHits, fn = fas_Rs_raw[[1]]), 
+    REV.ForwardReads_rbcL = sapply(REV_orients_rbcL, primerHits, fn = fas_Fs_raw[[1]]), 
+    REV.ReverseReads_rbcL = sapply(REV_orients_rbcL, primerHits, fn = fas_Rs_raw[[1]]))
+primer_count
+```
+As expected, the FWD primer is found in the forward reads in its forward orientation, and in some of the reverse reads in its reverse-complement orientation (due to read-through when the ITS region is short). Similarly the REV primer is found with its expected orientations.
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+FWD <- c("TTGGCAGCATTYCGAGTAACTCC")
+REV <- c("AACCYTCTTCAAAAAGGTC")
+
+FWD_RC <- dada2:::rc(FWD)
+REV_RC <- dada2:::rc(REV)
+
+path_cut <- file.path(rbcL_path, "cutadapt")
+if(!dir.exists(path_cut)) dir.create(path_cut)
+
+#path_cut <- paste0(barcodingDir, "/cutadapt")
+
+fas_Fs_cut <- file.path(path_cut, basename(fas_Fs_raw))
+fas_Rs_cut <- file.path(path_cut, basename(fas_Rs_raw))
+
+R1_flags <- paste(paste("-g", FWD, collapse = " "), paste("-a", REV_RC, collapse = " "))
+R2_flags <- paste(paste("-G", REV, collapse = " "), paste("-A", FWD_RC, collapse = " "))
+
+cutadapt <- "/home/fringilla/miniconda3/envs/cutadaptenv/bin/cutadapt" # Path to the executable
+
+for(i in seq_along(fas_Fs_raw)) {
+  cat("Processing", "-----------", i, "/", length(fas_Fs_raw), "-----------\n")
+  system2(cutadapt, args = c(R1_flags, R2_flags,
+                             "-m 50",
+                             "-M 200",
+                             "--discard-untrimmed",
+                             "--max-n 0",
+                             "--cores 0", # Use 0 to auto-detect.
+                             "-n 2", # required to remove FWD and REV from read
+                             # Optional strong constraint on expected length
+                             #paste0("-m ", 250-nchar(FWD)[1], ":", 250-nchar(REV)[1]), 
+                             #paste0("-M ", 250-nchar(FWD)[1], ":", 250-nchar(REV)[1]), 
+                             "-o", fas_Fs_cut[i], "-p", fas_Rs_cut[i],
+                             fas_Fs_raw[i], fas_Rs_raw[i]))
+}
+
+
+primer_count <- rbind(FWD.ForwardReads_rbcL = sapply(FWD_orients_rbcL, primerHits, fn = fas_Fs_cut[[1]]), 
+    FWD.ReverseReads_rbcL = sapply(FWD_orients_rbcL, primerHits, fn = fas_Rs_cut[[1]]), 
+    REV.ForwardReads_rbcL = sapply(REV_orients_rbcL, primerHits, fn = fas_Fs_cut[[1]]), 
+    REV.ReverseReads_rbcL = sapply(REV_orients_rbcL, primerHits, fn = fas_Rs_cut[[1]]))
+primer_count
+
+```
+
+## III. FILTER AND TRIM
+
+Remove 284_rbcL empty file
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+path_cut <- paste0(metabarcodingDir, "rbcL_raw_data/cutadapt") # If you skipped primers removal, provide the path to your sequences here
+list.files(path_cut)
+
+fas_Fs_cut <- sort(list.files(path_cut, pattern = file_pattern["F"], full.names = TRUE))
+fas_Rs_cut <- sort(list.files(path_cut, pattern = file_pattern["R"], full.names = TRUE))
+
+sample_names <- sapply(strsplit(basename(fas_Fs_cut), "_"), function(x) x[1])
+
+rbcL_cut <- sort(list.files(path_cut, pattern="rbcL", full.names = TRUE))
+```
+
+Inspect read quality profiles
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+plotQualityProfile(rbcL_cut[c(45,36,33,38,8,46,10,18,17)])
+#ggsave(paste(outputDir, "/02_DietMetabarcoding/01_Exploration/01_qualityProfile/rbcL_cut_plotQualityProfile.png", sep = "/"))
+
+fas_Fs_filtered <- file.path(rbcL_path, "filtered", basename(fas_Fs_cut))
+fas_Rs_filtered <- file.path(rbcL_path, "filtered", basename(fas_Rs_cut))
+all.equal(basename(fas_Fs_raw), basename(fas_Fs_filtered))
+
+names(fas_Fs_filtered) <- sample_names
+names(fas_Rs_filtered) <- sample_names
+
+```
+
+Standard filtering paraments: maxN=0 (DADA2 requires sequences contain no Ns), truncQ = 2, rm.phix = TRUE and maxEE=2. The maxEE parameter sets the maximum number of “expected errors” allowed in a read, which is a better filter than simply averaging quality scores.
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+filter_trim <- filterAndTrim(fas_Fs_cut, fas_Fs_filtered, fas_Rs_cut, fas_Rs_filtered,
+                       #truncLen = c(170, 100), 
+                       minLen = 174,
+                       maxLen = 194, 
+                       maxN = 0, maxEE = c(2, 2), truncQ = 2,
+                       rm.phix = TRUE, multithread = TRUE, verbose = FALSE)
+head(filter_trim)
+```
+## IV. DADA 2
+
+Learn error rates
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+error_F <- learnErrors(fas_Fs_filtered, multithread = TRUE, randomize = TRUE)
+#101903502 total bases in 565302 reads from 112 samples will be used for learning the error rates.
+saveRDS(error_F, paste0(outputDir, "/02_DietMetabarcoding/02_dada2/rbcL_error_F.rds"))
+#err <- readRDS(paste0(outputDir, "/02_Dada2/err.rds"))
+
+plotErrors(error_F, nominalQ=TRUE)
+ggsave(paste(outputDir, "/02_DietMetabarcoding/02_dada2/plotErrors_rbcL_F.png", sep = "/"))
+
+error_R <- learnErrors(fas_Rs_filtered, multithread = TRUE, randomize = TRUE)
+#100633957 total bases in 560007 reads from 137 samples will be used for learning the error rates.
+saveRDS(error_R, paste0(outputDir, "/02_DietMetabarcoding/02_dada2/rbcL_error_R.rds"))
+#err <- readRDS(paste0(outputDir, "/02_Dada2/err.rds"))
+
+plotErrors(error_R, nominalQ=TRUE)
+ggsave(paste(outputDir, "/02_DietMetabarcoding/02_dada2/plotErrors_rbcL_R.png", sep = "/"))
+```
+
+
+### DEREPLICATION, SAMPLE INFERENCE & MERGE PAIRED READS
+from https://github.com/fkeck/DADA2_diatoms_pipeline/blob/master/pipeline.R
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+merged_list <- vector("list", length(sample_names))
+names(merged_list) <- sample_names
+
+for(i in sample_names){
+  cat("Processing -------", which(sample_names == i), "/", length(sample_names), "-------", i, "\n")
+  derep_Fs <- derepFastq(fas_Fs_filtered[[i]], verbose = TRUE)
+  derep_Rs <- derepFastq(fas_Rs_filtered[[i]], verbose = TRUE)
+  dds_Fs <- dada(derep_Fs, err = error_F, multithread = TRUE, verbose = TRUE)
+  dds_Rs <- dada(derep_Rs, err = error_R, multithread = TRUE, verbose = TRUE)
+  merged_list[[i]] <- mergePairs(dds_Fs, derep_Fs, dds_Rs, derep_Rs, verbose = TRUE)
+}
+```
+
+### CONSTRUCT SEQUENCE TABLE
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+seqtab <- makeSequenceTable(merged_list)
+dim(seqtab)
+table(nchar(getSequences(seqtab)))
+```
+
+### REMOVE CHIMERA
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+seqtab_nochim <- removeBimeraDenovo(seqtab, method = "consensus", multithread = TRUE, verbose = TRUE)
+#Identified 232 bimeras out of 3275 input sequences.
+dim(seqtab_nochim)
+table(nchar(getSequences(seqtab_nochim)))
+```
+
+
+### Export files for use in QIIME2
+https://forum.qiime2.org/t/exporting-dada2-r-package-results-to-work-with-qiime2/2573/3
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+write.table(t(seqtab_nochim), paste0(outputDir, "/02_DietMetabarcoding/02_dada2/rbcLQIIME2seqtab.txt"), sep="\t", row.names=TRUE, col.names=NA, quote=FALSE)
+uniquesToFasta(seqtab_nochim, fout=paste0(outputDir, "/02_DietMetabarcoding/02_dada2/rbcL-rep-seqs.fna"), ids=colnames(seqtab_nochim))
+
+```
+
+### TAXONOMY ASSIGNMENT (CESGA cluster)
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+qiime2run qiime feature-classifier classify-sklearn \
+  --i-classifier /mnt/lustre/scratch/nlsas/home/csic/dde/pla/FringillaProject/06_rbcL/NCBI_rbcL_Viridiplantae_classifier_extracted_2022_09_22_derep.qza \
+  --i-reads /mnt/lustre/scratch/nlsas/home/csic/dde/pla/FringillaProject/06_rbcL/rbcL-rep-seqs.qza \
+  --o-classification /mnt/lustre/scratch/nlsas/home/csic/dde/pla/FringillaProject/06_rbcL/rbcL_4_derep_restricted.qza
+
+```
+
+# CLEAN rbcL data 
+
+The best classifier was trained uniq dereplication once (high taxonomic assignment at the Family level: ps_rbcL_4_derep_restricted_filt). We will use this classifier for all down stream analyses. 
+
+
+```{r psobject, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, results="hide"}
+
+rbcL_4_derep_restricted_biom_data <- import_biom(BIOMfilename = paste0(dataDir,"/classifiers/rbcL_4_derep_restricted.biom"))
+
+rep.seqs <- Biostrings::readDNAStringSet(paste0(outputDir,"/02_DietMetabarcoding/02_dada2/rbcL-rep-seqs.fna"), format = "fasta")
+
+ps_rbcL_4_derep_restricted <- merge_phyloseq(t(otu_table(rbcL_4_derep_restricted_biom_data)),tax_table(rbcL_4_derep_restricted_biom_data), fringilla,rep.seqs)
+
+taxa_names(ps_rbcL_4_derep_restricted) <- paste0("ASVrbcL", seq(ntaxa(ps_rbcL_4_derep_restricted)))
+
+tax_rbcL_4_derep_restricted <- data.frame(tax_table(ps_rbcL_4_derep_restricted))
+
+tax_rbcL_4_derep_restricted.clean <- data.frame(row.names = row.names(tax_rbcL_4_derep_restricted),Kingdom = str_replace(tax_rbcL_4_derep_restricted[,1], "k__",""),Phylum = str_replace(tax_rbcL_4_derep_restricted[,2], "p__",""),Class = str_replace(tax_rbcL_4_derep_restricted[,3], "c__",""),Order = str_replace(tax_rbcL_4_derep_restricted[,4], "o__",""),Family = str_replace(tax_rbcL_4_derep_restricted[,5], "f__",""),Genus = str_replace(tax_rbcL_4_derep_restricted[,6], "g__",""),Species = str_replace(tax_rbcL_4_derep_restricted[,7], "s__",""),stringsAsFactors = FALSE)
+
+tax_rbcL_4_derep_restricted.clean [tax_rbcL_4_derep_restricted.clean  == ''] <- NA
+
+tax_table(ps_rbcL_4_derep_restricted) <- as.matrix(tax_rbcL_4_derep_restricted.clean)
+
+
+ps_rbcL_4_derep_restricted_filt <- ps_rbcL_4_derep_restricted %>%
+  subset_taxa(
+    Kingdom == "Viridiplantae" &
+    Phylum == "Streptophyta")
+
+
+```
+
+
+## Removing contaminants using PCR controls
+
+We remove the contaminant ASVs using the DECONTAM package:
+
+(https://bioconductor.org/packages/release/bioc/vignettes/decontam/inst/doc/decontam_intro.html)
+
+We first look at the library sizes (i.e. the number of reads) in each sample, as a function of whether that sample was a true positive sample or a negative control
+```{r librarysizes, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE }
+
+
+df <- as.data.frame(sample_data(ps_rbcL_4_derep_restricted_filt)) 
+df$LibrarySize <- sample_sums(ps_rbcL_4_derep_restricted_filt)
+df <- df[order(df$LibrarySize),]
+df$Index <- seq(nrow(df))
+
+#png(paste0(outputDir, "/02_DietMetabarcoding/temp.png"),width=4000, height=2000,res=300)
+ggplot(data=df, aes(x=Index, y=LibrarySize, color=Sample_or_Control)) + geom_point() + theme_bw()
+##dev.off()
+
+
+```
+
+Second we investigate the prevalence of ASVs in control samples and so called "true samples". Then we remove identified contaminants from our dataset, 4 were identified as contaminants
+```{r prevalenceDecontam, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE }
+
+sample_data(ps_rbcL_4_derep_restricted_filt)$is.neg <- sample_data(ps_rbcL_4_derep_restricted_filt)$Sample_or_Control == "Control"
+
+contamdf.prev <- isContaminant(ps_rbcL_4_derep_restricted_filt, method="prevalence", neg="is.neg")
+table(contamdf.prev$contaminant)
+
+contamdf.prev05 <- isContaminant(ps_rbcL_4_derep_restricted_filt, method="prevalence", neg="is.neg", threshold=0.5)
+table(contamdf.prev05$contaminant)
+
+ps_rbcL_4_derep_restricted_filt.pa <- transform_sample_counts(ps_rbcL_4_derep_restricted_filt, function(abund) 1*(abund>0))
+
+ps_rbcL_4_derep_restricted_filt.pa.neg <- prune_samples(sample_data(ps_rbcL_4_derep_restricted_filt.pa)$Sample_or_Control == "Control", ps_rbcL_4_derep_restricted_filt.pa)
+
+ps_rbcL_4_derep_restricted_filt.pa.pos <- prune_samples(sample_data(ps_rbcL_4_derep_restricted_filt.pa)$Sample_or_Control == "Sample", ps_rbcL_4_derep_restricted_filt.pa)
+
+df.pa <- data.frame(pa.pos=taxa_sums(ps_rbcL_4_derep_restricted_filt.pa.pos), pa.neg=taxa_sums(ps_rbcL_4_derep_restricted_filt.pa.neg),contaminant=contamdf.prev$contaminant)
+
+ggplot(data=df.pa, aes(x=pa.neg, y=pa.pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)") + theme_bw()
+
+tax_table(ps_rbcL_4_derep_restricted_filt)[contamdf.prev05$contaminant,]
+
+ps_rbcL_4_derep_restricted_filt.contam <- prune_taxa(contamdf.prev05$contaminant, ps_rbcL_4_derep_restricted_filt)
+ps_rbcL_4_derep_restricted_filt
+
+ps_rbcL_4_derep_restricted_filt.noncontam <- prune_taxa(!contamdf.prev05$contaminant, ps_rbcL_4_derep_restricted_filt)
+ps_rbcL_4_derep_restricted_filt.noncontam
+
+### Four taxa are identified as contaminants
+
+ps_rbcL_4_derep_restricted_filt<-ps_rbcL_4_derep_restricted_filt.noncontam
+
+
+
+```
+
+
+We remove the PCR control samples from the phyloseq object
+```{r removeControls, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE ,results="hide"}
+
+subset_samples(ps_rbcL_4_derep_restricted_filt, Sample_or_Control %in% Samples_toRemove)
+
+subset_samples(ps_rbcL_4_derep_restricted_filt, !(Sample_or_Control %in% Samples_toRemove))
+
+ps_rbcL_4_derep_restricted_filt<-subset_samples(ps_rbcL_4_derep_restricted_filt, !(Sample_or_Control %in% Samples_toRemove))
+
+
+```
+
+### Fraction of **reads** that can be assigned to taxonomic level
+
+```{r fractionAssigned, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+readsPerSample = rowSums(otu_table(ps_rbcL_4_derep_restricted_filt))
+fractionReadsAssigned = sapply(colnames(tax_table(ps_rbcL_4_derep_restricted_filt)), function(x){
+  rowSums(otu_table(ps_rbcL_4_derep_restricted_filt)[, !is.na(tax_table(ps_rbcL_4_derep_restricted_filt))[,x]]) / readsPerSample
+})
+
+fractionReadsAssigned = data.frame(SampleID = rownames(fractionReadsAssigned), fractionReadsAssigned)
+fractionReadsAssigned.L = pivot_longer(fractionReadsAssigned, 
+    cols=colnames(tax_table(ps_rbcL_4_derep_restricted_filt)), names_to="taxlevel", values_to="fractionReadsAssigned")
+fractionReadsAssigned.L = data.frame(fractionReadsAssigned.L, sample_data(ps_rbcL_4_derep_restricted_filt)[fractionReadsAssigned.L$SampleID,])
+
+fractionReadsAssigned.L$taxlevelf = factor(fractionReadsAssigned.L$taxlevel, levels=c("Kingdom","Phylum","Class","Order","Family","Genus","Species"))
+
+# Boxplot, fraction assigned by SampleType
+#png(paste0(outputDir, "/02_DietMetabarcoding/01_Exploration/rbcLReads_Taxonomy_4_derep_restricted.png"),width=4000, height=2000,res=300)
+
+p4<-ggplot(fractionReadsAssigned.L, aes(y = fractionReadsAssigned, x = taxlevelf)) +  theme_bw(base_size = 10) +  geom_boxplot(color='black', outlier.shape=NA) + geom_point() +  ggtitle("Fraction of reads identified by taxonomic level, NCBI classifier \n(primer trained and dereplicated 'uniq'; 1885 ASVs)") + ylab ("Fraction of reads assigned") + xlab ("Taxonomic rank")
+##dev.off()
+
+Table4<-round(tapply(fractionReadsAssigned.L$fractionReadsAssigned,fractionReadsAssigned.L$taxlevelf,mean),4)*100
+c.names<-append(names(Table4),paste0("Classifier"))
+Table4<-append(Table4,paste0("4_derep_restricted"))
+Table4<-array(Table4,dimnames=list(c.names))
+
+
+```
+
+### Replace NAs with the highest possible rank in the taxonomic names
+```{r ReplaceNAs, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, results="hide"}
+
+
+tax_rbcL_4_derep_restricted_filt<- data.frame(tax_table(ps_rbcL_4_derep_restricted_filt))
+
+tax_rbcL_4_derep_restricted_filt[is.na(tax_rbcL_4_derep_restricted_filt)] <- ""
+
+for (i in 1:7){ tax_rbcL_4_derep_restricted_filt[,i] <- as.character(tax_rbcL_4_derep_restricted_filt[,i])}
+tax_rbcL_4_derep_restricted_filt[is.na(tax_rbcL_4_derep_restricted_filt)] <- ""
+
+for (i in 1:nrow(tax_rbcL_4_derep_restricted_filt)){if (tax_rbcL_4_derep_restricted_filt[i,2] == "")
+  {
+    kingdom <- paste("Kingdom_", tax_rbcL_4_derep_restricted_filt[i,1], sep = "")
+    tax_rbcL_4_derep_restricted_filt[i, 2:7] <- kingdom
+  } else if (tax_rbcL_4_derep_restricted_filt[i,3] == ""){
+    phylum <- paste("Phylum_", tax_rbcL_4_derep_restricted_filt[i,2], sep = "")
+    tax_rbcL_4_derep_restricted_filt[i, 3:7] <- phylum
+  } else if (tax_rbcL_4_derep_restricted_filt[i,4] == ""){
+    class <- paste("Class_", tax_rbcL_4_derep_restricted_filt[i,3], sep = "")
+    tax_rbcL_4_derep_restricted_filt[i, 4:7] <- class
+  } else if (tax_rbcL_4_derep_restricted_filt[i,5] == ""){
+    order <- paste("Order_", tax_rbcL_4_derep_restricted_filt[i,4], sep = "")
+    tax_rbcL_4_derep_restricted_filt[i, 5:7] <- order
+  } else if (tax_rbcL_4_derep_restricted_filt[i,6] == ""){
+    family <- paste("Family_", tax_rbcL_4_derep_restricted_filt[i,5], sep = "")
+    tax_rbcL_4_derep_restricted_filt[i, 6:7] <- family
+  } else if (tax_rbcL_4_derep_restricted_filt[i,7] == ""){
+    tax_rbcL_4_derep_restricted_filt$Species[i] <- paste("Genus",tax_rbcL_4_derep_restricted_filt$Genus[i], sep = "_")
+  }
+}
+
+tax_rbcL_4_derep_restricted_filt
+
+tax_table(ps_rbcL_4_derep_restricted_filt)<-as.matrix(tax_rbcL_4_derep_restricted_filt)
+```
+
+### Barplot of taxonomy at the class level according to the geographical local location of the samples (all sample types pooled):
+
+```{r taxonomyClass, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+
+#(sample_data(ps_rbcL_4_derep_restricted_filt))$Island_Mainland
+
+Merged<-merge_samples(ps_rbcL_4_derep_restricted_filt,"Island_Mainland")
+warnings() 
+
+#names(sample_data(Merged))
+
+physeq2 <- phyloseq::transform_sample_counts(Merged, function(x) x / sum(x) )
+physeq2
+
+ps_melt<- psmelt(physeq2)
+
+ps_melt$Family[ps_melt$Abundance < 0.01] <- "< 1% abund."
+
+p4 <- ggplot(data=ps_melt, aes(x=Sample, y=Abundance, fill=Family))
+p4 <-p4 + geom_bar(aes(), stat="identity", position="stack") +scale_fill_manual(values = c("darkblue", "#8b5b5b", "darkorchid", "lightskyblue", "darkgreen", "#4a3b2c", "deeppink", "khaki2","#aa6c39", "darkorange1", "#E0FFFF", "darksalmon", "#eee7e1", "black", "darkolivegreen1","pink","darkseagreen","#E41A1C","#0000FF","#00FF00","#FFA500","#E7298A","#00FFFF","#008000","#800080","#008080","#999999","#FF4500","#FFFF00","#4DAF4A","#A65628","#F781BF","#1B9E77","#808000","#377EB8", "#CBC3E3","#460046","#AA336A","#d2691e")) + guides(fill=guide_legend(title="Taxanomic assignment (Family or higher)",ncol=3)) +theme(text = element_text(size = 10),legend.position="right",axis.text.x = element_text(angle = 45, hjust = 1),panel.background = element_blank(),plot.margin = unit(c(1,1,1,1), "cm"))+ggtitle("primer trained and dereplicated 'uniq'; 1885 ASVs")+
+  xlab("")
+
+
+```
+
+## Explore sequencing depth and number of ASVs of
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# Add sequencing depth column 
+sample_data(ps_rbcL_4_derep_restricted_filt)$Seq_depth_rbcL <- sample_sums(ps_rbcL_4_derep_restricted_filt)
+
+df_explore_filt <- ps_rbcL_4_derep_restricted_filt %>% subset_samples(Genus == "Fringilla") %>%
+    sample_data %>%
+    as.data.frame
+table(df_explore_filt$Seq_depth_rbcL == 0)
+
+asv_df_explore_filt <- ps_rbcL_4_derep_restricted_filt %>%subset_samples(Genus == "Fringilla") %>%
+    t %>%
+    otu_table
+
+ASV_number <- colSums(asv_df_explore_filt != 0)
+
+df_explore_filt$ASV_number <- ASV_number
+
+table(df_explore_filt$ASV_number == 0)
+
+(p_run <- ggplot(df_explore_filt) + geom_boxplot(aes(x = Species_Label, y = Seq_depth_rbcL)) +
+    ylab("Sequencing depth") + scale_y_log10() + theme_linedraw() + theme(panel.grid = element_line(colour = "darkgrey"),
+    legend.position = "none"))
+
+# ASV number per species
+
+(p_ASVs <- ggplot(df_explore_filt) + geom_boxplot(aes(x = Species_Label, y = ASV_number)) +
+    ylab("Observed ASVs") + scale_y_log10() + theme_linedraw() + theme(panel.grid = element_line(colour = "darkgrey"),
+    legend.position = "none"))
+
+(p_ASVs <- ggplot(df_explore_filt) + geom_boxplot(aes(x = Month, y = ASV_number)) +
+    ylab("Observed ASVs") + scale_y_log10() + theme_linedraw() + theme(panel.grid = element_line(colour = "darkgrey"),
+    legend.position = "none"))
+
+table(df_explore_filt$Species_Label, df_explore_filt$Month)
+
+```
+
+## EXPORT rbcL PHYLOSEQ OBJECT
+
+Export ps_rbcL_4_derep_restricted_filt and use this phyloseq object for further downstream analyses on rbcL.
+
+Update metadata Fringilla project
+
+```{r export, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# Add sequencing depth column 
+sample_data(ps_rbcL_4_derep_restricted_filt)$Seq_depth_rbcL <- sample_sums(ps_rbcL_4_derep_restricted_filt)
+
+# remove unnecessary columns from metadata
+df <-  data.frame(sample_data(ps_rbcL_4_derep_restricted_filt)) %>%  select("sampleid", "Lab_Code", "Plate", "Seq_depth_rbcL", "Ring","Genus" , "Species", "Subspecies", "Species_Label", "Month", "Year", "Locality", "Habitat", "Xdec", "Ydec", "Archipelago_Mainland", "Island_Mainland",  "Area_km2", "Distance_mainland", "Age_ma", "Age", "Sex", , "Weight", "Wing", "X8_P", "Tail", "Nar", "P_Cr", "Height", "Width", "Cran", "Tars")
+
+sample_data(ps_rbcL_4_derep_restricted_filt) <- df
+
+# Replace sampleid with Lab_Code to match sample names across datasets 
+
+sample_names(ps_rbcL_4_derep_restricted_filt) <- paste0("X",sample_data(ps_rbcL_4_derep_restricted_filt)$Lab_Code)
+
+```
+Save phyloseq object
+```{r exportpartII saveObjects, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+ps_rbcL_4_derep_restricted_filt
+ps_rbcL_4_derep_restricted_filt %>% sample_data %>% names
+
+saveRDS(ps_rbcL_4_derep_restricted_filt, paste0(dataDir, "/ps.clean_rbcL.rds"))
+
+```
+
+## Session Info
+
+```{r sessioninfo, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+sessioninfo::session_info()%>%
+  details::details(summary = 'Current session info', open = FALSE)
+```

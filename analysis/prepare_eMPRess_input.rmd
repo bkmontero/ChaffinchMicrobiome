@@ -1,0 +1,431 @@
+---
+title: 'PACo Test'
+author: "B. K. Montero and M. Gillingham"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+## LOAD LIBRARIES
+
+```{r loadLibraries, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=(width.cutoff=45), paged.print=FALSE}
+
+
+rm(list = ls())
+
+#general
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+library(stringr)
+library(vegan)
+library(magrittr)
+library(ggplot2)
+library(ggpubr)
+library(MicEco)
+library(rlist) 
+library(grid)
+library(tsiR) 
+library(ape)
+library(treedataverse)
+library(ggh4x)
+
+# phyloseq section
+library(phyloseq)
+library(Biostrings)
+library(DECIPHER)
+library(speedyseq)
+library(microbiome)
+library(metagMisc)
+library(phylosmith)
+library(seqateurs)
+library(treedata.table)
+library(microViz)
+
+#rmd
+library(details)
+library(knitr)
+library(kableExtra)
+
+# PACo 
+library(ape)
+library(paco)
+library(future)
+library(doParallel)
+library(future)
+library(future.apply)
+library(multcomp)
+
+```
+
+## WORKING DIRECTORIES
+
+```{r source, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, results="hide"}
+
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/workingDirectories.R")
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/CleanScripts/graphics_param.R")
+
+```
+
+## PREPARE DATA
+
+Microbiome 
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+microb_fr <- readRDS(paste0(dataDir, "/microb_overlap_OTU99_fr_taxFix.rds"))
+
+# Add TipID microbiome to match stuff later on
+sample_data(microb_fr)$TipID_microbiome <- paste(sample_data(microb_fr)$Lab_Code, sample_data(microb_fr)$Species_Label, sep = "_")
+
+
+```
+
+# Overlap WGS data
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+microb_overlap <- microb_fr %>% subset_samples(Genus == "Fringilla" & WGS_data == 1 & Lab_Code != "132" & Lab_Code != "252" & Lab_Code != "89")
+microb_overlap <- biomeUtils::removeZeros(microb_overlap)
+microb_overlap_meta <- microb_overlap%>% sample_data %>% data.frame 
+
+```
+
+Subsample 
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# Merge samples by island first
+merge_by_pop <- function(ps_obj) {
+  # This will sum counts across samples from the same island
+  merge_samples(ps_obj, "Species_Label") 
+}
+
+# Ensure all islands are represented (balanced)
+subsample_one_pop_per_otu_balanced <- function(ps_obj) {
+  # Get OTU table
+  otu_table_orig <- as.data.frame(otu_table(ps_obj))
+  
+  # Get all islands
+  all_islands <- rownames(otu_table_orig)
+  
+  # Create a new OTU table filled with zeros
+  otu_table_new <- otu_table_orig
+  otu_table_new[,] <- 0
+  
+  # Track how many OTUs each island has been assigned
+  island_counts <- setNames(rep(0, length(all_islands)), all_islands)
+  
+  # First pass: assign each island at least one OTU
+  remaining_islands <- all_islands
+  
+  for (island in remaining_islands) {
+    # Find OTUs present on this island
+    present_otus <- colnames(otu_table_orig)[otu_table_orig[island, ] > 0]
+    
+    if (length(present_otus) > 0) {
+      # Randomly select one OTU for this island
+      selected_otu <- sample(present_otus, 1)
+      
+      # Assign this OTU to this island
+      otu_table_new[island, selected_otu] <- otu_table_orig[island, selected_otu]
+      island_counts[island] <- island_counts[island] + 1
+      
+      # Remove this OTU from consideration for other islands
+      otu_table_orig[, selected_otu] <- 0
+    }
+  }
+  
+  # Second pass: assign remaining OTUs randomly
+  for (otu in colnames(otu_table_orig)) {
+    if (sum(otu_table_orig[, otu]) > 0) {  # If OTU still has presence somewhere
+      # Find islands where this OTU is present
+      present_islands <- rownames(otu_table_orig[otu_table_orig[, otu] > 0, ])
+      
+      if (length(present_islands) > 0) {
+        # Randomly select one island
+        selected_island <- sample(present_islands, 1)
+        
+        # Keep the original count in only this island
+        otu_table_new[selected_island, otu] <- otu_table_orig[selected_island, otu]
+      }
+    }
+  }
+  
+  # Create new phyloseq object with modified OTU table
+  new_ps <- ps_obj
+  otu_table(new_ps) <- otu_table(otu_table_new, taxa_are_rows = FALSE)
+  
+  return(new_ps)
+}
+
+# Check how many islands you start with vs end with
+check_island_retention <- function(original_ps, final_ps) {
+  original_islands <- length(unique(sample_data(original_ps)$Species_Label))
+  final_islands <- nsamples(final_ps)
+  
+  cat("Original islands:", original_islands, "\n")
+  cat("Final islands:", final_islands, "\n")
+  cat("Islands lost:", original_islands - final_islands, "\n")
+  
+  return(list(original = original_islands, final = final_islands))
+}
+
+create_association_matrix <- function(ps_obj, filename) {
+  # Get OTU table
+  otu_table_df <- as.data.frame(otu_table(ps_obj))
+  
+  # Create association matrix in symbiont:host format
+  associations <- c()
+  
+  # For each symbiont (OTU), find which host (island) it's associated with
+  for (symbiont in colnames(otu_table_df)) {
+    # Find hosts where this symbiont is present
+    present_hosts <- rownames(otu_table_df[otu_table_df[, symbiont] > 0, ])
+    
+    if (length(present_hosts) > 0) {
+      # Should only be one host per symbiont after subsampling
+      for (host in present_hosts) {
+        associations <- c(associations, paste0(symbiont, ":", host))
+      }
+    }
+  }
+  
+  # Write to file
+  writeLines(associations, paste0(dataDir, "/eMPRess/", filename))
+  
+  # Also return the associations for checking
+  cat("Created association matrix with", length(associations), "associations\n")
+  cat("Saved to:", paste0(dataDir, "/eMPRess/", filename), "\n")
+  
+  return(associations)
+}
+
+```
+
+
+Lactobacillaceae
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+ps_Lactobacillaceae <- microb_fr%>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list = "Lactobacillaceae")
+
+ps_Lactobacillaceae <- speedyseq::tax_glom(ps_Lactobacillaceae, "Species",  NArm = FALSE)
+
+tax_table(ps_Lactobacillaceae) %>% data.frame %>% head(2)
+tax_table(ps_Lactobacillaceae) <- tax_table(ps_Lactobacillaceae)[,1:7]
+tax_table(ps_Lactobacillaceae) <- cbind(tax_table(ps_Lactobacillaceae), 
+    rownames(tax_table(ps_Lactobacillaceae)))
+colnames(tax_table(ps_Lactobacillaceae)) <- 
+  c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species","OTU_ID")
+
+
+set.seed(123)
+merged_ps <- merge_by_pop(ps_Lactobacillaceae)
+pop_subsampled <- subsample_one_pop_per_otu_balanced(merged_ps)
+
+# Check - should keep all islands
+nsamples(merged_ps)  # Original number of islands
+nsamples(pop_subsampled)  # Should be the same!
+
+prev_counts <- apply(otu_table(pop_subsampled), 2, function(x) sum(x > 0))
+table(prev_counts)
+# See how many OTUs each island has
+
+island_otu_counts <- rowSums(otu_table(merged_ps) > 0)
+print(island_otu_counts)
+
+island_otu_counts <- rowSums(otu_table(pop_subsampled) > 0)
+print(island_otu_counts)
+
+
+associations <- create_association_matrix(pop_subsampled, "lacto_merged_sp.mapping")
+
+associations_df <- as.data.frame(associations)
+head(associations_df)
+str(associations_df)
+associations_df[c("symbiont", "host")] <- do.call(rbind, strsplit(associations_df$associations, ":"))
+
+length(unique(associations_df$host))      # Should match your host species count
+length(unique(associations_df$symbiont))  # Should be initial number of OTUs
+table(table(associations_df$symbiont))    # Each symbiont should appear only once
+
+#symbiont tree
+
+write.tree(phy_tree(pop_subsampled), file = paste0(dataDir, "/lactob_symbiont_tree_sp.nwk"))
+
+```
+
+Burkholderiaceae
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+ps_Burkholderiaceae <- microb_fr %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list = "Burkholderiaceae")
+
+ps_Burkholderiaceae <- speedyseq::tax_glom(ps_Burkholderiaceae, "Species",  NArm = FALSE)
+
+tax_table(ps_Burkholderiaceae) %>% data.frame %>% head(2)
+tax_table(ps_Burkholderiaceae) <- tax_table(ps_Burkholderiaceae)[,1:7]
+tax_table(ps_Burkholderiaceae) <- cbind(tax_table(ps_Burkholderiaceae), 
+    rownames(tax_table(ps_Burkholderiaceae)))
+colnames(tax_table(ps_Burkholderiaceae)) <- 
+  c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species","OTU_ID")
+
+
+set.seed(123)
+merged_ps <- merge_by_pop(ps_Burkholderiaceae)
+pop_subsampled <- subsample_one_pop_per_otu_balanced(merged_ps)
+
+# Check - should keep all islands
+nsamples(merged_ps)  # Original number of islands
+nsamples(pop_subsampled)  # Should be the same!
+
+prev_counts <- apply(otu_table(pop_subsampled), 2, function(x) sum(x > 0))
+table(prev_counts)
+# See how many OTUs each island has
+
+island_otu_counts <- rowSums(otu_table(merged_ps) > 0)
+print(island_otu_counts)
+
+island_otu_counts <- rowSums(otu_table(pop_subsampled) > 0)
+print(island_otu_counts)
+
+associations <- create_association_matrix(pop_subsampled, "burkho_merged_sp.mapping")
+
+associations_df <- as.data.frame(associations)
+head(associations_df)
+str(associations_df)
+associations_df[c("symbiont", "host")] <- do.call(rbind, strsplit(associations_df$associations, ":"))
+
+length(unique(associations_df$host))      # Should match your host species count
+length(unique(associations_df$symbiont))  # Should be initial number of OTUs
+table(table(associations_df$symbiont))    # Each symbiont should appear only once
+
+#symbiont tree
+
+write.tree(phy_tree(pop_subsampled), file = paste0(dataDir, "/burkho_symbiont_tree_sp.nwk"))
+
+```
+
+Microbacteriaceae
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+ps_Microbacteriaceae <- microb_fr%>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list = "Microbacteriaceae")
+
+ps_Microbacteriaceae <- speedyseq::tax_glom(ps_Microbacteriaceae, "Species",  NArm = FALSE)
+
+tax_table(ps_Microbacteriaceae) %>% data.frame %>% head(2)
+tax_table(ps_Microbacteriaceae) <- tax_table(ps_Microbacteriaceae)[,1:7]
+tax_table(ps_Microbacteriaceae) <- cbind(tax_table(ps_Microbacteriaceae), 
+    rownames(tax_table(ps_Microbacteriaceae)))
+colnames(tax_table(ps_Microbacteriaceae)) <- 
+  c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species","OTU_ID")
+
+set.seed(123)
+merged_ps <- merge_by_pop(ps_Microbacteriaceae)
+pop_subsampled <- subsample_one_pop_per_otu_balanced(merged_ps)
+
+# Check - should keep all islands
+nsamples(merged_ps)  # Original number of islands
+nsamples(pop_subsampled)  # Should be the same!
+
+prev_counts <- apply(otu_table(pop_subsampled), 2, function(x) sum(x > 0))
+table(prev_counts)
+# See how many OTUs each island has
+
+island_otu_counts <- rowSums(otu_table(merged_ps) > 0)
+print(island_otu_counts)
+
+island_otu_counts <- rowSums(otu_table(pop_subsampled) > 0)
+print(island_otu_counts)
+
+
+associations <- create_association_matrix(pop_subsampled, "micro_merged_sp.mapping")
+
+associations_df <- as.data.frame(associations)
+head(associations_df)
+str(associations_df)
+associations_df[c("symbiont", "host")] <- do.call(rbind, strsplit(associations_df$associations, ":"))
+
+length(unique(associations_df$host))      # Should match your host species count
+length(unique(associations_df$symbiont))  # Should be initial number of OTUs
+table(table(associations_df$symbiont))    # Each symbiont should appear only once
+
+#symbiont tree
+
+write.tree(phy_tree(pop_subsampled), file = paste0(dataDir, "/eMPRess/micro_symbiont_tree_sp.nwk"))
+
+```
+
+host tree
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# Host tree Iqtree
+fringilla_tree <-  read.tree(file = paste0(dataDir, "/mtFr_edit_trim_aln.fas.treefile"))
+
+str(fringilla_tree)
+fringilla_tree$tip.label <- gsub("\\_NC","", fringilla_tree$tip.label)
+annot <- read_delim(paste0(dataDir, "/WGS_Fringilla_samples.tsv"))
+
+annot %>% names
+annot %>% data.frame %>% head
+table(annot$Label)
+
+#rename row and col names to match microbiome and diet matrices 
+fringilla_tree$tip.label <-  annot[match(fringilla_tree$tip.label, annot$WGS_ID),]$TipID_microbiome
+fringilla_tree$tip.label
+str(fringilla_tree)
+
+df <- microb_fr %>% sample_data %>% data.frame  %>% rownames_to_column("sample") %>% filter(WGS_data == 1  & Lab_Code != "132" & Lab_Code != "252" & Lab_Code != "89") %>% dplyr::select(sample, Species_Label)  
+head(df)
+
+fringilla_tree_microb <- as.treedata.table(tree = fringilla_tree, data = df, name_column = "sample")
+
+fringilla_tree_microb <- fringilla_tree_microb$phy
+plot(fringilla_tree_microb)
+
+fringilla_tree_microb = root(fringilla_tree_microb, outgroup = "149_Tenerife_F_teydea", resolve.root = TRUE)
+plot(fringilla_tree_microb)
+
+fringilla_tree_microb$tip.label
+
+str(df)
+df$sample
+table(df$Species_Label)
+
+tree_subsample <- function(L, df, tree){                  
+  # get subsample (note: subsampling within each species)
+  to_keep = df %>% 
+    #filter(WGS_data == 1) %>% 
+    #group_by(Species_Label) %>% 
+    dplyr::slice_sample(by = Species_Label, n = 1, replace = TRUE) %>%
+    .$sample
+  # subsampling tree
+ # to_rm = tree$tip.label[!tree$tip.label %in% to_keep]
+  to_rm = base::setdiff(tree$tip.label, to_keep)
+  tree = drop.tip(tree, to_rm)
+  return(tree)
+}
+
+ntrees = 3
+host_tree <- fringilla_tree_microb
+
+host_tree_l <- plyr::llply(as.list(1:ntrees), 
+                                  function(x) tree_subsample(x, df, host_tree), # x being a list of trees (1:ntrees)
+                                  .parallel=FALSE)
+plot(host_tree_l[[1]])
+plot(host_tree_l[[2]])
+plot(host_tree_l[[3]])
+
+#fix labels
+for (i in 1:length(host_tree_l)) {
+  tip.label(host_tree_l[[i]]) <- gsub("^.*?_","",tip.label(host_tree_l[[i]]))
+ }
+
+
+# check names match
+setdiff(tip.label(host_tree_l[[1]]), associations_df$host)
+setdiff(associations_df$host, tip.label(host_tree_l[[1]]))
+
+ write.tree(host_tree_l[[1]], file = paste0(dataDir, "/host_tree_1.nwk"))
+
+```
+

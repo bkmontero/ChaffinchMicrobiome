@@ -1,0 +1,503 @@
+---
+title: '16S alpha rarefaction'
+author: "B. Karina Montero "
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+
+## LOAD LIBRARIES
+
+```{r libraries, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+rm(list = ls())
+
+# basics
+library(tidyverse)
+library(stringr)
+library(vegan)
+library(magrittr)
+library(tidyverse)
+
+
+# plots
+library(ggplot2)
+library(ggpubr)
+library(fantaxtic)
+library(ggtext)
+library(ggh4x)
+library(png)
+library(cowplot)
+library(grid)
+library(gtable)
+library(rlist)
+library(ggmagnify)
+
+
+#phyloseq section
+library(MicEco)
+library(phyloseq)
+library(Biostrings)
+library(microbiome)
+library(microViz)
+library(DECIPHER)
+library(speedyseq)
+library(metagMisc)
+library(phylosmith)
+library(seqateurs)
+library(mirlyn)
+library(biomeUtils)
+library(metagMisc) # rarefy phyloseq
+
+# diversity 
+library(hilldiv)
+library(iNEXT)
+library(RInSp)
+
+#rmd
+library(details)
+library(knitr)
+library(kableExtra)
+
+```
+
+## WORKING DIRECTORIES
+```{r source, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/workingDirectories.R")
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/rare_function.R")
+
+```
+
+# MERGED DIET DATA
+
+```{r psObject_diet, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+ps_diet <- readRDS(paste0(dataDir, "/ps.merge_diet.rds"))
+diet_fr <- ps_diet %>% subset_samples(Genus == "Fringilla")
+
+```
+
+## 16S DATA
+
+```{r psObject, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# ASV clean data 
+
+ps_clean <- readRDS(paste0(dataDir, "/ps_clean_16S_GTDB2023.rds" ))
+ps_clean
+
+microb_fr <- ps_clean %>% subset_samples(Genus == "Fringilla")
+microb_fr <- removeZeros(microb_fr)
+
+
+```
+
+Overlap microbiome and diet
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# TipId as sample names 
+sample_data(microb_fr)$Species_Label <- gsub(" ", "_", sample_data(microb_fr)$Species_Label)
+sample_names(microb_fr) <- paste(sample_data(microb_fr)$Lab_Code, sample_data(microb_fr)$Species_Label, sep = "_")
+
+# TipId as sample names 
+sample_data(diet_fr)$Species_Label <- gsub(" ", "_", sample_data(diet_fr)$Species_Label)
+sample_names(diet_fr) <- paste(sample_data(diet_fr)$Lab_Code, sample_data(diet_fr)$Species_Label, sep = "_")
+
+setdiff(sample_names(microb_fr), sample_names(diet_fr)) %>% print
+setdiff(sample_names(diet_fr), sample_names(microb_fr)) %>% print
+
+# overlap
+microb_overlap <- prune_samples(sample_names(microb_fr) %in% sample_names(diet_fr), microb_fr) 
+
+diet_overlap <- prune_samples(sample_names(diet_fr) %in% sample_names(microb_fr), diet_fr) 
+
+#write_tsv(sample_data(microb_overlap), paste0(dataDir, "/microb_diet_overlap_metadata.tsv"))
+
+
+```
+
+Covariates 
+
+```{r covariates_diet, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+meta <- diet_overlap %>% sample_data %>% group_by(Genus) %>%  summarize(sampleSize = n()) %>% data.frame
+
+# create Age (juvenile and adult) category
+sample_data(diet_overlap)$Age_cat <- ifelse(sample_data(diet_overlap)$Age > 3, "adult", "fledging")
+
+# recode Sex covariate 
+sample_data(diet_overlap)$Sex <- ifelse(sample_data(diet_overlap)$Sex == 1, "male", "female")
+
+# relevel
+sample_data(diet_overlap)$Species <- as.factor(sample_data(diet_overlap)$Species)
+sample_data(diet_overlap)$Species <- relevel(sample_data(diet_overlap)$Species, "coelebs")
+str(sample_data(diet_overlap)$Species)
+sample_data(diet_overlap)$Species_Label <- as.factor(sample_data(diet_overlap)$Species_Label)
+sample_data(diet_overlap)$Species_Label <- relevel(sample_data(diet_overlap)$Species_Label, "Mainland_F_coelebs")
+str(sample_data(diet_overlap)$Species_Label)
+
+# recode numeric variables
+sample_data(diet_overlap)$Area_km2 <- as.numeric(sample_data(diet_overlap)$Area_km2)
+sample_data(diet_overlap)$Distance_mainland <- as.numeric(sample_data(diet_overlap)$Distance_mainland)
+sample_data(diet_overlap)$Age_ma <- as.numeric(sample_data(diet_overlap)$Age_ma)
+
+```
+
+## RAREFY DIET
+
+Rarefy data and extract species richness and shannon diversity
+
+```{r rarefy, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# clean diet assignments (weird marine arthropods likely to be misassignments and plant material unassigned to Class) 
+diet_clean <- ps_diet %>% subset_taxa(Order!= "Cumacea" & Order != "Cyclopoida" & Order != "Podocopida" & Order != "Spionida" & Class!= "Klebsormidiophyceae" & Order != "Class_Magnoliopsida")
+
+mirl_object <- mirl(merge_phyloseq(t(otu_table(diet_clean)),sample_data(diet_clean),tax_table(diet_clean), refseq(diet_clean)), libsize = 1000, rep = 100, set.seed = 120, mc.cores =16)
+
+mirl_object[sapply(mirl_object, is.null)] <- NULL
+
+List = list ()
+
+for (i in 1:length(mirl_object)){
+  phy <- mirl_object[[i]]
+  List[[i]] <- otu_table(phy)
+  }
+
+
+OTU_df <-list.cbind(List)
+
+rare_OTU_df <- t(apply(OTU_df,1, function(x) round(tapply(x,colnames(OTU_df),mean),0)))
+
+ps_diet_rarefied <- merge_phyloseq(t(otu_table(rare_OTU_df, taxa_are_rows =TRUE)), sample_data(diet_clean), tax_table(diet_clean), refseq(diet_clean))
+
+# Remove taxa with zero abundance after rarefaction
+ps <- removeZeros(ps_diet_rarefied)
+max(otu_table(ps))
+
+diet_alpha <- estimate_richness(ps_diet_rarefied, measures=c("Observed","Shannon"))
+
+sample_data(ps_diet_rarefied)$Observed_diet_rare <- diet_alpha$Observed
+sample_data(ps_diet_rarefied)$Shannon_diet_rare <- diet_alpha$Shannon
+
+saveRDS(ps, paste0(dataDir, "/ps_diet_rarefied.rds"))
+
+#ps_diet_rarefied <- readRDS(paste0(dataDir, "/ps_diet_rarefied.rds" ))
+```
+
+
+## 16S DATA
+
+```{r psObject, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# ASV clean phyloseq
+ps_clean <- readRDS(paste0(dataDir, "/ps_clean_16S_GTDB2023.rds" ))
+ps_clean
+
+```
+
+Metadata
+
+```{r covariates, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# fix Species Label
+sample_data(ps_clean)$Species_Label <- gsub(" ", "_", sample_data(ps_clean)$Species_Label) %>% as.factor
+
+sample_data(ps_clean)$TipID <- paste(sample_data(ps_clean)$WGS_ID, sample_data(ps_clean)$Species_Label, sep = "_")
+
+(sample_data(ps_clean)) %>% data.frame %>% names
+
+# add WGS column
+
+sample_data(ps_clean)$WGS_data <- ifelse(is.na(sample_data(ps_clean)$WGS_ID), 0, 1 )
+
+(sample_data(ps_clean)) %>% data.frame %>% head
+
+# add Diet column 
+ps_diet <- readRDS(paste0(dataDir, "/ps_diet_rarefied.rds"))
+
+meta_diet <- ps_diet %>% sample_data %>% data.frame
+
+#write_tsv(meta_OTU,paste0(dataDir, "/meta_ps_merge_diet.tsv"))
+
+diet_data <- prune_samples(sample_names(ps_clean) %in% sample_names(ps_diet), ps_clean) %>% sample_data %>% data.frame %>% dplyr::select("Lab_Code") 
+diet_data <- diet_data$Lab_Code
+sample_data(ps_clean)$diet_data <- ifelse(sample_data(ps_clean)$Lab_Code %in%  diet_data, 1, 0 )
+
+table(sample_data(ps_clean)$diet_data)
+
+# overlap WGS, diet
+overlap <- ps_clean %>% sample_data %>% data.frame %>% filter(WGS_data == 1 & diet_data == 1)
+nrow(overlap)
+
+# create Age (juvenile and adult) category
+sample_data(ps_clean)$Age_cat <- ifelse(sample_data(ps_clean)$Age > 3, "adult", "fledging")
+
+# relevel
+sample_data(ps_clean)$Species <- as.factor(sample_data(ps_clean)$Species)
+sample_data(ps_clean)$Species <- relevel(sample_data(ps_clean)$Species, "coelebs")
+str(sample_data(ps_clean)$Species)
+
+sample_data(ps_clean)$Species_Label <- as.factor(sample_data(ps_clean)$Species_Label)
+sample_data(ps_clean)$Species_Label <- relevel(sample_data(ps_clean)$Species_Label, "Mainland_F_coelebs")
+
+sample_data(ps_clean)$Fringilla_Other <- if_else(sample_data(ps_clean)$Genus == "Fringilla", "Fringilla", "Other")
+
+sample_data(ps_clean)$Chaff_Blue <- ifelse(sample_data(ps_clean)$Species_Label == "Tenerife_F_teydea" | sample_data(ps_clean)$Species_Label == "Gran_Canaria_F_polatzeki", "Bluefinch", ifelse(sample_data(ps_clean)$Fringilla_Other == "Other", "Other", "Chaffinch"))
+
+
+```
+
+## Rarefy 16S
+
+Rarefy data and extract species richness and shannon diversity
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# warning: slow! 
+mirl_object <- mirl(merge_phyloseq(t(otu_table(ps_clean)),sample_data(ps_clean),tax_table(ps_clean),refseq(ps_clean)), libsize = 2000, rep = 100, set.seed = 120, mc.cores = 16)
+
+mirl_object[sapply(mirl_object, is.null)] <- NULL
+
+List = list ()
+
+for (i in 1:length(mirl_object)){
+  phy <- mirl_object[[i]]
+  List[[i]] <- otu_table(phy)
+  }
+
+ASV_df <-list.cbind(List)
+
+rare_ASV_df <- t(apply(ASV_df,1, function(x) round(tapply(x,colnames(ASV_df),mean), 0)))
+dim(rare_ASV_df)
+
+ps_ASV_filter_rarefied <- merge_phyloseq(t(otu_table(rare_ASV_df, taxa_are_rows =TRUE)), sample_data(ps_clean), tax_table(ps_clean), refseq(ps_clean))
+
+# Remove taxa with zero abundance after rarefaction
+ps <- removeZeros(ps_ASV_filter_rarefied)
+max(otu_table(ps)[5])
+
+microb_alpha <- estimate_richness(ps, measures=c("Observed","Shannon"))
+
+sample_data(ps)$Observed_ASV_rare <- microb_alpha$Observed
+sample_data(ps)$Shannon_ASV_rare <- microb_alpha$Shannon
+
+saveRDS(ps, paste0(dataDir, "/ps_ASV_rarefied.rds"))
+```
+
+
+Fasta file for ASVs
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+ps <- readRDS(paste0(dataDir, "/ps_ASV_rarefied.rds" ))
+
+ps %>%
+      refseq() %>%
+      Biostrings::writeXStringSet(paste0(dataDir, "/ps_ASV_rarefied.fasta"), append=FALSE, compress=FALSE, compression_level=NA, format="fasta")
+
+```
+
+
+
+## ESTIMATE DIET GENERALIST/SPECIALIST PER ISLAND
+
+This was estimated using the the E measure of inter-individual variation after Araujo et al. (2008)
+
+https://doi.org/10.1890/07-0630.1
+https://rdrr.io/cran/RInSp/man/Eindex.html
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, results="hide"}
+
+ps_diet_rarefied <- readRDS(paste0(dataDir, "/ps_diet_rarefied.rds" ))
+
+diet_df <- ps_diet_rarefied %>% sample_data %>% data.frame %>% group_by(Species_Label) %>% mutate(sampleSize = n())
+
+#diet_df <- diet_df[1:(length(diet_df)-3)]
+#head(diet_df)
+
+#diet_df <- diet_df %>% group_by(Species_Label) %>% mutate(sampleSize = n())
+#head(data.frame(diet_df))
+
+table(droplevels(as.factor(diet_df$Species_Label)))
+
+names(diet_df)
+
+RInSp.Mainland_F_coelebs <- import.RInSp(otu_table(subset_samples(ps_diet_rarefied, Species_Label == "Mainland_F_coelebs")))
+RInSp.Hierro_F_c_ombriosa <- import.RInSp(otu_table(subset_samples(ps_diet_rarefied, Species_Label == "El Hierro_F_c_ombriosa")))
+RInSp.Flores_F_moreletti <- import.RInSp(otu_table(subset_samples(ps_diet_rarefied, Species_Label == "Flores_F_moreletti")))
+RInSp.Canaria_F_c_bakeri <- import.RInSp(otu_table(subset_samples(ps_diet_rarefied, Species_Label == "Gran Canaria_F_c_bakeri")))
+RInSp.Canaria_F_polatzeki <- import.RInSp(otu_table(subset_samples(ps_diet_rarefied, Species_Label == "Gran Canaria_F_polatzeki")))
+RInSp.Gomera_F_c_canariensis <- import.RInSp(otu_table(subset_samples(ps_diet_rarefied, Species_Label == "La Gomera_F_c_canariensis")))
+RInSp.Palma_F_c_palmae <- import.RInSp(otu_table(subset_samples(ps_diet_rarefied, Species_Label == "La Palma_F_c_palmae")))
+RInSp.Madeira_F_maderensis <- import.RInSp(otu_table(subset_samples(ps_diet_rarefied, Species_Label == "Madeira_F_maderensis")))
+RInSp.Miguel_F_moreletti <- import.RInSp(otu_table(subset_samples(ps_diet_rarefied, Species_Label == "Sao Miguel_F_moreletti")))
+RInSp.Tenerife_F_c_canariensis <- import.RInSp(otu_table(subset_samples(ps_diet_rarefied, Species_Label == "Tenerife_F_c_canariensis")))
+RInSp.Tenerife_F_teydea <- import.RInSp(otu_table(subset_samples(ps_diet_rarefied, Species_Label == "Tenerife_F_teydea")))
+RInSp.Hierro_P_canariensis <- import.RInSp(otu_table(subset_samples(ps_diet_rarefied, Species_Label == "El Hierro_P_canariensis")))
+RInSp.Hierro_T_merula <- import.RInSp(otu_table(subset_samples(ps_diet_rarefied, Species_Label == "El Hierro_T_merula")))
+RInSp.Gomera_C_teneriffae <- import.RInSp(otu_table(subset_samples(ps_diet_rarefied, Species_Label == "La Gomera_C_teneriffae")))
+RInSp.Gomera_E_rubecula <- import.RInSp(otu_table(subset_samples(ps_diet_rarefied, Species_Label == "La Gomera_E_rubecula")))
+RInSp.Gomera_T_merula <- import.RInSp(otu_table(subset_samples(ps_diet_rarefied, Species_Label == "La Gomera_T_merula")))
+RInSp.Sao_Miguel_M_cinerea <- import.RInSp(otu_table(subset_samples(ps_diet_rarefied, Species_Label == "Sao Miguel_M_cinerea")))
+RInSp.Sao_Miguel_S_atricapilla <- import.RInSp(otu_table(subset_samples(ps_diet_rarefied, Species_Label == "Sao Miguel_S_atricapilla")))
+
+
+Eresult.Mainland_F_coelebs <- Eindex(RInSp.Mainland_F_coelebs, index = "saramaki", jackknife = TRUE)
+Eresult.Hierro_F_c_ombriosa <- Eindex(RInSp.Hierro_F_c_ombriosa, index = "saramaki", jackknife = TRUE)
+Eresult.Flores_F_moreletti <- Eindex(RInSp.Flores_F_moreletti, index = "saramaki", jackknife = TRUE)
+Eresult.Canaria_F_c_bakeri <- Eindex(RInSp.Canaria_F_c_bakeri, index = "saramaki", jackknife = TRUE)
+Eresult.Canaria_F_polatzeki <- Eindex(RInSp.Canaria_F_polatzeki, index = "saramaki", jackknife = TRUE)
+Eresult.Gomera_F_c_canariensis <- Eindex(RInSp.Gomera_F_c_canariensis, index = "saramaki", jackknife = TRUE)
+Eresult.Palma_F_c_palmae <- Eindex(RInSp.Palma_F_c_palmae, index = "saramaki", jackknife = TRUE)
+Eresult.Madeira_F_maderensis <- Eindex(RInSp.Madeira_F_maderensis, index = "saramaki", jackknife = TRUE)
+Eresult.Miguel_F_moreletti <- Eindex(RInSp.Miguel_F_moreletti, index = "saramaki", jackknife = TRUE)
+Eresult.Tenerife_F_c_canariensis <- Eindex(RInSp.Tenerife_F_c_canariensis, index = "saramaki", jackknife = TRUE)
+Eresult.Tenerife_F_teydea <- Eindex(RInSp.Tenerife_F_teydea, index = "saramaki", jackknife = TRUE)
+Eresult.Hierro_P_canariensis <- Eindex(RInSp.Hierro_P_canariensis, index = "saramaki", jackknife = TRUE)
+Eresult.Hierro_T_merula <- Eindex(RInSp.Hierro_T_merula, index = "saramaki", jackknife = TRUE)
+Eresult.Gomera_C_teneriffae <- Eindex(RInSp.Gomera_C_teneriffae, index = "saramaki", jackknife = TRUE)
+Eresult.Gomera_E_rubecula <- Eindex(RInSp.Gomera_E_rubecula, index = "saramaki", jackknife = TRUE)
+Eresult.Gomera_T_merula <- Eindex(RInSp.Gomera_T_merula, index = "saramaki", jackknife = TRUE)
+Eresult.Sao_Miguel_M_cinerea <- Eindex(RInSp.Sao_Miguel_M_cinerea, index = "saramaki", jackknife = TRUE)
+Eresult.Sao_Miguel_S_atricapilla <- Eindex(RInSp.Sao_Miguel_S_atricapilla, index = "saramaki", jackknife = TRUE)
+
+
+Edata <- data.frame(E = c(Eresult.Mainland_F_coelebs$E, 
+                          Eresult.Hierro_F_c_ombriosa$E,  
+                          Eresult.Hierro_P_canariensis$E, 
+                          Eresult.Hierro_T_merula$E, 
+                          Eresult.Flores_F_moreletti$E,
+                          Eresult.Canaria_F_c_bakeri$E,
+                          Eresult.Canaria_F_polatzeki$E, 
+                          Eresult.Gomera_C_teneriffae$E, 
+                          Eresult.Gomera_E_rubecula$E, 
+                          Eresult.Gomera_F_c_canariensis$E, 
+                          Eresult.Gomera_T_merula$E,
+                          Eresult.Palma_F_c_palmae$E,
+                          Eresult.Madeira_F_maderensis$E,
+                          Eresult.Miguel_F_moreletti$E,
+                          Eresult.Sao_Miguel_M_cinerea$E, 
+                          Eresult.Sao_Miguel_S_atricapilla$E, 
+                          Eresult.Tenerife_F_c_canariensis$E, 
+                          Eresult.Tenerife_F_teydea$E),
+                    VarE = c(Eresult.Mainland_F_coelebs$VarE, 
+                          Eresult.Hierro_F_c_ombriosa$VarE, 
+                          Eresult.Hierro_P_canariensis$VarE, 
+                          Eresult.Hierro_T_merula$VarE, 
+                          Eresult.Flores_F_moreletti$VarE,
+                          Eresult.Canaria_F_c_bakeri$VarE,
+                          Eresult.Canaria_F_polatzeki$VarE, 
+                          Eresult.Gomera_C_teneriffae$VarE, 
+                          Eresult.Gomera_E_rubecula$VarE, 
+                          Eresult.Gomera_F_c_canariensis$VarE, 
+                          Eresult.Gomera_T_merula$VarE, 
+                          Eresult.Palma_F_c_palmae$VarE,
+                          Eresult.Madeira_F_maderensis$VarE,
+                          Eresult.Miguel_F_moreletti$VarE, 
+                          Eresult.Sao_Miguel_M_cinerea$VarE, 
+                          Eresult.Sao_Miguel_S_atricapilla$VarE, 
+                          Eresult.Tenerife_F_c_canariensis$VarE,
+                          Eresult.Tenerife_F_teydea$VarE), 
+                    Species_Label = c("Mainland_F_coelebs","El Hierro_F_c_ombriosa","El Hierro_P_canariensis","El Hierro_T_merula","Flores_F_moreletti","Gran Canaria_F_c_bakeri","Gran Canaria_F_polatzeki","La Gomera_C_teneriffae","La Gomera_E_rubecula","La Gomera_F_c_canariensis","La Gomera_T_merula","La Palma_F_c_palmae","Madeira_F_maderensis","Sao Miguel_F_moreletti","Sao Miguel_M_cinerea","Sao Miguel_S_atricapilla","Tenerife_F_c_canariensis","Tenerife_F_teydea"))
+
+head(Edata)
+
+Edata$Species_Label <- factor(Edata$Species_Label)
+Edata
+
+diet_df <- (merge(diet_df, Edata, by = "Species_Label", all = TRUE))
+tail(diet_df)
+diet_df <-(merge(data.frame(sample_data(ps_diet_rarefied)),diet_df[,c(3,37,38)], by ="Lab_Code"))
+tail(diet_df)
+
+base::setdiff(sample_data(ps_diet_rarefied)$Lab_Code, diet_df$Lab_Code) %>% print
+#setdiff(sample_data(ps_OTU_99_rarefied)$Lab_Code, diet_df$Lab_Code) %>% print
+  
+sample_data(ps_diet_rarefied)$E <- diet_df$E
+sample_data(ps_diet_rarefied)$VarE <- diet_df$VarE
+
+saveRDS(ps_diet_rarefied, paste0(dataDir, "/ps_diet_rarefied.rds"))
+
+fringilla <- c("Mainland_F_coelebs","El Hierro_F_c_ombriosa","Flores_F_moreletti","Gran Canaria_F_c_bakeri","Gran Canaria_F_polatzeki","La Gomera_F_c_canariensis","La Palma_F_c_palmae","Madeira_F_maderensis","Sao Miguel_F_moreletti","Tenerife_F_c_canariensis","Tenerife_F_teydea")
+
+
+Edata_df <- Edata[Edata$Species_Label %in% fringilla,]
+
+write.table(Edata_df, file=paste0(dataDir, "/Edata_df.tsv"), quote=FALSE, sep='\t', col.names = NA)
+
+Edata_df <- read_tsv(paste0(dataDir, "/Edata_df.tsv"))
+
+```
+
+
+## MERGE DIET AND MICROBIOME DIVERSITY DATA
+
+
+Overlap microbiome and diet
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+ps_ASV_rarefied <- readRDS(paste0(dataDir, "/ps_ASV_rarefied.rds"))
+ps_diet_rarefied <- readRDS(paste0(dataDir, "/ps_diet_rarefied.rds"))
+
+sample_data(ps_diet_rarefied)$E
+sample_data(ps_diet_rarefied)$Lab_Code
+
+ps_ASV_rarefied %>% sample_data %>% names
+ps_diet_rarefied %>% sample_data %>% names
+
+# TipId as sample names 
+sample_data(ps_ASV_rarefied)$Species_Label <- gsub(" ", "_", sample_data(ps_ASV_rarefied)$Species_Label)
+sample_names(ps_ASV_rarefied) <- paste(sample_data(ps_ASV_rarefied)$Lab_Code, sample_data(ps_ASV_rarefied)$Species_Label, sep = "_")
+
+# TipId as sample names 
+sample_data(ps_diet_rarefied)$Species_Label <- gsub(" ", "_", sample_data(ps_diet_rarefied)$Species_Label)
+sample_names(ps_diet_rarefied) <- paste(sample_data(ps_diet_rarefied)$Lab_Code, sample_data(ps_diet_rarefied)$Species_Label, sep = "_")
+
+setdiff(sample_names(ps_ASV_rarefied), sample_names(ps_diet_rarefied)) %>% print
+setdiff(sample_names(ps_diet_rarefied), sample_names(ps_ASV_rarefied)) %>% print
+
+# overlap
+microb_overlap_rare <- prune_samples(sample_names(ps_ASV_rarefied) %in% sample_names(ps_diet_rarefied), ps_ASV_rarefied) 
+
+diet_overlap_rare <- prune_samples(sample_names(ps_diet_rarefied) %in% sample_names(ps_ASV_rarefied), ps_diet_rarefied) 
+
+#write_tsv(sample_data(microb_overlap), paste0(dataDir, "/microb_diet_overlap_metadata.tsv"))
+
+microb_overlap_rare_fr <- microb_overlap_rare %>% subset_samples(Genus == "Fringilla")
+diet_overlap_rare_fr <- diet_overlap_rare %>% subset_samples(Genus == "Fringilla")
+
+sample_names(microb_overlap_rare_fr) == sample_names(diet_overlap_rare_fr)
+
+sample_data(diet_overlap_rare_fr)$Observed_ASV_rare <- sample_data(microb_overlap_rare_fr)$Observed_ASV_rare
+sample_data(diet_overlap_rare_fr)$Shannon_ASV_rare <- sample_data(microb_overlap_rare_fr)$Shannon_ASV_rare
+
+sample_data(microb_overlap_rare_fr)$Observed_diet_rare <- sample_data(diet_overlap_rare_fr)$Observed_diet_rare
+sample_data(microb_overlap_rare_fr)$Shannon_diet_rare <- sample_data(diet_overlap_rare_fr)$Shannon_diet_rare
+sample_data(microb_overlap_rare_fr)$E <- sample_data(diet_overlap_rare_fr)$E
+sample_data(microb_overlap_rare_fr)$VarE <- sample_data(diet_overlap_rare_fr)$VarE
+
+
+sample_data(diet_overlap_rare)$Observed_ASV_rare <- sample_data(microb_overlap_rare)$Observed_ASV_rare
+sample_data(diet_overlap_rare)$Shannon_ASV_rare <- sample_data(microb_overlap_rare)$Shannon_ASV_rare
+
+sample_data(microb_overlap_rare)$Observed_diet_rare <- sample_data(diet_overlap_rare)$Observed_diet_rare
+sample_data(microb_overlap_rare)$Shannon_diet_rare <- sample_data(diet_overlap_rare)$Shannon_diet_rare
+
+microb_overlap_rare <- removeZeros(microb_overlap_rare)
+diet_overlap_rare <- removeZeros(diet_overlap_rare)
+microb_overlap_rare_fr <- removeZeros(microb_overlap_rare_fr)
+diet_overlap_rare_fr <- removeZeros(diet_overlap_rare_fr)
+
+```
+
+write to file
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+saveRDS(microb_overlap_rare_fr, paste0(dataDir, "/microb_overlap_ASV_rare_fr.rds"))
+
+saveRDS(diet_overlap_rare_fr, paste0(dataDir, "/diet_overlap_ASV_rare_fr.rds"))
+
+
+```

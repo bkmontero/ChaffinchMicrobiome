@@ -1,0 +1,534 @@
+---
+title: 'Processing the rbcL'
+author: "B. Karina Montero and Mark Gillingham"
+date: "`r Sys.Date()`"
+#output: pdf_document
+output: html_document
+---
+
+## Loading libraries
+```{r libraries, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, results="hide"}
+rm(list = ls())
+
+# basics
+library(dplyr)
+library(ggplot2)
+library(stringr)
+library(tidyr)
+library(ggpubr)
+
+# phyloseq section
+library(phyloseq)
+library(decontam)
+
+```
+
+## WORKING DIRECTORIES
+```{r directories, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, results="hide"}
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/workingDirectories.R")
+```
+
+
+## I. LOAD & CHECK DATA
+
+### 1. metadata
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+fringilla <- import_qiime_sample_data(mapfilename = paste0(dataDir, "/metadata_fringilla_diet_03.06.23.csv"))
+
+```
+
+### 2. Directory containing the fastq files
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+COI_path <- paste0(metabarcodingDir, "COI_raw_data") 
+list.files(COI_path)
+COI_files <- sort(list.files(COI_path, pattern="COI", full.names = TRUE))
+```
+
+### 3. Inspect read quality profiles
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+plotQualityProfile(COI_files[c(45,36,33,38,8,46,10,18,17)])
+```
+## II. REMOVE PRIMERS
+
+
+Set patterns to discriminate your forward and reverse read files
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+file_pattern <- c("F" = "_R1_001.fastq", "R" = "_R2_001.fastq")
+fas_Fs_raw <- sort(list.files(COI_path, pattern = file_pattern["F"], full.names = TRUE))
+fas_Rs_raw <- sort(list.files(COI_path, pattern = file_pattern["R"], full.names = TRUE))
+```
+
+Primer sequences
+
+For arthropoda library preparation, a fragment of the mitochondrial gene COI of around 178 (bp) was amplified using the following primers:
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+FWD_COI <- "ATTCAACCAATCATAAAGATATTGG" # LepF1 (Hebert et al. 2004).
+REV_COI <- "WACTAATCAATTWCCAAAHCCHCC" #  ZBJ-ArtR2c-deg (modified by Shutt et al. (2020) from Zeale et al. (2011)).
+```
+
+To ensure we have the right primers, and the correct orientation of the primers on the reads, we will verify the presence and orientation of these primers in the data.
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+allOrients <- function(primer) {
+    # Create all orientations of the input sequence
+    require(Biostrings)
+    dna <- DNAString(primer)  # The Biostrings works w/ DNAString objects rather than character vectors
+    orients <- c(Forward = dna, Complement = complement(dna), Reverse = reverse(dna), 
+        RevComp = reverseComplement(dna))
+    return(sapply(orients, toString))  # Convert back to character vector
+}
+
+FWD_orients_COI <- allOrients(FWD_COI)
+REV_orients_COI <- allOrients(REV_COI)
+
+```
+
+Count the number of times the primers appear in the forward and reverse read, while considering all possible primer orientations.
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+primerHits <- function(primer, fn) {
+    # Counts number of reads in which the primer is found
+    nhits <- vcountPattern(primer, sread(readFastq(fn)), fixed = FALSE)
+    return(sum(nhits > 0))
+}
+
+primer_count <- rbind(FWD.ForwardReads_COI = sapply(FWD_orients_COI, primerHits, fn = fas_Fs_raw[[1]]), 
+    FWD.ReverseReads_COI = sapply(FWD_orients_COI, primerHits, fn = fas_Rs_raw[[1]]), 
+    REV.ForwardReads_COI = sapply(REV_orients_COI, primerHits, fn = fas_Fs_raw[[1]]), 
+    REV.ReverseReads_COI = sapply(REV_orients_COI, primerHits, fn = fas_Rs_raw[[1]]))
+primer_count
+```
+As expected, the FWD primer is found in the forward reads in its forward orientation, and in some of the reverse reads in its reverse-complement orientation (due to read-through when the COI region is short). Similarly the REV primer is found with its expected orientations.
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+FWD <- c("ATTCAACCAATCATAAAGATATTGG")
+REV <- c("WACTAATCAATTWCCAAAHCCHCC")
+
+FWD_RC <- dada2:::rc(FWD)
+REV_RC <- dada2:::rc(REV)
+
+path_cut <- file.path(COI_path, "cutadapt")
+if(!dir.exists(path_cut)) dir.create(path_cut)
+
+
+#path_cut <- paste0(barcodingDir, "/cutadapt")
+
+fas_Fs_cut <- file.path(path_cut, basename(fas_Fs_raw))
+fas_Rs_cut <- file.path(path_cut, basename(fas_Rs_raw))
+
+R1_flags <- paste(paste("-g", FWD, collapse = " "), paste("-a", REV_RC, collapse = " "))
+R2_flags <- paste(paste("-G", REV, collapse = " "), paste("-A", FWD_RC, collapse = " "))
+
+cutadapt <- "/home/fringilla/miniconda3/envs/cutadaptenv/bin/cutadapt" # Path to the executable
+
+for(i in seq_along(fas_Fs_raw)) {
+  cat("Processing", "-----------", i, "/", length(fas_Fs_raw), "-----------\n")
+  system2(cutadapt, args = c(R1_flags, R2_flags,
+                             "-m 50",
+                             "-M 200",
+                             "--discard-untrimmed",
+                             "--max-n 0",
+                             "--cores 0", # Use 0 to auto-detect.
+                             "-n 2", # required to remove FWD and REV from read
+                             # Optional strong constraint on expected length
+                             #paste0("-m ", 250-nchar(FWD)[1], ":", 250-nchar(REV)[1]), 
+                             #paste0("-M ", 250-nchar(FWD)[1], ":", 250-nchar(REV)[1]), 
+                             "-o", fas_Fs_cut[i], "-p", fas_Rs_cut[i],
+                             fas_Fs_raw[i], fas_Rs_raw[i]))
+}
+
+
+primer_count <- rbind(FWD.ForwardReads_COI = sapply(FWD_orients_COI, primerHits, fn = fas_Fs_cut[[1]]), 
+    FWD.ReverseReads_COI = sapply(FWD_orients_COI, primerHits, fn = fas_Rs_cut[[1]]), 
+    REV.ForwardReads_COI = sapply(REV_orients_COI, primerHits, fn = fas_Fs_cut[[1]]), 
+    REV.ReverseReads_COI = sapply(REV_orients_COI, primerHits, fn = fas_Rs_cut[[1]]))
+primer_count
+
+```
+
+## III. FILTER AND TRIM
+
+Remove BPCR5_COI empty file
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+path_cut <- paste0(metabarcodingDir, "COI_raw_data/cutadapt") # If you skipped primers removal, provide the path to your sequences here
+list.files(path_cut)
+
+fas_Fs_cut <- sort(list.files(path_cut, pattern = file_pattern["F"], full.names = TRUE))
+fas_Rs_cut <- sort(list.files(path_cut, pattern = file_pattern["R"], full.names = TRUE))
+
+sample_names <- sapply(strsplit(basename(fas_Fs_cut), "_"), function(x) x[1])
+
+COI_cut <- sort(list.files(path_cut, pattern="COI", full.names = TRUE))
+```
+
+Inspect read quality profiles
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+plotQualityProfile(COI_cut[c(45,36,33,38,8,46,10,18,17)])
+#ggsave(paste(outputDir, "/02_DietMetabarcoding/01_Exploration/01_qualityProfile/COI_cut_plotQualityProfile.png", sep = "/"))
+
+fas_Fs_filtered <- file.path(COI_path, "filtered", basename(fas_Fs_cut))
+fas_Rs_filtered <- file.path(COI_path, "filtered", basename(fas_Rs_cut))
+all.equal(basename(fas_Fs_raw), basename(fas_Fs_filtered))
+
+names(fas_Fs_filtered) <- sample_names
+names(fas_Rs_filtered) <- sample_names
+
+```
+
+Standard filtering paraments: maxN=0 (DADA2 requires sequences contain no Ns), truncQ = 2, rm.phix = TRUE and maxEE=2. The maxEE parameter sets the maximum number of “expected errors” allowed in a read, which is a better filter than simply averaging quality scores.
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+filter_trim <- filterAndTrim(fas_Fs_cut, fas_Fs_filtered, fas_Rs_cut, fas_Rs_filtered,
+                       #truncLen = c(170, 100), 
+                       minLen = 175,
+                       maxLen = 184, 
+                       maxN = 0, maxEE = c(2, 2), truncQ = 2,
+                       rm.phix = TRUE, multithread = TRUE, verbose = FALSE)
+head(filter_trim)
+```
+The filter removed all reads: /home/fringilla/Documents/AllGenetics/COI_raw_data/filtered/BPCR5_COI_S1_L001_R1_001.fastq.gz and /home/fringilla/Documents/AllGenetics/COI_raw_data/filtered/BPCR5_COI_S1_L001_R2_001.fastq.gz not written.
+Some input samples had no reads pass the filter.
+
+I delete these files manually.
+
+## IV. DADA 2
+
+Learn error rates
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+error_F <- learnErrors(fas_Fs_filtered, multithread = TRUE, randomize = TRUE)
+#101903502 total bases in 565302 reads from 112 samples will be used for learning the error rates.
+saveRDS(error_F, paste0(outputDir, "/02_DietMetabarcoding/02_dada2/COI_error_F.rds"))
+#err <- readRDS(paste0(outputDir, "/02_Dada2/err.rds"))
+
+plotErrors(error_F, nominalQ=TRUE)
+ggsave(paste(outputDir, "/02_DietMetabarcoding/02_dada2/plotErrors_COI_F.png", sep = "/"))
+
+error_R <- learnErrors(fas_Rs_filtered, multithread = TRUE, randomize = TRUE)
+#100633957 total bases in 560007 reads from 137 samples will be used for learning the error rates.
+saveRDS(error_R, paste0(outputDir, "/02_DietMetabarcoding/02_dada2/COI_error_R.rds"))
+#err <- readRDS(paste0(outputDir, "/02_Dada2/err.rds"))
+
+plotErrors(error_R, nominalQ=TRUE)
+ggsave(paste(outputDir, "/02_DietMetabarcoding/02_dada2/plotErrors_COI_R.png", sep = "/"))
+```
+
+
+### DEREPLICATION, SAMPLE INFERENCE & MERGE PAIRED READS
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+merged_list <- vector("list", length(sample_names))
+names(merged_list) <- sample_names
+
+for(i in sample_names){
+  cat("Processing -------", which(sample_names == i), "/", length(sample_names), "-------", i, "\n")
+  derep_Fs <- derepFastq(fas_Fs_filtered[[i]], verbose = TRUE)
+  derep_Rs <- derepFastq(fas_Rs_filtered[[i]], verbose = TRUE)
+  dds_Fs <- dada(derep_Fs, err = error_F, multithread = TRUE, verbose = TRUE)
+  dds_Rs <- dada(derep_Rs, err = error_R, multithread = TRUE, verbose = TRUE)
+  merged_list[[i]] <- mergePairs(dds_Fs, derep_Fs, dds_Rs, derep_Rs, verbose = TRUE)
+}
+```
+
+### CONSTRUCT SEQUENCE TABLE
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+seqtab <- makeSequenceTable(merged_list)
+dim(seqtab)
+table(nchar(getSequences(seqtab)))
+```
+
+### REMOVE CHIMERA
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+seqtab_nochim <- removeBimeraDenovo(seqtab, method = "consensus", multithread = TRUE, verbose = TRUE)
+#Identified 232 bimeras out of 3275 input sequences.
+dim(seqtab_nochim)
+table(nchar(getSequences(seqtab_nochim)))
+```
+
+#### TRACK READS THROUGH THE PIPELINE
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+track <- cbind(filter_trim, rowSums(seqtab), rowSums(seqtab_nochim))
+colnames(track) <- c("Cutadapt", "Filtered", "Merged", "Nonchim")
+rownames(track) <- sample_names
+head(track)
+
+write.csv(track, paste0(outputDir, "/02_DietMetabarcoding/02_dada2/COI_track_reads.csv"))
+```
+
+### Export files for use in QIIME2
+https://forum.qiime2.org/t/exporting-dada2-r-package-results-to-work-with-qiime2/2573/3
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+write.table(t(seqtab_nochim), paste0(outputDir, "/02_DietMetabarcoding/02_dada2/COIQIIME2seqtab.txt"), sep="\t", row.names=TRUE, col.names=NA, quote=FALSE)
+uniquesToFasta(seqtab_nochim, fout=paste0(outputDir, "/02_DietMetabarcoding/02_dada2/COI-rep-seqs.fna"), ids=colnames(seqtab_nochim))
+
+```
+
+
+
+### TAXONOMY ASSIGNMENT (CESGA cluster)
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+qiime2run qiime feature-classifier classify-sklearn \
+  --i-classifier /mnt/lustre/scratch/nlsas/home/csic/dde/pla/FringillaProject/06_rbcL/NCBI_rbcL_Viridiplantae_classifier_extracted_2022_09_22_derep.qza \
+  --i-reads /mnt/lustre/scratch/nlsas/home/csic/dde/pla/FringillaProject/06_rbcL/rbcL-rep-seqs.qza \
+  --o-classification /mnt/lustre/scratch/nlsas/home/csic/dde/pla/FringillaProject/06_rbcL/rbcL_4_derep_restricted.qza
+
+```
+
+# CLEAN COI data 
+
+The result were very similar regardless of whether the classifier was dereplicated after primer timming but taxonomic assignement was slightly higher when not dereplicating so we choose this pipeline (ps_mkCOInr_trimmed_filt)
+
+
+```{r psobject, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, results="hide"}
+mkCOInr_trimmed <- import_biom(BIOMfilename = paste0(outputDir, "/02_DietMetabarcoding/02_dada2/mkCOInr/COInr_2022_05_06/qiime/mkCOInr_trimmed/mkCOInr_trimmed.biom"))
+
+rep.seqs <- Biostrings::readDNAStringSet(paste0(outputDir,"/02_DietMetabarcoding/02_dada2/PhyloseqRegional/dna-sequences.fasta"), format = "fasta")
+
+ps_mkCOInr_trimmed <- merge_phyloseq(t(otu_table(mkCOInr_trimmed)),tax_table(mkCOInr_trimmed), fringillaCOI,rep.seqs)
+
+taxa_names(ps_mkCOInr_trimmed) <- paste0("ASVCOI", seq(ntaxa(ps_mkCOInr_trimmed)))
+
+tax_mkCOInr_trimmed<- data.frame(tax_table(ps_mkCOInr_trimmed))
+
+ps_mkCOInr_trimmed
+
+names(tax_mkCOInr_trimmed)
+levels(factor(tax_mkCOInr_trimmed$Rank1))
+levels(factor(tax_mkCOInr_trimmed$Rank2))
+
+
+tax_mkCOInr_trimmed.clean <- data.frame(row.names = row.names(tax_mkCOInr_trimmed),Kingdom = str_replace(tax_mkCOInr_trimmed[,1], "k__",""),Phylum = str_replace(tax_mkCOInr_trimmed[,2], "p__",""),Class = str_replace(tax_mkCOInr_trimmed[,3], "c__",""),Order = str_replace(tax_mkCOInr_trimmed[,4], "o__",""),Family = str_replace(tax_mkCOInr_trimmed[,5], "f__",""),Genus = str_replace(tax_mkCOInr_trimmed[,6], "g__",""),Species = str_replace(tax_mkCOInr_trimmed[,7], "s__",""),stringsAsFactors = FALSE)
+
+tax_mkCOInr_trimmed.clean [tax_mkCOInr_trimmed.clean  == ''] <- NA
+
+tax_mkCOInr_trimmed.clean$Kingdom<-gsub("_.*","",tax_mkCOInr_trimmed.clean$Kingdom)
+tax_mkCOInr_trimmed.clean$Phylum<-gsub("_.*","",tax_mkCOInr_trimmed.clean$Phylum)
+tax_mkCOInr_trimmed.clean$Class<-gsub("_.*","",tax_mkCOInr_trimmed.clean$Class)
+tax_mkCOInr_trimmed.clean$Order<-gsub("_.*","",tax_mkCOInr_trimmed.clean$Order)
+tax_mkCOInr_trimmed.clean$Family<-gsub("_.*","",tax_mkCOInr_trimmed.clean$Family)
+tax_mkCOInr_trimmed.clean$Genus<-gsub("_.*","",tax_mkCOInr_trimmed.clean$Genus)
+tax_mkCOInr_trimmed.clean$Species<-gsub("_[[:digit:]]*$","",tax_mkCOInr_trimmed.clean$Species)
+tax_mkCOInr_trimmed.clean$Species<-gsub("_-[[:digit:]]*$","",tax_mkCOInr_trimmed.clean$Species)
+
+tax_table(ps_mkCOInr_trimmed)<-as.matrix(tax_mkCOInr_trimmed.clean)
+
+ps_mkCOInr_trimmed
+
+ps_mkCOInr_trimmed_filt <- ps_mkCOInr_trimmed  %>%
+  subset_taxa(
+    Kingdom == "Metazoa" &
+    Phylum != "Chordata" &
+    Phylum !=  "Tardigrada" &
+    Phylum !=  "Rotifera" &
+    Phylum !=  "Cnidaria" &
+    Phylum != "Nemertea" &
+    Phylum != "Nematoda" &
+    Phylum != "Acanthocephala"
+    # & Class != is.na(TRUE)
+  )
+
+ps_mkCOInr_trimmed_filt
+
+
+```
+
+## Removing contaminants using PCR controls
+
+We remove the contaminant ASVs using the DECONTAM package:
+
+(https://bioconductor.org/packages/release/bioc/vignettes/decontam/inst/doc/decontam_intro.html)
+
+We first look at the library sizes (i.e. the number of reads) in each sample, as a function of whether that sample was a true positive sample or a negative control
+
+```{r librarysizes, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE }
+
+df <- as.data.frame(sample_data(ps_mkCOInr_trimmed_filt)) 
+df$LibrarySize <- sample_sums(ps_mkCOInr_trimmed_filt)
+df <- df[order(df$LibrarySize),]
+df$Index <- seq(nrow(df))
+
+ggplot(data=df, aes(x=Index, y=LibrarySize, color=Sample_or_Control)) + geom_point()
+
+```
+
+Second we investigate the prevalence of ASVs in control samples and so called "true samples". Then we would remove identified contaminants from our dataset, however no contaminants were identified
+
+```{r prevalenceDecontam, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+sample_data(ps_mkCOInr_trimmed_filt)$is.neg <- sample_data(ps_mkCOInr_trimmed_filt)$Sample_or_Control == "Control"
+
+contamdf.prev <- isContaminant(ps_mkCOInr_trimmed_filt, method="prevalence", neg="is.neg")
+table(contamdf.prev$contaminant)
+
+contamdf.prev05 <- isContaminant(ps_mkCOInr_trimmed_filt, method="prevalence", neg="is.neg", threshold=0.5)
+table(contamdf.prev05$contaminant)
+
+ps_mkCOInr_trimmed_filt.pa <- transform_sample_counts(ps_mkCOInr_trimmed_filt, function(abund) 1*(abund>0))
+
+ps_mkCOInr_trimmed_filt.pa.neg <- prune_samples(sample_data(ps_mkCOInr_trimmed_filt.pa)$Sample_or_Control == "Control", ps_mkCOInr_trimmed_filt.pa)
+
+
+ps_mkCOInr_trimmed_filt.pa.pos <- prune_samples(sample_data(ps_mkCOInr_trimmed_filt.pa)$Sample_or_Control == "Sample", ps_mkCOInr_trimmed_filt.pa)
+
+df.pa <- data.frame(pa.pos=taxa_sums(ps_mkCOInr_trimmed_filt.pa.pos), pa.neg=taxa_sums(ps_mkCOInr_trimmed_filt.pa.neg),contaminant=contamdf.prev$contaminant)
+
+ggplot(data=df.pa, aes(x=pa.neg, y=pa.pos, color=contaminant)) + geom_point() +
+  xlab("Prevalence (Negative Controls)") + ylab("Prevalence (True Samples)")
+
+#tax_table(ps_mkCOInr_trimmed_filt)[contamdf.prev05$contaminant,]
+#ps_mkCOInr_trimmed_filt.contam <- prune_taxa(contamdf.prev05$contaminant, ps_mkCOInr_trimmed_filt)
+#ps_mkCOInr_trimmed_filt
+
+ps_mkCOInr_trimmed_filt.noncontam <- prune_taxa(!contamdf.prev05$contaminant, ps_mkCOInr_trimmed_filt)
+ps_mkCOInr_trimmed_filt.noncontam
+
+ps_mkCOInr_trimmed_filt<-ps_mkCOInr_trimmed_filt.noncontam
+
+```
+
+We remove the PCR control samples from the phyloseq object
+```{r removeControls, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE , results="hide"}
+
+Samples_toRemove <- c("Control")
+subset_samples(ps_mkCOInr_trimmed_filt, Sample_or_Control %in% Samples_toRemove)
+
+subset_samples(ps_mkCOInr_trimmed_filt, !(Sample_or_Control %in% Samples_toRemove))
+
+ps_mkCOInr_trimmed_filt<-subset_samples(ps_mkCOInr_trimmed_filt, !(Sample_or_Control %in% Samples_toRemove))
+
+```
+
+
+### Are there trends in the fraction of **reads** that can be assigned to taxonomic level by experimental variables?
+
+```{r FractionAssigned, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+readsPerSample = rowSums(otu_table(ps_mkCOInr_trimmed_filt))
+fractionReadsAssigned = sapply(colnames(tax_table(ps_mkCOInr_trimmed_filt)), function(x){
+  rowSums(otu_table(ps_mkCOInr_trimmed_filt)[, !is.na(tax_table(ps_mkCOInr_trimmed_filt))[,x]]) / readsPerSample
+})
+
+fractionReadsAssigned = data.frame(SampleID = rownames(fractionReadsAssigned), fractionReadsAssigned)
+fractionReadsAssigned.L = pivot_longer(fractionReadsAssigned, 
+    cols=colnames(tax_table(ps_mkCOInr_trimmed_filt)), names_to="taxlevel", values_to="fractionReadsAssigned")
+fractionReadsAssigned.L = data.frame(fractionReadsAssigned.L, sample_data(ps_mkCOInr_trimmed_filt)[fractionReadsAssigned.L$SampleID,])
+
+fractionReadsAssigned.L$taxlevelf = factor(fractionReadsAssigned.L$taxlevel, levels=c("Kingdom","Phylum","Class","Order","Family","Genus","Species"))
+
+
+
+pmkCOInr_trimmed_filt<-ggplot(fractionReadsAssigned.L, aes(y = fractionReadsAssigned, x = taxlevelf)) +  theme_bw(base_size = 10) +  geom_boxplot(color='black', outlier.shape=NA) +  ggtitle("NCBI&BOLD: mkCOInr (trained with primers; 1487 ASVs)") + geom_point() + ylab ("Fraction of reads assigned") + xlab ("Taxonomic rank")
+
+
+
+pmkCOInr_trimmed_filt
+```
+
+### Replace NAs with the highest possible rank in the taxnomic names 
+```{r ReplaceNAs, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, results="hide"}
+tax_mkCOInr_trimmed_filt<- data.frame(tax_table(ps_mkCOInr_trimmed_filt))
+
+
+tax_mkCOInr_trimmed_filt[is.na(tax_mkCOInr_trimmed_filt)] <- ""
+
+for (i in 1:7){ tax_mkCOInr_trimmed_filt[,i] <- as.character(tax_mkCOInr_trimmed_filt[,i])}
+tax_mkCOInr_trimmed_filt[is.na(tax_mkCOInr_trimmed_filt)] <- ""
+
+
+for (i in 1:nrow(tax_mkCOInr_trimmed_filt)){if (tax_mkCOInr_trimmed_filt[i,2] == "")
+  {
+    kingdom <- paste("Kingdom_", tax_mkCOInr_trimmed_filt[i,1], sep = "")
+    tax_mkCOInr_trimmed_filt[i, 2:7] <- kingdom
+  } else if (tax_mkCOInr_trimmed_filt[i,3] == ""){
+    phylum <- paste("Phylum_", tax_mkCOInr_trimmed_filt[i,2], sep = "")
+    tax_mkCOInr_trimmed_filt[i, 3:7] <- phylum
+  } else if (tax_mkCOInr_trimmed_filt[i,4] == ""){
+    class <- paste("Class_", tax_mkCOInr_trimmed_filt[i,3], sep = "")
+    tax_mkCOInr_trimmed_filt[i, 4:7] <- class
+  } else if (tax_mkCOInr_trimmed_filt[i,5] == ""){
+    order <- paste("Order_", tax_mkCOInr_trimmed_filt[i,4], sep = "")
+    tax_mkCOInr_trimmed_filt[i, 5:7] <- order
+  } else if (tax_mkCOInr_trimmed_filt[i,6] == ""){
+    family <- paste("Family_", tax_mkCOInr_trimmed_filt[i,5], sep = "")
+    tax_mkCOInr_trimmed_filt[i, 6:7] <- family
+  } else if (tax_mkCOInr_trimmed_filt[i,7] == ""){
+    tax_mkCOInr_trimmed_filt$Species[i] <- paste("Genus",tax_mkCOInr_trimmed_filt$Genus[i], sep = "_")
+  }
+}
+
+tax_mkCOInr_trimmed_filt
+
+tax_table(ps_mkCOInr_trimmed_filt)<-as.matrix(tax_mkCOInr_trimmed_filt)
+```
+
+
+### Barplot of taxonomy at the class level according to the geographical local location of the samples (all sample types pooled):
+
+```{r taxonomyClass, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+(sample_data(ps_mkCOInr_trimmed_filt))$Island_Mainland
+
+Merged<-merge_samples(ps_mkCOInr_trimmed_filt,"Island_Mainland")
+warnings() 
+
+names(sample_data(Merged))
+
+physeq2 = phyloseq::transform_sample_counts(Merged, function(x) x / sum(x) )
+physeq2
+
+
+ps_melt<- psmelt(physeq2)
+head(ps_melt)
+
+p8c <- ggplot(data=ps_melt, aes(x=Sample, y=Abundance, fill=Class))
+p8c <-p8c + geom_bar(aes(), stat="identity", position="stack") +scale_fill_manual(values = c("darkblue", "#8b5b5b", "darkorchid", "lightskyblue", "darkgreen", "#4a3b2c", "deeppink", "khaki2","#aa6c39", "darkorange1", "#E0FFFF", "darksalmon", "#eee7e1", "black", "darkolivegreen1","pink","darkseagreen","#E41A1C","#0000FF","#00FF00","#FFA500","#E7298A","#00FFFF","#008000","#800080","#008080","#999999","#FF4500","#FFFF00","#4DAF4A","#A65628","#F781BF","#1B9E77","#808000","#377EB8", "#CBC3E3","#460046","#AA336A","#d2691e")) + guides(fill=guide_legend(title="Taxanomic assignment (Class or higher)",ncol=2)) +theme(text = element_text(size = 10),legend.position="right",axis.text.x = element_text(angle = 45, hjust = 1),panel.background = element_blank(),plot.margin = unit(c(1,1,1,1), "cm"))+ggtitle("Relative abundance of COI in fecal sample according to host species and geography \nusing the mkCOInr pipeline (trimmed)")+
+  xlab("")
+
+
+
+(sample_data(ps_mkCOInr_trimmed_derep_filt))$Island_Mainland
+
+```
+
+We will use this classifier for all down stream analyses. We export ps_mkCOInr_trimmed_filt and use this phyloseq object for further downstream analyses on COI.
+
+Update metadata Fringilla project
+
+```{r export, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# Add sequencing depth column 
+sample_data(ps_mkCOInr_trimmed_filt)$Seq_depth_COI <- sample_sums(ps_mkCOInr_trimmed_filt)
+
+# remove unnecessary columns from metadata
+df <-  data.frame(sample_data(ps_mkCOInr_trimmed_filt)) %>%  select("sampleid", "Lab_Code", "Plate", "Seq_depth_rbcL", "Ring","Genus" , "Species", "Subspecies", "Species_Label", "Month", "Year", "Locality", "Habitat", "Xdec", "Ydec", "Archipelago_Mainland", "Island_Mainland",  "Area_km2", "Distance_mainland", "Age_ma", "Age", "Sex", , "Weight", "Wing", "X8_P", "Tail", "Nar", "P_Cr", "Height", "Width", "Cran", "Tars")
+
+sample_data(ps_mkCOInr_trimmed_filt) <- df
+
+# Replace sampleid with Lab_Code to match sample names across datasets 
+
+sample_names(ps_mkCOInr_trimmed_filt) <- paste0("X",sample_data(ps_mkCOInr_trimmed_filt)$Lab_Code)
+
+```
+Save phyloseq object
+```{r exportpartII saveObjects, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+ps_mkCOInr_trimmed_filt
+ps_mkCOInr_trimmed_filt %>% sample_data %>% names
+
+saveRDS(ps_mkCOInr_trimmed_filt, paste0(dataDir, "/ps.clean_COI.rds"))
+
+```
+
+## Session Info
+
+```{r sessioninfo, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+sessioninfo::session_info()%>%
+  details::details(summary = 'Current session info', open = FALSE)
+```
