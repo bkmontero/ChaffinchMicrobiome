@@ -1,4 +1,4 @@
-# ChaffinchMicrobiome <img src="data/Microcebe.png" align="right" height="200"/></a>
+# ChaffinchMicrobiome <img src="preprocessing/MacaronesianChaffinches.png" align="right" height="200"/></a>
 
 
 This repository contains the scripts associated with the manuscipt "Host filtering and biogeography structure island bird gut microbiomes"
