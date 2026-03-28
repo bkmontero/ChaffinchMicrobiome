@@ -2,8 +2,10 @@
 title: 'Effect of colonisation history and biogeography'
 author: "B. K. Montero and M. Gillingham"
 date: "`r Sys.Date()`"
-output: html_document
-
+output: 
+  rmdformats::downcute:
+    code_folding: hide
+    toc_depth: 2
 ---
 
 
@@ -44,7 +46,6 @@ library(car)
 library(multcomp)
 library(glmmTMB)
 library(ggeffects)
-
 ```
 ## WORKING DIRECTORIES
 
@@ -82,7 +83,7 @@ ps_fringilla_rare <- biomeUtils::removeZeros(ps_fringilla_rare)
 
 Is there a sequential reduction of alpha diversity as predicted by colonization history? (i.e. mainland > Azores > Madeira > Canary Islands) 
 
-```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, fig.width=14, fig.height=7}
 
 rich <- estimate_richness(ps_fringilla_rare, measures=c("Observed", "Shannon"))
 pd <- calculatePD(ps_fringilla_rare, justDF = TRUE)
@@ -147,7 +148,7 @@ No evidence of alpha diversity mirroring the colonization history of the chaffin
 
 Plot richness according to species within islands:
 
-```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, fig.width=14, fig.height=7}
 
 mainland_fringilla <- mainland_fringilla %>% filter(Genus == "Fringilla") %>%    mutate( Labels = Species_Label %>% str_replace("Mainland_F_coelebs", "Mainland : F.coelebs") %>% str_replace("_F_", " : F.") %>% str_replace("c_", "c.") %>% str_replace("_", " ")) 
 
@@ -218,7 +219,7 @@ levels(mainland_fringilla$Species_Label)
 
 To account for phylogenetic relationships between bacterial taxa we repeated the above analysis using Faith's PD.
 
-```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, fig.width=14, fig.height=7}
 
 GLM1 <- glm.nb(PD_integer ~ Age_cat + Sex + Species_Label, data = mainland_fringilla,na.action = na.fail)
 summary(GLM1)
@@ -345,7 +346,7 @@ s.quant <- beta.div.comp(Matrix_abund, coef = "BS", quant = TRUE, save.abc = FAL
 
 #### (Percentage difference, (quantitative form of Sorensen index) (a.k.a. Bray-Curtis))
 
-```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, fig.width=14, fig.height=7}
 
 ##Replacement values
 # dataframe of all pairwise comparisons
@@ -442,7 +443,7 @@ dist_df_diff_site$S+dist_df_diff_site$repl+dist_df_diff_site$rich
 
 
 Plot per site variation of beta components
-```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, fig.width=14, fig.height=7}
 dist_df_diff_mainland$site_interest <- gsub('Mainland_F_coelebs','', dist_df_diff_mainland$X1_X2_Species_Label)
 
 dist_df_diff_mainland$site_interest <- gsub(':','', dist_df_diff_mainland$site_interest)
@@ -518,7 +519,7 @@ rect_data <- data.frame(
 
 Triangle Plots 
 
-```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, fig.width=14, fig.height=7}
 
 (triangle.overall.diff.bray <-ggtern(data=dist_df_diff_common,aes(rich,repl,S)) +  geom_point(size = 4,  alpha = 0.05, stroke = 0.25) + geom_crosshair_tern(aes(mean(dist_df_diff_common$rich),mean( dist_df_diff_common$repl), mean(dist_df_diff_common$S)),col="darkred",lty="dashed", lineend = "round", size = 2.2) + 
     geom_point(aes(mean(dist_df_diff_common$rich),mean( dist_df_diff_common$repl), mean(dist_df_diff_common$S)),col='darkred',size=10) +
@@ -535,7 +536,7 @@ Triangle Plots
 
 ### Beta partition using a matrix of Jaccard indices (presence-absence data)
 
-```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, fig.width=14, fig.height=7}
 
 str(j.matrix)
 
@@ -669,7 +670,7 @@ dist_df_diff_site.j$S+dist_df_diff_site.j$repl+dist_df_diff_site.j$rich
 
 I repeat the overall dissimilarity plot but weighted and unweighted unifrac:
 
-```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, fig.width=14, fig.height=7}
 
 # UNWEIGHTED UNIFRAC
 
@@ -903,7 +904,7 @@ D_unifrac_w_patch
 # BIOGEOGRAPHY
 
 
-```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, fig.width=14, fig.height=7}
 
 nomainland_fringilla <- mainland_fringilla %>% dplyr::filter(!is.na(Area_km2) & Genus == "Fringilla")
 str(nomainland_fringilla)
@@ -986,7 +987,7 @@ confint(GLMM3)
 ```
 
 ## Patchwork
-```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, fig.width=14, fig.height=7}
 
 png(paste0(outputDir, "/Figures/Colonisation_history_speciesFix.png"), width = 300, height = 240, units = "mm", res = 350)
 ((p1 + theme(axis.title.x = element_blank(), axis.text.x = element_blank(), axis.line.x = element_blank(), axis.ticks.x = element_blank(), strip.text.x = element_text(size = 18))) / D_overall_bray_patch) + plot_layout(axes = 'collect')
@@ -1017,12 +1018,12 @@ dev.off()
 png(paste0(outputDir, "/Figures/Colonisation_history_speciesFix_PDUniFrac.png"), width = 300, height = 360, units = "mm", res = 350)
 (p_PD + theme(axis.title.x = element_blank(), axis.text.x = element_blank(), axis.line.x = element_blank(), axis.ticks.x = element_blank(), strip.text.x = element_text(size = 18))) / 
   D_unifrac_uw_patch /
-  D_unifrac_w_patch + plot_layout(axes = 'collect')
+  D_unifrac_w_patch + plot_layout(axes = 'collect') + plot_annotation(tag_levels = 'A') & theme(plot.tag = element_text(size = 24, face = 'bold'))
 dev.off()
 
 ```
 
 
-```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, fig.width=14, fig.height=7}
 (((p1 +  theme(axis.title.x = element_blank(), axis.text.x =element_blank())) / D_overall_bray_patch) | ( triangle.overall.diff.bray  / triangle.overall.diff.jaccard)) / (pArea + pDistance + pAge_ma) + plot_annotation(tag_levels = 'A') &  theme(plot.tag = element_text(size = 24, face = "bold"))
 ```

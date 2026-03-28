@@ -2,7 +2,9 @@
 title: 'PACo Test'
 author: "B. K. Montero and M. Gillingham"
 date: "`r Sys.Date()`"
-output: html_document
+output: 
+  html_document:
+    code_folding: hide
 ---
 
 ## LOAD LIBRARIES
@@ -29,7 +31,7 @@ library(ape)
 library(treedataverse)
 library(ggh4x)
 library(ggtext)
-
+library(MKinfer)
 
 # phyloseq section
 library(phyloseq)
@@ -208,7 +210,7 @@ df_all_species <- df2 %>%
   mutate(Island_Species_comp = paste(Island_comp,Species_comp,sep='_')) %>%
   mutate(Island_SpComplex_comp = paste(Island_comp,Chaff_Blue_comp,sep='_')) %>%
   mutate(similarity = 1-dist)
-head(df_all,2)
+head(df_all_species,2)
 
 df_sympatric_species <- df_all_species %>% filter(sympatric.ind1 == "sympatric" & sympatric.ind2 == "sympatric")
 
@@ -241,7 +243,7 @@ df_all_genus <- df2 %>%
   mutate(Island_Species_comp = paste(Island_comp,Species_comp,sep='_')) %>%
   mutate(Island_SpComplex_comp = paste(Island_comp,Chaff_Blue_comp,sep='_')) %>%
   mutate(similarity = 1-dist)
-head(df_all,2)
+head(df_all_genus,2)
 
 df_sympatric_genus <- df_all_genus %>% filter(sympatric.ind1 == "sympatric" & sympatric.ind2 == "sympatric")
 
@@ -273,7 +275,7 @@ df_all_family <- df2 %>%
   mutate(Island_Species_comp = paste(Island_comp,Species_comp,sep='_')) %>%
   mutate(Island_SpComplex_comp = paste(Island_comp,Chaff_Blue_comp,sep='_')) %>%
   mutate(similarity = 1-dist)
-head(df_all,2)
+head(df_all_family,2)
 
 df_sympatric_family <- df_all_family %>% filter(sympatric.ind1 == "sympatric" & sympatric.ind2 == "sympatric")
 
@@ -304,7 +306,7 @@ df_all_order <- df2 %>%
   mutate(Island_Species_comp = paste(Island_comp,Species_comp,sep='_')) %>%
   mutate(Island_SpComplex_comp = paste(Island_comp,Chaff_Blue_comp,sep='_')) %>%
   mutate(similarity = 1-dist)
-head(df_all,2)
+head(df_all_order,2)
 
 df_sympatric_order <- df_all_order %>% filter(sympatric.ind1 == "sympatric" & sympatric.ind2 == "sympatric")
 
@@ -336,7 +338,7 @@ df_all_class <- df2 %>%
   mutate(Island_Species_comp = paste(Island_comp,Species_comp,sep='_')) %>%
   mutate(Island_SpComplex_comp = paste(Island_comp,Chaff_Blue_comp,sep='_')) %>%
   mutate(similarity = 1-dist)
-head(df_all,2)
+head(df_all_class,2)
 
 df_sympatric_class <- df_all_class %>% filter(sympatric.ind1 == "sympatric" & sympatric.ind2 == "sympatric")
 
@@ -368,7 +370,7 @@ df_all_phylum <- df2 %>%
   mutate(Island_Species_comp = paste(Island_comp,Species_comp,sep='_')) %>%
   mutate(Island_SpComplex_comp = paste(Island_comp,Chaff_Blue_comp,sep='_')) %>%
   mutate(similarity = 1-dist)
-head(df_all,2)
+head(df_all_phylum,2)
 
 df_sympatric_phylum <- df_all_phylum %>% filter(sympatric.ind1 == "sympatric" & sympatric.ind2 == "sympatric")
 
@@ -392,7 +394,7 @@ plot
     	axis.text.x = element_blank()
     	))
 
-symp_stats_table_otu
+#symp_stats_table_otu
 (chaff_blue_Island_otu <- df_sympatric_otu %>% ggplot(aes(x=Island_SpComplex_comp, y=similarity)) +
     geom_violin(aes(fill=Island_SpComplex_comp), show.legend = T, lwd = 1, alpha = 0.7, width= .7, draw_quantiles = c(0.25, 0.75), linetype = "dashed")+
      geom_violin(fill = "transparent", show.legend = T, lwd = 1.25, width= .7, draw_quantiles = c(0.5)) +
@@ -406,7 +408,7 @@ symp_stats_table_otu
      annotate(geom = "text", x = 1.5,  y = 0.30, label = "*", size = 8) +
 
     theme_bw()+
-   # ggtitle("OTU") +
+    ggtitle("OTU") +
     scale_fill_manual(name = "Pairwise comparisons", values=c('grey','#CCBB44','#66CCEE','#AA3377'), labels= c("Different island, different host species complex", "Different island, same host species complex", "Same island, different host species complex", "Same island, same host species complex"))+
     ylab('Proportion of shared OTUs') +
     xlab("")+
@@ -429,6 +431,7 @@ symp_stats_table_otu
     theme(
       axis.text.x = element_blank()
       ))
+
 (chaff_blue_Island_species <- df_sympatric_species %>% ggplot(aes(x=Island_SpComplex_comp, y=similarity)) +
     geom_violin(aes(fill=Island_SpComplex_comp), show.legend = T, lwd = 1, alpha = 0.7, width= .7, draw_quantiles = c(0.25, 0.75), linetype = "dashed")+
      geom_violin(fill = "transparent", show.legend = T, lwd = 1.25, width= .7, draw_quantiles = c(0.5)) +
@@ -441,7 +444,7 @@ symp_stats_table_otu
      annotate(geom = "segment", x = 2.1, xend = 2.9, y = 0.425, yend = 0.425) + 
      annotate(geom = "text", x = 2.5,  y = 0.43, label = "*", size = 8) +
     theme_bw()+
-   # ggtitle("Species") +
+    ggtitle("Species") +
    scale_fill_manual(name = "Pairwise comparisons", values=c('grey','#CCBB44','#66CCEE','#AA3377'), labels= c("Different island, different host species complex", "Different island, same host species complex", "Same island, different host species complex", "Same island, same host species complex"))+
     ylab('Proportion of shared species') +
     xlab("")+
@@ -493,7 +496,7 @@ symp_stats_table_otu
     geom_violin(aes(fill=Island_SpComplex_comp), show.legend = T, lwd = 1, alpha = 0.7, width= .7, draw_quantiles = c(0.25, 0.75), linetype = "dashed")+
      geom_violin(fill = "transparent", show.legend = T, lwd = 1.25, width= .7, draw_quantiles = c(0.5)) +
     theme_bw()+
-    ggtitle("family") +
+    ggtitle("Family") +
     scale_fill_manual(values=c('grey','#CCBB44','#66CCEE','#AA3377'))+
     ylab('Proportion of shared families') +
     guides(fill=guide_legend(ncol=2)) +
@@ -587,6 +590,7 @@ ggarrange(chaff_blue_Island_otu, chaff_blue_Island_species, chaff_blue_Island_ge
 png(paste0(outputDir, "/Figures/SharedTaxa_AllLevels.png") ,width=1900, height=1200,res=150)
 
 ggarrange(chaff_blue_Island_otu, chaff_blue_Island_species, chaff_blue_Island_genus, chaff_blue_Island_family, chaff_blue_Island_order, chaff_blue_Island_class, chaff_blue_Island_phylum, common.legend = T)
+
 dev.off()
 
 ```
@@ -861,6 +865,7 @@ symp_stats_table_all <- rbind(symp_stats_table_otu, symp_stats_table_species, sy
 symp_stats_table_class, symp_stats_table_phylum)
 
 write.csv(symp_stats_table_all, paste0(dataDir, "/out_permtest_shared.csv"), row.names=FALSE)
+
 ```
 
 JACCARD
@@ -1426,4 +1431,12 @@ phylum_dist <- vegdist(otu_table(microb_fr_phylum_symp), method = "bray", binary
 
 ```
 
-Phylosymbiosis-a pattern in which species relatedness mirrors microbiome similarity-appears to be limited to host clades with  
+```{r sessionInfo, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+sessioninfo::session_info()|>
+  details::details(
+    summary = 'Current session info',
+    open    = TRUE
+  )
+
+```

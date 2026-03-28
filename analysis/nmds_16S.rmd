@@ -2,7 +2,10 @@
 title: 'Ordination 16S data'
 author: "B. K. Montero and M. Gillingham"
 date: "`r Sys.Date()`"
-output: html_document
+output: 
+  rmdformats::downcute:
+    code_folding: hide
+    toc_depth: 2
 
 ---
 
@@ -1021,17 +1024,38 @@ set.seed(42)
 #Sex        1    0.282 0.00570 1.2339 0.1917    
 #Residual 194   44.284 0.89572                  
 #Total    201   49.440 1.00000                  
----
+#---
 #Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 
 # Weighted UniFrac
+
+
 unifrac_w_dist <- UniFrac(ps_fringilla, weighted = TRUE)
 
 set.seed(42)
 (ad <- adonis2(unifrac_w_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
 
+#               Df SumOfSqs      R2      F Pr(>F)    
+#Species_Label  10    8.655 0.19985 4.9142 0.0001 ***
+#Age_cat         1    0.125 0.00288 0.7084 0.6564    
+#Sex             1    0.194 0.00449 1.1030 0.3272    
+#Residual      189   33.289 0.76862                  
+#Total         201   43.310 1.00000                  
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
 set.seed(42)
 (ad <- adonis2(unifrac_w_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
+
+#adonis2(formula = unifrac_w_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
+#          Df SumOfSqs      R2      F Pr(>F)    
+#Species    5    5.191 0.16151 7.6890 0.0001 ***
+#Age_cat    1    0.122 0.00378 0.9001 0.4207    
+#Sex        1    0.066 0.00204 0.4863 0.7365    
+#Residual 194   26.196 0.81499                  
+#Total    201   32.143 1.00000                  
+#---
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 
 
 # FAMILY LEVEL
@@ -1046,26 +1070,22 @@ unifrac_uw_dist <- UniFrac(ps_fringilla, weighted = FALSE)
 set.seed(42)
 (ad <- adonis2(unifrac_uw_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
 
-#adonis2(formula = unifrac_w_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
 #               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10    8.285 0.22791 5.8130 0.0001 ***
-#Age_cat         1    0.059 0.00162 0.4127 0.8264    
-#Sex             1    0.118 0.00325 0.8286 0.4907    
-#Residual      189   26.938 0.74102                  
-#Total         201   36.353 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+#Species_Label  10    7.266 0.13355 2.9918 0.0001 ***
+#Age_cat         1    0.237 0.00435 0.9751 0.4680    
+#Sex             1    0.254 0.00467 1.0461 0.3549    
+#Residual      189   45.900 0.84366                  
+#Total         201   54.406 1.00000  
 
 set.seed(42)
 (ad <- adonis2(unifrac_uw_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
 
-#adonis2(formula = unifrac_w_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
 #          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5    5.432 0.14942 7.0742 0.0001 ***
-#Age_cat    1    0.378 0.01039 2.4586 0.0464 *  
-#Sex        1    0.095 0.00261 0.6171 0.6499    
-#Residual 194   29.792 0.81951                  
-#Total    201   36.353 1.00000                  
+#Species    5    4.248 0.07807 3.3691 0.0001 ***
+#Age_cat    1    0.333 0.00613 1.3221 0.1083    
+#Sex        1    0.252 0.00464 1.0002 0.4240    
+#Residual 194   48.918 0.89913                  
+#Total    201   54.406 1.00000                  
 #---
 #Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
 

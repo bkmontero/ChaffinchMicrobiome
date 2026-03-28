@@ -1,0 +1,838 @@
+---
+title: 'Ordination 16S data - UniFrac'
+author: "B. K. Montero and M. Gillingham"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    code_folding: hide
+---
+
+## LOAD LIBRARIES
+
+```{r loadLibraries, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=(width.cutoff=45), paged.print=FALSE}
+
+rm(list = ls())
+
+#general
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+library(stringr)
+library(vegan)
+library(magrittr)
+library(ggplot2)
+library(ggpubr)
+library(MicEco)
+library(rlist)
+library(grid)
+library(tsiR)
+library(ggforce)
+library(ggrepel)
+library(ggh4x)
+library(ggtext)
+library(MKinfer)
+
+# phyloseq section
+library(phyloseq)
+library(Biostrings)
+library(DECIPHER)
+library(speedyseq)
+library(microbiome)
+library(metagMisc)
+library(phylosmith)
+library(seqateurs)
+library(treedata.table)
+library(biomeUtils)
+library(RVAideMemoire)
+
+# diversity
+library(betapart)
+library(adespatial)
+library(ecodist)
+library(geosphere)
+
+#rmd
+library(details)
+library(knitr)
+library(kableExtra)
+
+# PACo
+library(ape)
+library(paco)
+library(future)
+library(doParallel)
+library(future.apply)
+library(multcomp)
+
+```
+
+## WORKING DIRECTORIES
+
+```{r source, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, results="hide"}
+
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/workingDirectories.R")
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/CleanScripts/graphics_param.R")
+
+```
+
+## Microbiome
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+microb_fr <- readRDS(paste0(dataDir, "/microb_overlap_OTU99_fr_taxFix.rds"))
+
+microb_fr <- biomeUtils::removeZeros(microb_fr)
+
+```
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+microb_fr_otu <- microb_fr
+microb_fr_species <- speedyseq::tax_glom(microb_fr, "Species", NArm = FALSE)
+microb_fr_genus <- speedyseq::tax_glom(microb_fr, "Genus", NArm = FALSE)
+microb_fr_family <- speedyseq::tax_glom(microb_fr, "Family", NArm = FALSE)
+microb_fr_order <- speedyseq::tax_glom(microb_fr, "Order", NArm = FALSE)
+microb_fr_class <- speedyseq::tax_glom(microb_fr, "Class", NArm = FALSE)
+microb_fr_phylum <- speedyseq::tax_glom(microb_fr, "Phylum", NArm = FALSE)
+
+# add OTU_ID to tax tables
+tax_table(microb_fr_otu)
+
+# species
+tax_table(microb_fr_species) <- tax_table(microb_fr_species)[, 1:7]
+tax_table(microb_fr_species) <- cbind(tax_table(microb_fr_species), rownames(tax_table(microb_fr_species)))
+colnames(tax_table(microb_fr_species)) <- c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species", "OTU_ID")
+
+# genus
+tax_table(microb_fr_genus) <- tax_table(microb_fr_genus)[, 1:6]
+tax_table(microb_fr_genus) <- cbind(tax_table(microb_fr_genus), rownames(tax_table(microb_fr_genus)))
+colnames(tax_table(microb_fr_genus)) <- c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "OTU_ID")
+
+# family
+tax_table(microb_fr_family) <- tax_table(microb_fr_family)[, 1:5]
+tax_table(microb_fr_family) <- cbind(tax_table(microb_fr_family), rownames(tax_table(microb_fr_family)))
+colnames(tax_table(microb_fr_family)) <- c("Kingdom", "Phylum", "Class", "Order", "Family", "OTU_ID")
+
+# order
+tax_table(microb_fr_order) <- tax_table(microb_fr_order)[, 1:4]
+tax_table(microb_fr_order) <- cbind(tax_table(microb_fr_order), rownames(tax_table(microb_fr_order)))
+colnames(tax_table(microb_fr_order)) <- c("Kingdom", "Phylum", "Class", "Order", "OTU_ID")
+
+# class
+tax_table(microb_fr_class) <- tax_table(microb_fr_class)[, 1:3]
+tax_table(microb_fr_class) <- cbind(tax_table(microb_fr_class), rownames(tax_table(microb_fr_class)))
+colnames(tax_table(microb_fr_class)) <- c("Kingdom", "Phylum", "Class", "OTU_ID")
+
+# phylum
+tax_table(microb_fr_phylum) <- tax_table(microb_fr_phylum)[, 1:2]
+tax_table(microb_fr_phylum) <- cbind(tax_table(microb_fr_phylum), rownames(tax_table(microb_fr_phylum)))
+colnames(tax_table(microb_fr_phylum)) <- c("Kingdom", "Phylum", "OTU_ID")
+
+# meta
+microb_fr_meta_otu <- sample_data(microb_fr_otu) %>% data.frame
+microb_fr_meta_species <- sample_data(microb_fr_species) %>% data.frame
+microb_fr_meta_genus <- sample_data(microb_fr_genus) %>% data.frame
+microb_fr_meta_family <- sample_data(microb_fr_family) %>% data.frame
+microb_fr_meta_order <- sample_data(microb_fr_order) %>% data.frame
+microb_fr_meta_class <- sample_data(microb_fr_class) %>% data.frame
+microb_fr_meta_phylum <- sample_data(microb_fr_phylum) %>% data.frame
+
+```
+
+# Percent shared ASVs - Unweighted UniFrac
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+## OTU
+dist <- UniFrac(microb_fr_otu, weighted = FALSE)
+distM <- as.matrix(dist)
+df1 <- data.frame(t(combn(colnames(distM), 2)), dist = t(distM)[lower.tri(distM)])
+colnames(df1) <- c('ind1', 'ind2', 'dist')
+
+microb_fr_meta_otu$sympatric <- if_else(microb_fr_meta_otu$Island_Mainland == "Tenerife" | microb_fr_meta_otu$Island_Mainland == "Gran Canaria", "sympatric", "allopatric")
+
+site_species <- data.frame(microb_fr_meta_otu) %>%
+  dplyr::select(Species_Label, Species, Island_Mainland, Chaff_Blue, Archipelago_Mainland, sympatric) %>%
+  rownames_to_column(var = 'Sampleid')
+df2 <- df1 %>%
+  left_join(site_species, by = c('ind1' = 'Sampleid')) %>%
+  left_join(site_species, by = c('ind2' = 'Sampleid'), suffix = c(".ind1", ".ind2"))
+
+df_all_otu <- df2 %>%
+  mutate(Label_comp = if_else(Species_Label.ind1 == Species_Label.ind2, 'same_Label', 'diff_Label')) %>%
+  mutate(Species_comp = if_else(Species.ind1 == Species.ind2, 'same_Species', 'diff_Species')) %>%
+  mutate(Island_comp = if_else(Island_Mainland.ind1 == Island_Mainland.ind2, 'same_Island', 'diff_Island')) %>%
+  mutate(Chaff_Blue_comp = if_else(Chaff_Blue.ind1 == Chaff_Blue.ind2, 'same_SpComplex', 'diff_SpComplex')) %>%
+  mutate(Archipelago_comp = if_else(Archipelago_Mainland.ind1 == Archipelago_Mainland.ind2, 'same_Archipelago', 'diff_Archipelago')) %>%
+  mutate(Archipelago_Island_comp = paste(Archipelago_comp, Island_comp, sep = '_')) %>%
+  mutate(Island_Species_comp = paste(Island_comp, Species_comp, sep = '_')) %>%
+  mutate(Island_SpComplex_comp = paste(Island_comp, Chaff_Blue_comp, sep = '_')) %>%
+  mutate(similarity = 1 - dist)
+
+df_sympatric_otu <- df_all_otu %>% filter(sympatric.ind1 == "sympatric" & sympatric.ind2 == "sympatric")
+
+
+## Species
+dist <- UniFrac(microb_fr_species, weighted = FALSE)
+distM <- as.matrix(dist)
+df1 <- data.frame(t(combn(colnames(distM), 2)), dist = t(distM)[lower.tri(distM)])
+colnames(df1) <- c('ind1', 'ind2', 'dist')
+
+microb_fr_meta_species$sympatric <- if_else(microb_fr_meta_species$Island_Mainland == "Tenerife" | microb_fr_meta_species$Island_Mainland == "Gran Canaria", "sympatric", "allopatric")
+
+site_species <- data.frame(microb_fr_meta_species) %>%
+  dplyr::select(Species_Label, Species, Island_Mainland, Chaff_Blue, Archipelago_Mainland, sympatric) %>%
+  rownames_to_column(var = 'Sampleid')
+df2 <- df1 %>%
+  left_join(site_species, by = c('ind1' = 'Sampleid')) %>%
+  left_join(site_species, by = c('ind2' = 'Sampleid'), suffix = c(".ind1", ".ind2"))
+
+df_all_species <- df2 %>%
+  mutate(Label_comp = if_else(Species_Label.ind1 == Species_Label.ind2, 'same_Label', 'diff_Label')) %>%
+  mutate(Species_comp = if_else(Species.ind1 == Species.ind2, 'same_Species', 'diff_Species')) %>%
+  mutate(Island_comp = if_else(Island_Mainland.ind1 == Island_Mainland.ind2, 'same_Island', 'diff_Island')) %>%
+  mutate(Chaff_Blue_comp = if_else(Chaff_Blue.ind1 == Chaff_Blue.ind2, 'same_SpComplex', 'diff_SpComplex')) %>%
+  mutate(Archipelago_comp = if_else(Archipelago_Mainland.ind1 == Archipelago_Mainland.ind2, 'same_Archipelago', 'diff_Archipelago')) %>%
+  mutate(Archipelago_Island_comp = paste(Archipelago_comp, Island_comp, sep = '_')) %>%
+  mutate(Island_Species_comp = paste(Island_comp, Species_comp, sep = '_')) %>%
+  mutate(Island_SpComplex_comp = paste(Island_comp, Chaff_Blue_comp, sep = '_')) %>%
+  mutate(similarity = 1 - dist)
+
+df_sympatric_species <- df_all_species %>% filter(sympatric.ind1 == "sympatric" & sympatric.ind2 == "sympatric")
+
+
+## Genus
+dist <- UniFrac(microb_fr_genus, weighted = FALSE)
+distM <- as.matrix(dist)
+df1 <- data.frame(t(combn(colnames(distM), 2)), dist = t(distM)[lower.tri(distM)])
+colnames(df1) <- c('ind1', 'ind2', 'dist')
+
+microb_fr_meta_genus$sympatric <- if_else(microb_fr_meta_genus$Island_Mainland == "Tenerife" | microb_fr_meta_genus$Island_Mainland == "Gran Canaria", "sympatric", "allopatric")
+
+site_species <- data.frame(microb_fr_meta_genus) %>%
+  dplyr::select(Species_Label, Species, Island_Mainland, Chaff_Blue, Archipelago_Mainland, sympatric) %>%
+  rownames_to_column(var = 'Sampleid')
+df2 <- df1 %>%
+  left_join(site_species, by = c('ind1' = 'Sampleid')) %>%
+  left_join(site_species, by = c('ind2' = 'Sampleid'), suffix = c(".ind1", ".ind2"))
+
+df_all_genus <- df2 %>%
+  mutate(Label_comp = if_else(Species_Label.ind1 == Species_Label.ind2, 'same_Label', 'diff_Label')) %>%
+  mutate(Species_comp = if_else(Species.ind1 == Species.ind2, 'same_Species', 'diff_Species')) %>%
+  mutate(Island_comp = if_else(Island_Mainland.ind1 == Island_Mainland.ind2, 'same_Island', 'diff_Island')) %>%
+  mutate(Chaff_Blue_comp = if_else(Chaff_Blue.ind1 == Chaff_Blue.ind2, 'same_SpComplex', 'diff_SpComplex')) %>%
+  mutate(Archipelago_comp = if_else(Archipelago_Mainland.ind1 == Archipelago_Mainland.ind2, 'same_Archipelago', 'diff_Archipelago')) %>%
+  mutate(Archipelago_Island_comp = paste(Archipelago_comp, Island_comp, sep = '_')) %>%
+  mutate(Island_Species_comp = paste(Island_comp, Species_comp, sep = '_')) %>%
+  mutate(Island_SpComplex_comp = paste(Island_comp, Chaff_Blue_comp, sep = '_')) %>%
+  mutate(similarity = 1 - dist)
+
+df_sympatric_genus <- df_all_genus %>% filter(sympatric.ind1 == "sympatric" & sympatric.ind2 == "sympatric")
+
+
+## Family
+dist <- UniFrac(microb_fr_family, weighted = FALSE)
+distM <- as.matrix(dist)
+df1 <- data.frame(t(combn(colnames(distM), 2)), dist = t(distM)[lower.tri(distM)])
+colnames(df1) <- c('ind1', 'ind2', 'dist')
+
+microb_fr_meta_family$sympatric <- if_else(microb_fr_meta_family$Island_Mainland == "Tenerife" | microb_fr_meta_family$Island_Mainland == "Gran Canaria", "sympatric", "allopatric")
+
+site_species <- data.frame(microb_fr_meta_family) %>%
+  dplyr::select(Species_Label, Species, Island_Mainland, Chaff_Blue, Archipelago_Mainland, sympatric) %>%
+  rownames_to_column(var = 'Sampleid')
+df2 <- df1 %>%
+  left_join(site_species, by = c('ind1' = 'Sampleid')) %>%
+  left_join(site_species, by = c('ind2' = 'Sampleid'), suffix = c(".ind1", ".ind2"))
+
+df_all_family <- df2 %>%
+  mutate(Label_comp = if_else(Species_Label.ind1 == Species_Label.ind2, 'same_Label', 'diff_Label')) %>%
+  mutate(Species_comp = if_else(Species.ind1 == Species.ind2, 'same_Species', 'diff_Species')) %>%
+  mutate(Island_comp = if_else(Island_Mainland.ind1 == Island_Mainland.ind2, 'same_Island', 'diff_Island')) %>%
+  mutate(Chaff_Blue_comp = if_else(Chaff_Blue.ind1 == Chaff_Blue.ind2, 'same_SpComplex', 'diff_SpComplex')) %>%
+  mutate(Archipelago_comp = if_else(Archipelago_Mainland.ind1 == Archipelago_Mainland.ind2, 'same_Archipelago', 'diff_Archipelago')) %>%
+  mutate(Archipelago_Island_comp = paste(Archipelago_comp, Island_comp, sep = '_')) %>%
+  mutate(Island_Species_comp = paste(Island_comp, Species_comp, sep = '_')) %>%
+  mutate(Island_SpComplex_comp = paste(Island_comp, Chaff_Blue_comp, sep = '_')) %>%
+  mutate(similarity = 1 - dist)
+
+df_sympatric_family <- df_all_family %>% filter(sympatric.ind1 == "sympatric" & sympatric.ind2 == "sympatric")
+
+
+## Order
+dist <- UniFrac(microb_fr_order, weighted = FALSE)
+distM <- as.matrix(dist)
+df1 <- data.frame(t(combn(colnames(distM), 2)), dist = t(distM)[lower.tri(distM)])
+colnames(df1) <- c('ind1', 'ind2', 'dist')
+
+microb_fr_meta_order$sympatric <- if_else(microb_fr_meta_order$Island_Mainland == "Tenerife" | microb_fr_meta_order$Island_Mainland == "Gran Canaria", "sympatric", "allopatric")
+
+site_species <- data.frame(microb_fr_meta_order) %>%
+  dplyr::select(Species_Label, Species, Island_Mainland, Chaff_Blue, Archipelago_Mainland, sympatric) %>%
+  rownames_to_column(var = 'Sampleid')
+df2 <- df1 %>%
+  left_join(site_species, by = c('ind1' = 'Sampleid')) %>%
+  left_join(site_species, by = c('ind2' = 'Sampleid'), suffix = c(".ind1", ".ind2"))
+
+df_all_order <- df2 %>%
+  mutate(Label_comp = if_else(Species_Label.ind1 == Species_Label.ind2, 'same_Label', 'diff_Label')) %>%
+  mutate(Species_comp = if_else(Species.ind1 == Species.ind2, 'same_Species', 'diff_Species')) %>%
+  mutate(Island_comp = if_else(Island_Mainland.ind1 == Island_Mainland.ind2, 'same_Island', 'diff_Island')) %>%
+  mutate(Chaff_Blue_comp = if_else(Chaff_Blue.ind1 == Chaff_Blue.ind2, 'same_SpComplex', 'diff_SpComplex')) %>%
+  mutate(Archipelago_comp = if_else(Archipelago_Mainland.ind1 == Archipelago_Mainland.ind2, 'same_Archipelago', 'diff_Archipelago')) %>%
+  mutate(Archipelago_Island_comp = paste(Archipelago_comp, Island_comp, sep = '_')) %>%
+  mutate(Island_Species_comp = paste(Island_comp, Species_comp, sep = '_')) %>%
+  mutate(Island_SpComplex_comp = paste(Island_comp, Chaff_Blue_comp, sep = '_')) %>%
+  mutate(similarity = 1 - dist)
+
+df_sympatric_order <- df_all_order %>% filter(sympatric.ind1 == "sympatric" & sympatric.ind2 == "sympatric")
+
+
+## Class
+dist <- UniFrac(microb_fr_class, weighted = FALSE)
+distM <- as.matrix(dist)
+df1 <- data.frame(t(combn(colnames(distM), 2)), dist = t(distM)[lower.tri(distM)])
+colnames(df1) <- c('ind1', 'ind2', 'dist')
+
+microb_fr_meta_class$sympatric <- if_else(microb_fr_meta_class$Island_Mainland == "Tenerife" | microb_fr_meta_class$Island_Mainland == "Gran Canaria", "sympatric", "allopatric")
+
+site_species <- data.frame(microb_fr_meta_class) %>%
+  dplyr::select(Species_Label, Species, Island_Mainland, Chaff_Blue, Archipelago_Mainland, sympatric) %>%
+  rownames_to_column(var = 'Sampleid')
+df2 <- df1 %>%
+  left_join(site_species, by = c('ind1' = 'Sampleid')) %>%
+  left_join(site_species, by = c('ind2' = 'Sampleid'), suffix = c(".ind1", ".ind2"))
+
+df_all_class <- df2 %>%
+  mutate(Label_comp = if_else(Species_Label.ind1 == Species_Label.ind2, 'same_Label', 'diff_Label')) %>%
+  mutate(Species_comp = if_else(Species.ind1 == Species.ind2, 'same_Species', 'diff_Species')) %>%
+  mutate(Island_comp = if_else(Island_Mainland.ind1 == Island_Mainland.ind2, 'same_Island', 'diff_Island')) %>%
+  mutate(Chaff_Blue_comp = if_else(Chaff_Blue.ind1 == Chaff_Blue.ind2, 'same_SpComplex', 'diff_SpComplex')) %>%
+  mutate(Archipelago_comp = if_else(Archipelago_Mainland.ind1 == Archipelago_Mainland.ind2, 'same_Archipelago', 'diff_Archipelago')) %>%
+  mutate(Archipelago_Island_comp = paste(Archipelago_comp, Island_comp, sep = '_')) %>%
+  mutate(Island_Species_comp = paste(Island_comp, Species_comp, sep = '_')) %>%
+  mutate(Island_SpComplex_comp = paste(Island_comp, Chaff_Blue_comp, sep = '_')) %>%
+  mutate(similarity = 1 - dist)
+
+df_sympatric_class <- df_all_class %>% filter(sympatric.ind1 == "sympatric" & sympatric.ind2 == "sympatric")
+
+
+## Phylum
+dist <- UniFrac(microb_fr_phylum, weighted = FALSE)
+distM <- as.matrix(dist)
+df1 <- data.frame(t(combn(colnames(distM), 2)), dist = t(distM)[lower.tri(distM)])
+colnames(df1) <- c('ind1', 'ind2', 'dist')
+
+microb_fr_meta_phylum$sympatric <- if_else(microb_fr_meta_phylum$Island_Mainland == "Tenerife" | microb_fr_meta_phylum$Island_Mainland == "Gran Canaria", "sympatric", "allopatric")
+
+site_species <- data.frame(microb_fr_meta_phylum) %>%
+  dplyr::select(Species_Label, Species, Island_Mainland, Chaff_Blue, Archipelago_Mainland, sympatric) %>%
+  rownames_to_column(var = 'Sampleid')
+df2 <- df1 %>%
+  left_join(site_species, by = c('ind1' = 'Sampleid')) %>%
+  left_join(site_species, by = c('ind2' = 'Sampleid'), suffix = c(".ind1", ".ind2"))
+
+df_all_phylum <- df2 %>%
+  mutate(Label_comp = if_else(Species_Label.ind1 == Species_Label.ind2, 'same_Label', 'diff_Label')) %>%
+  mutate(Species_comp = if_else(Species.ind1 == Species.ind2, 'same_Species', 'diff_Species')) %>%
+  mutate(Island_comp = if_else(Island_Mainland.ind1 == Island_Mainland.ind2, 'same_Island', 'diff_Island')) %>%
+  mutate(Chaff_Blue_comp = if_else(Chaff_Blue.ind1 == Chaff_Blue.ind2, 'same_SpComplex', 'diff_SpComplex')) %>%
+  mutate(Archipelago_comp = if_else(Archipelago_Mainland.ind1 == Archipelago_Mainland.ind2, 'same_Archipelago', 'diff_Archipelago')) %>%
+  mutate(Archipelago_Island_comp = paste(Archipelago_comp, Island_comp, sep = '_')) %>%
+  mutate(Island_Species_comp = paste(Island_comp, Species_comp, sep = '_')) %>%
+  mutate(Island_SpComplex_comp = paste(Island_comp, Chaff_Blue_comp, sep = '_')) %>%
+  mutate(similarity = 1 - dist)
+
+df_sympatric_phylum <- df_all_phylum %>% filter(sympatric.ind1 == "sympatric" & sympatric.ind2 == "sympatric")
+
+```
+
+## Violin Plots - Unweighted UniFrac
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# OTU
+(chaff_blue_Island_otu_uw <- df_sympatric_otu %>% ggplot(aes(x = Island_SpComplex_comp, y = similarity)) +
+    geom_violin(aes(fill = Island_SpComplex_comp), show.legend = T, lwd = 1, alpha = 0.7, width = .7, draw_quantiles = c(0.25, 0.75), linetype = "dashed") +
+    geom_violin(fill = "transparent", show.legend = T, lwd = 1.25, width = .7, draw_quantiles = c(0.5)) +
+    theme_bw() +
+    ggtitle("OTU") +
+    scale_fill_manual(name = "Pairwise comparisons", values = c('grey', '#CCBB44', '#66CCEE', '#AA3377'), labels = c("Different island, different host species complex", "Different island, same host species complex", "Same island, different host species complex", "Same island, same host species complex")) +
+    ylab('1 - Unweighted UniFrac') +
+    xlab("") +
+    guides(fill = guide_legend(ncol = 1)) +
+    theme(axis.text.x = element_blank()))
+
+# Species
+(chaff_blue_Island_species_uw <- df_sympatric_species %>% ggplot(aes(x = Island_SpComplex_comp, y = similarity)) +
+    geom_violin(aes(fill = Island_SpComplex_comp), show.legend = T, lwd = 1, alpha = 0.7, width = .7, draw_quantiles = c(0.25, 0.75), linetype = "dashed") +
+    geom_violin(fill = "transparent", show.legend = T, lwd = 1.25, width = .7, draw_quantiles = c(0.5)) +
+    theme_bw() +
+    ggtitle("Species") +
+    scale_fill_manual(name = "Pairwise comparisons", values = c('grey', '#CCBB44', '#66CCEE', '#AA3377'), labels = c("Different island, different host species complex", "Different island, same host species complex", "Same island, different host species complex", "Same island, same host species complex")) +
+    ylab('1 - Unweighted UniFrac') +
+    xlab("") +
+    guides(fill = guide_legend(ncol = 1)) +
+    theme(axis.text.x = element_blank()))
+
+# Genus
+(chaff_blue_Island_genus_uw <- df_sympatric_genus %>% ggplot(aes(x = Island_SpComplex_comp, y = similarity)) +
+    geom_violin(aes(fill = Island_SpComplex_comp), show.legend = T, lwd = 1, alpha = 0.7, width = .7, draw_quantiles = c(0.25, 0.75), linetype = "dashed") +
+    geom_violin(fill = "transparent", show.legend = T, lwd = 1.25, width = .7, draw_quantiles = c(0.5)) +
+    theme_bw() +
+    ggtitle("Genus") +
+    scale_fill_manual(values = c('grey', '#CCBB44', '#66CCEE', '#AA3377')) +
+    ylab('1 - Unweighted UniFrac') +
+    guides(fill = guide_legend(ncol = 1)) +
+    theme(axis.text.x = element_blank()))
+
+# Family
+(chaff_blue_Island_family_uw <- df_sympatric_family %>% ggplot(aes(x = Island_SpComplex_comp, y = similarity)) +
+    geom_violin(aes(fill = Island_SpComplex_comp), show.legend = T, lwd = 1, alpha = 0.7, width = .7, draw_quantiles = c(0.25, 0.75), linetype = "dashed") +
+    geom_violin(fill = "transparent", show.legend = T, lwd = 1.25, width = .7, draw_quantiles = c(0.5)) +
+    theme_bw() +
+    ggtitle("Family") +
+    scale_fill_manual(values = c('grey', '#CCBB44', '#66CCEE', '#AA3377')) +
+    ylab('1 - Unweighted UniFrac') +
+    guides(fill = guide_legend(ncol = 2)) +
+    theme(axis.text.x = element_blank()))
+
+# Order
+(chaff_blue_Island_order_uw <- df_sympatric_order %>% ggplot(aes(x = Island_SpComplex_comp, y = similarity)) +
+    geom_violin(aes(fill = Island_SpComplex_comp), show.legend = T, lwd = 1, alpha = 0.7, width = .7, draw_quantiles = c(0.25, 0.75), linetype = "dashed") +
+    geom_violin(fill = "transparent", show.legend = T, lwd = 1.25, width = .7, draw_quantiles = c(0.5)) +
+    theme_bw() +
+    ggtitle("Order") +
+    scale_fill_manual(values = c('grey', '#CCBB44', '#66CCEE', '#AA3377')) +
+    ylab('1 - Unweighted UniFrac') +
+    guides(fill = guide_legend(ncol = 2)) +
+    theme(axis.text.x = element_blank()))
+
+# Class
+(chaff_blue_Island_class_uw <- df_sympatric_class %>% ggplot(aes(x = Island_SpComplex_comp, y = similarity)) +
+    geom_violin(aes(fill = Island_SpComplex_comp), show.legend = T, lwd = 1, alpha = 0.7, width = .7, draw_quantiles = c(0.25, 0.75), linetype = "dashed") +
+    geom_violin(fill = "transparent", show.legend = T, lwd = 1.25, width = .7, draw_quantiles = c(0.5)) +
+    theme_bw() +
+    ggtitle("Class") +
+    scale_fill_manual(values = c('grey', '#CCBB44', '#66CCEE', '#AA3377')) +
+    ylab('1 - Unweighted UniFrac') +
+    guides(fill = guide_legend(ncol = 2)) +
+    theme(axis.text.x = element_blank()))
+
+# Phylum
+(chaff_blue_Island_phylum_uw <- df_sympatric_phylum %>% ggplot(aes(x = Island_SpComplex_comp, y = similarity)) +
+    geom_violin(aes(fill = Island_SpComplex_comp), show.legend = T, lwd = 1, alpha = 0.7, width = .7, draw_quantiles = c(0.25, 0.75), linetype = "dashed") +
+    geom_violin(fill = "transparent", show.legend = T, lwd = 1.25, width = .7, draw_quantiles = c(0.5)) +
+    theme_bw() +
+    ggtitle("Phylum") +
+    scale_fill_manual(values = c('grey', '#CCBB44', '#66CCEE', '#AA3377')) +
+    ylab('1 - Unweighted UniFrac') +
+    guides(fill = guide_legend(ncol = 2)) +
+    theme(axis.text.x = element_blank()))
+
+ggarrange(chaff_blue_Island_otu_uw, chaff_blue_Island_species_uw, chaff_blue_Island_genus_uw, chaff_blue_Island_family_uw, chaff_blue_Island_order_uw, chaff_blue_Island_class_uw, chaff_blue_Island_phylum_uw, common.legend = T)
+
+png(paste0(outputDir, "/Figures/SharedTaxa_AllLevels_UW_UniFrac.png"), width = 1900, height = 1200, res = 150)
+ggarrange(chaff_blue_Island_otu_uw, chaff_blue_Island_species_uw, chaff_blue_Island_genus_uw, chaff_blue_Island_family_uw, chaff_blue_Island_order_uw, chaff_blue_Island_class_uw, chaff_blue_Island_phylum_uw, common.legend = T)
+dev.off()
+
+```
+
+## Permutation t-tests - Unweighted UniFrac
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# OTU
+group1_values <- df_sympatric_otu$dist[df_sympatric_otu$Island_SpComplex_comp == "diff_Island_diff_SpComplex"]
+group2_values <- df_sympatric_otu$dist[df_sympatric_otu$Island_SpComplex_comp == "diff_Island_same_SpComplex"]
+t1 <- perm.t.test(group1_values, group2_values)
+r1 <- c("diff_Island_diff_SpComplex", "diff_Island_same_SpComplex", length(group1_values), length(group2_values), t1$estimate[1], abs(t1$estimate[2]), t1$statistic, t1$p.value)
+
+group1_values <- df_sympatric_otu$dist[df_sympatric_otu$Island_SpComplex_comp == "diff_Island_diff_SpComplex"]
+group2_values <- df_sympatric_otu$dist[df_sympatric_otu$Island_SpComplex_comp == "same_Island_diff_SpComplex"]
+t2 <- perm.t.test(group1_values, group2_values)
+r2 <- c("diff_Island_diff_SpComplex", "same_Island_diff_SpComplex", length(group1_values), length(group2_values), t2$estimate[1], abs(t2$estimate[2]), t2$statistic, t2$p.value)
+
+group1_values <- df_sympatric_otu$dist[df_sympatric_otu$Island_SpComplex_comp == "diff_Island_diff_SpComplex"]
+group2_values <- df_sympatric_otu$dist[df_sympatric_otu$Island_SpComplex_comp == "same_Island_same_SpComplex"]
+t3 <- perm.t.test(group1_values, group2_values)
+r3 <- c("diff_Island_diff_SpComplex", "same_Island_same_SpComplex", length(group1_values), length(group2_values), t3$estimate[1], abs(t3$estimate[2]), t3$statistic, t3$p.value)
+
+group1_values <- df_sympatric_otu$dist[df_sympatric_otu$Island_SpComplex_comp == "diff_Island_same_SpComplex"]
+group2_values <- df_sympatric_otu$dist[df_sympatric_otu$Island_SpComplex_comp == "same_Island_diff_SpComplex"]
+t4 <- perm.t.test(group1_values, group2_values)
+r4 <- c("diff_Island_same_SpComplex", "same_Island_diff_SpComplex", length(group1_values), length(group2_values), t4$estimate[1], abs(t4$estimate[2]), t4$statistic, t4$p.value)
+
+group1_values <- df_sympatric_otu$dist[df_sympatric_otu$Island_SpComplex_comp == "diff_Island_same_SpComplex"]
+group2_values <- df_sympatric_otu$dist[df_sympatric_otu$Island_SpComplex_comp == "same_Island_same_SpComplex"]
+t5 <- perm.t.test(group1_values, group2_values)
+r5 <- c("diff_Island_same_SpComplex", "same_Island_same_SpComplex", length(group1_values), length(group2_values), t5$estimate[1], abs(t5$estimate[2]), t5$statistic, t5$p.value)
+
+group1_values <- df_sympatric_otu$dist[df_sympatric_otu$Island_SpComplex_comp == "same_Island_diff_SpComplex"]
+group2_values <- df_sympatric_otu$dist[df_sympatric_otu$Island_SpComplex_comp == "same_Island_same_SpComplex"]
+t6 <- perm.t.test(group1_values, group2_values)
+r6 <- c("same_Island_diff_SpComplex", "same_Island_same_SpComplex", length(group1_values), length(group2_values), t6$estimate[1], abs(t6$estimate[2]), t6$statistic, t6$p.value)
+
+symp_stats_table_otu <- data.frame(rbind(r1, r2, r3, r4, r5, r6))
+names(symp_stats_table_otu) <- c('group1', 'group2', 'group1_n', 'group2_n', 'group1_mean', 'group2_mean', 'statistic', 'p.value')
+symp_stats_table_otu <- symp_stats_table_otu %>%
+  mutate(p.value = as.numeric(p.value), statistic = round(as.numeric(statistic), 1),
+         group1_mean = round(as.numeric(group1_mean), 4), group2_mean = round(as.numeric(group2_mean), 4))
+symp_stats_table_otu$p_adj_bonferroni <- round(p.adjust(symp_stats_table_otu$p.value, method = "bonferroni"), 4)
+symp_stats_table_otu$p.value <- round(symp_stats_table_otu$p.value, 4)
+symp_stats_table_otu$tax <- "OTU99"
+symp_stats_table_otu
+
+# NOTE: Repeat the same block above for each taxonomic level (species, genus, family, order, class, phylum)
+# replacing df_sympatric_otu with df_sympatric_species, df_sympatric_genus, etc.
+# and naming the output symp_stats_table_species, symp_stats_table_genus, etc.
+# with $tax <- "Species", "Genus", "Family", "Order", "Class", "Phylum" respectively.
+# The pairwise comparisons are identical.
+# For brevity, here is the combined output assuming all are run:
+
+# Species
+r1s <- r2s <- r3s <- r4s <- r5s <- r6s <- NULL
+group1_values <- df_sympatric_species$dist[df_sympatric_species$Island_SpComplex_comp == "diff_Island_diff_SpComplex"]
+group2_values <- df_sympatric_species$dist[df_sympatric_species$Island_SpComplex_comp == "diff_Island_same_SpComplex"]
+t1s <- perm.t.test(group1_values, group2_values); r1s <- c("diff_Island_diff_SpComplex", "diff_Island_same_SpComplex", length(group1_values), length(group2_values), t1s$estimate[1], abs(t1s$estimate[2]), t1s$statistic, t1s$p.value)
+group2_values <- df_sympatric_species$dist[df_sympatric_species$Island_SpComplex_comp == "same_Island_diff_SpComplex"]
+t2s <- perm.t.test(group1_values, group2_values); r2s <- c("diff_Island_diff_SpComplex", "same_Island_diff_SpComplex", length(group1_values), length(group2_values), t2s$estimate[1], abs(t2s$estimate[2]), t2s$statistic, t2s$p.value)
+group2_values <- df_sympatric_species$dist[df_sympatric_species$Island_SpComplex_comp == "same_Island_same_SpComplex"]
+t3s <- perm.t.test(group1_values, group2_values); r3s <- c("diff_Island_diff_SpComplex", "same_Island_same_SpComplex", length(group1_values), length(group2_values), t3s$estimate[1], abs(t3s$estimate[2]), t3s$statistic, t3s$p.value)
+group1_values <- df_sympatric_species$dist[df_sympatric_species$Island_SpComplex_comp == "diff_Island_same_SpComplex"]
+group2_values <- df_sympatric_species$dist[df_sympatric_species$Island_SpComplex_comp == "same_Island_diff_SpComplex"]
+t4s <- perm.t.test(group1_values, group2_values); r4s <- c("diff_Island_same_SpComplex", "same_Island_diff_SpComplex", length(group1_values), length(group2_values), t4s$estimate[1], abs(t4s$estimate[2]), t4s$statistic, t4s$p.value)
+group2_values <- df_sympatric_species$dist[df_sympatric_species$Island_SpComplex_comp == "same_Island_same_SpComplex"]
+t5s <- perm.t.test(group1_values, group2_values); r5s <- c("diff_Island_same_SpComplex", "same_Island_same_SpComplex", length(group1_values), length(group2_values), t5s$estimate[1], abs(t5s$estimate[2]), t5s$statistic, t5s$p.value)
+group1_values <- df_sympatric_species$dist[df_sympatric_species$Island_SpComplex_comp == "same_Island_diff_SpComplex"]
+group2_values <- df_sympatric_species$dist[df_sympatric_species$Island_SpComplex_comp == "same_Island_same_SpComplex"]
+t6s <- perm.t.test(group1_values, group2_values); r6s <- c("same_Island_diff_SpComplex", "same_Island_same_SpComplex", length(group1_values), length(group2_values), t6s$estimate[1], abs(t6s$estimate[2]), t6s$statistic, t6s$p.value)
+symp_stats_table_species <- data.frame(rbind(r1s, r2s, r3s, r4s, r5s, r6s))
+names(symp_stats_table_species) <- c('group1', 'group2', 'group1_n', 'group2_n', 'group1_mean', 'group2_mean', 'statistic', 'p.value')
+symp_stats_table_species <- symp_stats_table_species %>% mutate(p.value = as.numeric(p.value), statistic = round(as.numeric(statistic), 1), group1_mean = round(as.numeric(group1_mean), 4), group2_mean = round(as.numeric(group2_mean), 4))
+symp_stats_table_species$p_adj_bonferroni <- round(p.adjust(symp_stats_table_species$p.value, method = "bonferroni"), 4)
+symp_stats_table_species$p.value <- round(symp_stats_table_species$p.value, 4)
+symp_stats_table_species$tax <- "Species"
+
+# Genus
+group1_values <- df_sympatric_genus$dist[df_sympatric_genus$Island_SpComplex_comp == "diff_Island_diff_SpComplex"]
+group2_values <- df_sympatric_genus$dist[df_sympatric_genus$Island_SpComplex_comp == "diff_Island_same_SpComplex"]
+t1g <- perm.t.test(group1_values, group2_values); r1g <- c("diff_Island_diff_SpComplex", "diff_Island_same_SpComplex", length(group1_values), length(group2_values), t1g$estimate[1], abs(t1g$estimate[2]), t1g$statistic, t1g$p.value)
+group2_values <- df_sympatric_genus$dist[df_sympatric_genus$Island_SpComplex_comp == "same_Island_diff_SpComplex"]
+t2g <- perm.t.test(group1_values, group2_values); r2g <- c("diff_Island_diff_SpComplex", "same_Island_diff_SpComplex", length(group1_values), length(group2_values), t2g$estimate[1], abs(t2g$estimate[2]), t2g$statistic, t2g$p.value)
+group2_values <- df_sympatric_genus$dist[df_sympatric_genus$Island_SpComplex_comp == "same_Island_same_SpComplex"]
+t3g <- perm.t.test(group1_values, group2_values); r3g <- c("diff_Island_diff_SpComplex", "same_Island_same_SpComplex", length(group1_values), length(group2_values), t3g$estimate[1], abs(t3g$estimate[2]), t3g$statistic, t3g$p.value)
+group1_values <- df_sympatric_genus$dist[df_sympatric_genus$Island_SpComplex_comp == "diff_Island_same_SpComplex"]
+group2_values <- df_sympatric_genus$dist[df_sympatric_genus$Island_SpComplex_comp == "same_Island_diff_SpComplex"]
+t4g <- perm.t.test(group1_values, group2_values); r4g <- c("diff_Island_same_SpComplex", "same_Island_diff_SpComplex", length(group1_values), length(group2_values), t4g$estimate[1], abs(t4g$estimate[2]), t4g$statistic, t4g$p.value)
+group2_values <- df_sympatric_genus$dist[df_sympatric_genus$Island_SpComplex_comp == "same_Island_same_SpComplex"]
+t5g <- perm.t.test(group1_values, group2_values); r5g <- c("diff_Island_same_SpComplex", "same_Island_same_SpComplex", length(group1_values), length(group2_values), t5g$estimate[1], abs(t5g$estimate[2]), t5g$statistic, t5g$p.value)
+group1_values <- df_sympatric_genus$dist[df_sympatric_genus$Island_SpComplex_comp == "same_Island_diff_SpComplex"]
+group2_values <- df_sympatric_genus$dist[df_sympatric_genus$Island_SpComplex_comp == "same_Island_same_SpComplex"]
+t6g <- perm.t.test(group1_values, group2_values); r6g <- c("same_Island_diff_SpComplex", "same_Island_same_SpComplex", length(group1_values), length(group2_values), t6g$estimate[1], abs(t6g$estimate[2]), t6g$statistic, t6g$p.value)
+symp_stats_table_genus <- data.frame(rbind(r1g, r2g, r3g, r4g, r5g, r6g))
+names(symp_stats_table_genus) <- c('group1', 'group2', 'group1_n', 'group2_n', 'group1_mean', 'group2_mean', 'statistic', 'p.value')
+symp_stats_table_genus <- symp_stats_table_genus %>% mutate(p.value = as.numeric(p.value), statistic = round(as.numeric(statistic), 1), group1_mean = round(as.numeric(group1_mean), 4), group2_mean = round(as.numeric(group2_mean), 4))
+symp_stats_table_genus$p_adj_bonferroni <- round(p.adjust(symp_stats_table_genus$p.value, method = "bonferroni"), 4)
+symp_stats_table_genus$p.value <- round(symp_stats_table_genus$p.value, 4)
+symp_stats_table_genus$tax <- "Genus"
+
+# Family
+group1_values <- df_sympatric_family$dist[df_sympatric_family$Island_SpComplex_comp == "diff_Island_diff_SpComplex"]
+group2_values <- df_sympatric_family$dist[df_sympatric_family$Island_SpComplex_comp == "diff_Island_same_SpComplex"]
+t1f <- perm.t.test(group1_values, group2_values); r1f <- c("diff_Island_diff_SpComplex", "diff_Island_same_SpComplex", length(group1_values), length(group2_values), t1f$estimate[1], abs(t1f$estimate[2]), t1f$statistic, t1f$p.value)
+group2_values <- df_sympatric_family$dist[df_sympatric_family$Island_SpComplex_comp == "same_Island_diff_SpComplex"]
+t2f <- perm.t.test(group1_values, group2_values); r2f <- c("diff_Island_diff_SpComplex", "same_Island_diff_SpComplex", length(group1_values), length(group2_values), t2f$estimate[1], abs(t2f$estimate[2]), t2f$statistic, t2f$p.value)
+group2_values <- df_sympatric_family$dist[df_sympatric_family$Island_SpComplex_comp == "same_Island_same_SpComplex"]
+t3f <- perm.t.test(group1_values, group2_values); r3f <- c("diff_Island_diff_SpComplex", "same_Island_same_SpComplex", length(group1_values), length(group2_values), t3f$estimate[1], abs(t3f$estimate[2]), t3f$statistic, t3f$p.value)
+group1_values <- df_sympatric_family$dist[df_sympatric_family$Island_SpComplex_comp == "diff_Island_same_SpComplex"]
+group2_values <- df_sympatric_family$dist[df_sympatric_family$Island_SpComplex_comp == "same_Island_diff_SpComplex"]
+t4f <- perm.t.test(group1_values, group2_values); r4f <- c("diff_Island_same_SpComplex", "same_Island_diff_SpComplex", length(group1_values), length(group2_values), t4f$estimate[1], abs(t4f$estimate[2]), t4f$statistic, t4f$p.value)
+group2_values <- df_sympatric_family$dist[df_sympatric_family$Island_SpComplex_comp == "same_Island_same_SpComplex"]
+t5f <- perm.t.test(group1_values, group2_values); r5f <- c("diff_Island_same_SpComplex", "same_Island_same_SpComplex", length(group1_values), length(group2_values), t5f$estimate[1], abs(t5f$estimate[2]), t5f$statistic, t5f$p.value)
+group1_values <- df_sympatric_family$dist[df_sympatric_family$Island_SpComplex_comp == "same_Island_diff_SpComplex"]
+group2_values <- df_sympatric_family$dist[df_sympatric_family$Island_SpComplex_comp == "same_Island_same_SpComplex"]
+t6f <- perm.t.test(group1_values, group2_values); r6f <- c("same_Island_diff_SpComplex", "same_Island_same_SpComplex", length(group1_values), length(group2_values), t6f$estimate[1], abs(t6f$estimate[2]), t6f$statistic, t6f$p.value)
+symp_stats_table_family <- data.frame(rbind(r1f, r2f, r3f, r4f, r5f, r6f))
+names(symp_stats_table_family) <- c('group1', 'group2', 'group1_n', 'group2_n', 'group1_mean', 'group2_mean', 'statistic', 'p.value')
+symp_stats_table_family <- symp_stats_table_family %>% mutate(p.value = as.numeric(p.value), statistic = round(as.numeric(statistic), 1), group1_mean = round(as.numeric(group1_mean), 4), group2_mean = round(as.numeric(group2_mean), 4))
+symp_stats_table_family$p_adj_bonferroni <- round(p.adjust(symp_stats_table_family$p.value, method = "bonferroni"), 4)
+symp_stats_table_family$p.value <- round(symp_stats_table_family$p.value, 4)
+symp_stats_table_family$tax <- "Family"
+
+# Order
+group1_values <- df_sympatric_order$dist[df_sympatric_order$Island_SpComplex_comp == "diff_Island_diff_SpComplex"]
+group2_values <- df_sympatric_order$dist[df_sympatric_order$Island_SpComplex_comp == "diff_Island_same_SpComplex"]
+t1o <- perm.t.test(group1_values, group2_values); r1o <- c("diff_Island_diff_SpComplex", "diff_Island_same_SpComplex", length(group1_values), length(group2_values), t1o$estimate[1], abs(t1o$estimate[2]), t1o$statistic, t1o$p.value)
+group2_values <- df_sympatric_order$dist[df_sympatric_order$Island_SpComplex_comp == "same_Island_diff_SpComplex"]
+t2o <- perm.t.test(group1_values, group2_values); r2o <- c("diff_Island_diff_SpComplex", "same_Island_diff_SpComplex", length(group1_values), length(group2_values), t2o$estimate[1], abs(t2o$estimate[2]), t2o$statistic, t2o$p.value)
+group2_values <- df_sympatric_order$dist[df_sympatric_order$Island_SpComplex_comp == "same_Island_same_SpComplex"]
+t3o <- perm.t.test(group1_values, group2_values); r3o <- c("diff_Island_diff_SpComplex", "same_Island_same_SpComplex", length(group1_values), length(group2_values), t3o$estimate[1], abs(t3o$estimate[2]), t3o$statistic, t3o$p.value)
+group1_values <- df_sympatric_order$dist[df_sympatric_order$Island_SpComplex_comp == "diff_Island_same_SpComplex"]
+group2_values <- df_sympatric_order$dist[df_sympatric_order$Island_SpComplex_comp == "same_Island_diff_SpComplex"]
+t4o <- perm.t.test(group1_values, group2_values); r4o <- c("diff_Island_same_SpComplex", "same_Island_diff_SpComplex", length(group1_values), length(group2_values), t4o$estimate[1], abs(t4o$estimate[2]), t4o$statistic, t4o$p.value)
+group2_values <- df_sympatric_order$dist[df_sympatric_order$Island_SpComplex_comp == "same_Island_same_SpComplex"]
+t5o <- perm.t.test(group1_values, group2_values); r5o <- c("diff_Island_same_SpComplex", "same_Island_same_SpComplex", length(group1_values), length(group2_values), t5o$estimate[1], abs(t5o$estimate[2]), t5o$statistic, t5o$p.value)
+group1_values <- df_sympatric_order$dist[df_sympatric_order$Island_SpComplex_comp == "same_Island_diff_SpComplex"]
+group2_values <- df_sympatric_order$dist[df_sympatric_order$Island_SpComplex_comp == "same_Island_same_SpComplex"]
+t6o <- perm.t.test(group1_values, group2_values); r6o <- c("same_Island_diff_SpComplex", "same_Island_same_SpComplex", length(group1_values), length(group2_values), t6o$estimate[1], abs(t6o$estimate[2]), t6o$statistic, t6o$p.value)
+symp_stats_table_order <- data.frame(rbind(r1o, r2o, r3o, r4o, r5o, r6o))
+names(symp_stats_table_order) <- c('group1', 'group2', 'group1_n', 'group2_n', 'group1_mean', 'group2_mean', 'statistic', 'p.value')
+symp_stats_table_order <- symp_stats_table_order %>% mutate(p.value = as.numeric(p.value), statistic = round(as.numeric(statistic), 1), group1_mean = round(as.numeric(group1_mean), 4), group2_mean = round(as.numeric(group2_mean), 4))
+symp_stats_table_order$p_adj_bonferroni <- round(p.adjust(symp_stats_table_order$p.value, method = "bonferroni"), 4)
+symp_stats_table_order$p.value <- round(symp_stats_table_order$p.value, 4)
+symp_stats_table_order$tax <- "Order"
+
+# Class
+group1_values <- df_sympatric_class$dist[df_sympatric_class$Island_SpComplex_comp == "diff_Island_diff_SpComplex"]
+group2_values <- df_sympatric_class$dist[df_sympatric_class$Island_SpComplex_comp == "diff_Island_same_SpComplex"]
+t1c <- perm.t.test(group1_values, group2_values); r1c <- c("diff_Island_diff_SpComplex", "diff_Island_same_SpComplex", length(group1_values), length(group2_values), t1c$estimate[1], abs(t1c$estimate[2]), t1c$statistic, t1c$p.value)
+group2_values <- df_sympatric_class$dist[df_sympatric_class$Island_SpComplex_comp == "same_Island_diff_SpComplex"]
+t2c <- perm.t.test(group1_values, group2_values); r2c <- c("diff_Island_diff_SpComplex", "same_Island_diff_SpComplex", length(group1_values), length(group2_values), t2c$estimate[1], abs(t2c$estimate[2]), t2c$statistic, t2c$p.value)
+group2_values <- df_sympatric_class$dist[df_sympatric_class$Island_SpComplex_comp == "same_Island_same_SpComplex"]
+t3c <- perm.t.test(group1_values, group2_values); r3c <- c("diff_Island_diff_SpComplex", "same_Island_same_SpComplex", length(group1_values), length(group2_values), t3c$estimate[1], abs(t3c$estimate[2]), t3c$statistic, t3c$p.value)
+group1_values <- df_sympatric_class$dist[df_sympatric_class$Island_SpComplex_comp == "diff_Island_same_SpComplex"]
+group2_values <- df_sympatric_class$dist[df_sympatric_class$Island_SpComplex_comp == "same_Island_diff_SpComplex"]
+t4c <- perm.t.test(group1_values, group2_values); r4c <- c("diff_Island_same_SpComplex", "same_Island_diff_SpComplex", length(group1_values), length(group2_values), t4c$estimate[1], abs(t4c$estimate[2]), t4c$statistic, t4c$p.value)
+group2_values <- df_sympatric_class$dist[df_sympatric_class$Island_SpComplex_comp == "same_Island_same_SpComplex"]
+t5c <- perm.t.test(group1_values, group2_values); r5c <- c("diff_Island_same_SpComplex", "same_Island_same_SpComplex", length(group1_values), length(group2_values), t5c$estimate[1], abs(t5c$estimate[2]), t5c$statistic, t5c$p.value)
+group1_values <- df_sympatric_class$dist[df_sympatric_class$Island_SpComplex_comp == "same_Island_diff_SpComplex"]
+group2_values <- df_sympatric_class$dist[df_sympatric_class$Island_SpComplex_comp == "same_Island_same_SpComplex"]
+t6c <- perm.t.test(group1_values, group2_values); r6c <- c("same_Island_diff_SpComplex", "same_Island_same_SpComplex", length(group1_values), length(group2_values), t6c$estimate[1], abs(t6c$estimate[2]), t6c$statistic, t6c$p.value)
+symp_stats_table_class <- data.frame(rbind(r1c, r2c, r3c, r4c, r5c, r6c))
+names(symp_stats_table_class) <- c('group1', 'group2', 'group1_n', 'group2_n', 'group1_mean', 'group2_mean', 'statistic', 'p.value')
+symp_stats_table_class <- symp_stats_table_class %>% mutate(p.value = as.numeric(p.value), statistic = round(as.numeric(statistic), 1), group1_mean = round(as.numeric(group1_mean), 4), group2_mean = round(as.numeric(group2_mean), 4))
+symp_stats_table_class$p_adj_bonferroni <- round(p.adjust(symp_stats_table_class$p.value, method = "bonferroni"), 4)
+symp_stats_table_class$p.value <- round(symp_stats_table_class$p.value, 4)
+symp_stats_table_class$tax <- "Class"
+
+# Phylum
+group1_values <- df_sympatric_phylum$dist[df_sympatric_phylum$Island_SpComplex_comp == "diff_Island_diff_SpComplex"]
+group2_values <- df_sympatric_phylum$dist[df_sympatric_phylum$Island_SpComplex_comp == "diff_Island_same_SpComplex"]
+t1p <- perm.t.test(group1_values, group2_values); r1p <- c("diff_Island_diff_SpComplex", "diff_Island_same_SpComplex", length(group1_values), length(group2_values), t1p$estimate[1], abs(t1p$estimate[2]), t1p$statistic, t1p$p.value)
+group2_values <- df_sympatric_phylum$dist[df_sympatric_phylum$Island_SpComplex_comp == "same_Island_diff_SpComplex"]
+t2p <- perm.t.test(group1_values, group2_values); r2p <- c("diff_Island_diff_SpComplex", "same_Island_diff_SpComplex", length(group1_values), length(group2_values), t2p$estimate[1], abs(t2p$estimate[2]), t2p$statistic, t2p$p.value)
+group2_values <- df_sympatric_phylum$dist[df_sympatric_phylum$Island_SpComplex_comp == "same_Island_same_SpComplex"]
+t3p <- perm.t.test(group1_values, group2_values); r3p <- c("diff_Island_diff_SpComplex", "same_Island_same_SpComplex", length(group1_values), length(group2_values), t3p$estimate[1], abs(t3p$estimate[2]), t3p$statistic, t3p$p.value)
+group1_values <- df_sympatric_phylum$dist[df_sympatric_phylum$Island_SpComplex_comp == "diff_Island_same_SpComplex"]
+group2_values <- df_sympatric_phylum$dist[df_sympatric_phylum$Island_SpComplex_comp == "same_Island_diff_SpComplex"]
+t4p <- perm.t.test(group1_values, group2_values); r4p <- c("diff_Island_same_SpComplex", "same_Island_diff_SpComplex", length(group1_values), length(group2_values), t4p$estimate[1], abs(t4p$estimate[2]), t4p$statistic, t4p$p.value)
+group2_values <- df_sympatric_phylum$dist[df_sympatric_phylum$Island_SpComplex_comp == "same_Island_same_SpComplex"]
+t5p <- perm.t.test(group1_values, group2_values); r5p <- c("diff_Island_same_SpComplex", "same_Island_same_SpComplex", length(group1_values), length(group2_values), t5p$estimate[1], abs(t5p$estimate[2]), t5p$statistic, t5p$p.value)
+group1_values <- df_sympatric_phylum$dist[df_sympatric_phylum$Island_SpComplex_comp == "same_Island_diff_SpComplex"]
+group2_values <- df_sympatric_phylum$dist[df_sympatric_phylum$Island_SpComplex_comp == "same_Island_same_SpComplex"]
+t6p <- perm.t.test(group1_values, group2_values); r6p <- c("same_Island_diff_SpComplex", "same_Island_same_SpComplex", length(group1_values), length(group2_values), t6p$estimate[1], abs(t6p$estimate[2]), t6p$statistic, t6p$p.value)
+symp_stats_table_phylum <- data.frame(rbind(r1p, r2p, r3p, r4p, r5p, r6p))
+names(symp_stats_table_phylum) <- c('group1', 'group2', 'group1_n', 'group2_n', 'group1_mean', 'group2_mean', 'statistic', 'p.value')
+symp_stats_table_phylum <- symp_stats_table_phylum %>% mutate(p.value = as.numeric(p.value), statistic = round(as.numeric(statistic), 1), group1_mean = round(as.numeric(group1_mean), 4), group2_mean = round(as.numeric(group2_mean), 4))
+symp_stats_table_phylum$p_adj_bonferroni <- round(p.adjust(symp_stats_table_phylum$p.value, method = "bonferroni"), 4)
+symp_stats_table_phylum$p.value <- round(symp_stats_table_phylum$p.value, 4)
+symp_stats_table_phylum$tax <- "Phylum"
+
+symp_stats_table_all_uw <- rbind(symp_stats_table_otu, symp_stats_table_species, symp_stats_table_genus, symp_stats_table_family, symp_stats_table_order, symp_stats_table_class, symp_stats_table_phylum)
+
+write.csv(symp_stats_table_all_uw, paste0(dataDir, "/out_permtest_shared_UW_UniFrac.csv"), row.names = FALSE)
+
+```
+
+# Unweighted UniFrac - NMDS & PERMANOVA (sympatric)
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# Subset sympatric populations
+microb_fr_otu_symp <- microb_fr_otu %>% subset_samples(Island_Mainland == "Tenerife" | Island_Mainland == "Gran Canaria")
+microb_fr_species_symp <- microb_fr_species %>% subset_samples(Island_Mainland == "Tenerife" | Island_Mainland == "Gran Canaria")
+microb_fr_genus_symp <- microb_fr_genus %>% subset_samples(Island_Mainland == "Tenerife" | Island_Mainland == "Gran Canaria")
+microb_fr_family_symp <- microb_fr_family %>% subset_samples(Island_Mainland == "Tenerife" | Island_Mainland == "Gran Canaria")
+microb_fr_order_symp <- microb_fr_order %>% subset_samples(Island_Mainland == "Tenerife" | Island_Mainland == "Gran Canaria")
+microb_fr_class_symp <- microb_fr_class %>% subset_samples(Island_Mainland == "Tenerife" | Island_Mainland == "Gran Canaria")
+microb_fr_phylum_symp <- microb_fr_phylum %>% subset_samples(Island_Mainland == "Tenerife" | Island_Mainland == "Gran Canaria")
+
+# OTU NMDS
+set.seed(306202)
+otu_uw_dist <- UniFrac(microb_fr_otu_symp, weighted = FALSE)
+ord <- metaMDS(otu_uw_dist, k = 4)
+
+scrs <- scores(ord, display = 'sites')
+scrs <- cbind(as.data.frame(scrs), Species_Label = sample_data(microb_fr_otu_symp)$Species_Label, Island_Mainland = sample_data(microb_fr_otu_symp)$Island_Mainland, Chaff_Blue = sample_data(microb_fr_otu_symp)$Chaff_Blue)
+cent <- aggregate(cbind(NMDS1, NMDS2) ~ Species_Label, data = scrs, FUN = mean)
+
+(otu_NMDS_uw <- ggplot(scrs, aes(x = NMDS1, y = NMDS2, shape = Species_Label, fill = Species_Label)) +
+    geom_point(size = 10) +
+    geom_point(data = cent, aes(y = NMDS2, x = NMDS1, fill = Species_Label), size = 15, stroke = 1.5, color = "black") +
+    scale_fill_manual(name = "Host species", breaks = c("Gran_Canaria_F_c_bakeri", "Tenerife_F_c_canariensis", "Gran_Canaria_F_polatzeki", "Tenerife_F_teydea"), values = c("#31A354", "#708238", "#1F78B4", "#A6CEE3"), labels = c("Gran Canaria: *F.c. bakeri*", "Tenerife: *F.c. canariensis*", "Gran Canaria: *F. polatzeki*", "Tenerife: *F. teydea*")) +
+    scale_shape_manual(name = "Host species", breaks = c("Gran_Canaria_F_c_bakeri", "Tenerife_F_c_canariensis", "Gran_Canaria_F_polatzeki", "Tenerife_F_teydea"), values = c(23, 22, 21, 25), labels = c("Gran Canaria: *F.c. bakeri*", "Tenerife: *F.c. canariensis*", "Gran Canaria: *F. polatzeki*", "Tenerife: *F. teydea*")) +
+    pca_theme + theme(legend.text = element_markdown()) + ggtitle("OTU") +
+    scale_y_continuous(labels = scales::number_format(accuracy = 0.01)) + guides(color = "none"))
+
+# Species NMDS
+set.seed(306202)
+species_uw_dist <- UniFrac(microb_fr_species_symp, weighted = FALSE)
+ord <- metaMDS(species_uw_dist, k = 4)
+scrs <- scores(ord, display = 'sites')
+scrs <- cbind(as.data.frame(scrs), Species_Label = sample_data(microb_fr_species_symp)$Species_Label)
+cent <- aggregate(cbind(NMDS1, NMDS2) ~ Species_Label, data = scrs, FUN = mean)
+(species_NMDS_uw <- ggplot(scrs, aes(x = NMDS1, y = NMDS2, shape = Species_Label, fill = Species_Label)) + geom_point(size = 10) + geom_point(data = cent, aes(y = NMDS2, x = NMDS1, fill = Species_Label), size = 15, stroke = 1.5, color = "black") + scale_fill_manual(name = "Host species", breaks = c("Gran_Canaria_F_c_bakeri", "Tenerife_F_c_canariensis", "Gran_Canaria_F_polatzeki", "Tenerife_F_teydea"), values = c("#31A354", "#708238", "#1F78B4", "#A6CEE3"), labels = c("Gran Canaria: *F.c. bakeri*", "Tenerife: *F.c. canariensis*", "Gran Canaria: *F. polatzeki*", "Tenerife: *F. teydea*")) + scale_shape_manual(name = "Host species", breaks = c("Gran_Canaria_F_c_bakeri", "Tenerife_F_c_canariensis", "Gran_Canaria_F_polatzeki", "Tenerife_F_teydea"), values = c(23, 22, 21, 25), labels = c("Gran Canaria: *F.c. bakeri*", "Tenerife: *F.c. canariensis*", "Gran Canaria: *F. polatzeki*", "Tenerife: *F. teydea*")) + pca_theme + theme(legend.text = element_markdown()) + ggtitle("Species") + scale_y_continuous(labels = scales::number_format(accuracy = 0.01)) + guides(color = "none"))
+
+# Genus NMDS
+set.seed(306202)
+genus_uw_dist <- UniFrac(microb_fr_genus_symp, weighted = FALSE)
+ord <- metaMDS(genus_uw_dist, k = 4)
+scrs <- scores(ord, display = 'sites')
+scrs <- cbind(as.data.frame(scrs), Species_Label = sample_data(microb_fr_genus_symp)$Species_Label)
+cent <- aggregate(cbind(NMDS1, NMDS2) ~ Species_Label, data = scrs, FUN = mean)
+(genus_NMDS_uw <- ggplot(scrs, aes(x = NMDS1, y = NMDS2, shape = Species_Label, fill = Species_Label)) + geom_point(size = 10) + geom_point(data = cent, aes(y = NMDS2, x = NMDS1, fill = Species_Label), size = 15, stroke = 1.5, color = "black") + scale_fill_manual(name = "Host species", breaks = c("Gran_Canaria_F_c_bakeri", "Tenerife_F_c_canariensis", "Gran_Canaria_F_polatzeki", "Tenerife_F_teydea"), values = c("#31A354", "#708238", "#1F78B4", "#A6CEE3"), labels = c("Gran Canaria: *F.c. bakeri*", "Tenerife: *F.c. canariensis*", "Gran Canaria: *F. polatzeki*", "Tenerife: *F. teydea*")) + scale_shape_manual(name = "Host species", breaks = c("Gran_Canaria_F_c_bakeri", "Tenerife_F_c_canariensis", "Gran_Canaria_F_polatzeki", "Tenerife_F_teydea"), values = c(23, 22, 21, 25), labels = c("Gran Canaria: *F.c. bakeri*", "Tenerife: *F.c. canariensis*", "Gran Canaria: *F. polatzeki*", "Tenerife: *F. teydea*")) + pca_theme + theme(legend.text = element_markdown()) + ggtitle("Genus") + scale_y_continuous(labels = scales::number_format(accuracy = 0.01)) + guides(color = "none"))
+
+# Family NMDS
+set.seed(306202)
+family_uw_dist <- UniFrac(microb_fr_family_symp, weighted = FALSE)
+ord <- metaMDS(family_uw_dist, k = 4)
+scrs <- scores(ord, display = 'sites')
+scrs <- cbind(as.data.frame(scrs), Species_Label = sample_data(microb_fr_family_symp)$Species_Label)
+cent <- aggregate(cbind(NMDS1, NMDS2) ~ Species_Label, data = scrs, FUN = mean)
+(family_NMDS_uw <- ggplot(scrs, aes(x = NMDS1, y = NMDS2, shape = Species_Label, fill = Species_Label)) + geom_point(size = 10) + geom_point(data = cent, aes(y = NMDS2, x = NMDS1, fill = Species_Label), size = 15, stroke = 1.5, color = "black") + scale_fill_manual(name = "Host species", breaks = c("Gran_Canaria_F_c_bakeri", "Tenerife_F_c_canariensis", "Gran_Canaria_F_polatzeki", "Tenerife_F_teydea"), values = c("#31A354", "#708238", "#1F78B4", "#A6CEE3"), labels = c("Gran Canaria: *F.c. bakeri*", "Tenerife: *F.c. canariensis*", "Gran Canaria: *F. polatzeki*", "Tenerife: *F. teydea*")) + scale_shape_manual(name = "Host species", breaks = c("Gran_Canaria_F_c_bakeri", "Tenerife_F_c_canariensis", "Gran_Canaria_F_polatzeki", "Tenerife_F_teydea"), values = c(23, 22, 21, 25), labels = c("Gran Canaria: *F.c. bakeri*", "Tenerife: *F.c. canariensis*", "Gran Canaria: *F. polatzeki*", "Tenerife: *F. teydea*")) + pca_theme + theme(legend.text = element_markdown()) + ggtitle("Family") + scale_y_continuous(labels = scales::number_format(accuracy = 0.01)) + guides(color = "none"))
+
+# Order NMDS
+set.seed(306202)
+order_uw_dist <- UniFrac(microb_fr_order_symp, weighted = FALSE)
+ord <- metaMDS(order_uw_dist, k = 4)
+scrs <- scores(ord, display = 'sites')
+scrs <- cbind(as.data.frame(scrs), Species_Label = sample_data(microb_fr_order_symp)$Species_Label)
+cent <- aggregate(cbind(NMDS1, NMDS2) ~ Species_Label, data = scrs, FUN = mean)
+(order_NMDS_uw <- ggplot(scrs, aes(x = NMDS1, y = NMDS2, shape = Species_Label, fill = Species_Label)) + geom_point(size = 10) + geom_point(data = cent, aes(y = NMDS2, x = NMDS1, fill = Species_Label), size = 15, stroke = 1.5, color = "black") + scale_fill_manual(name = "Host species", breaks = c("Gran_Canaria_F_c_bakeri", "Tenerife_F_c_canariensis", "Gran_Canaria_F_polatzeki", "Tenerife_F_teydea"), values = c("#31A354", "#708238", "#1F78B4", "#A6CEE3"), labels = c("Gran Canaria: *F.c. bakeri*", "Tenerife: *F.c. canariensis*", "Gran Canaria: *F. polatzeki*", "Tenerife: *F. teydea*")) + scale_shape_manual(name = "Host species", breaks = c("Gran_Canaria_F_c_bakeri", "Tenerife_F_c_canariensis", "Gran_Canaria_F_polatzeki", "Tenerife_F_teydea"), values = c(23, 22, 21, 25), labels = c("Gran Canaria: *F.c. bakeri*", "Tenerife: *F.c. canariensis*", "Gran Canaria: *F. polatzeki*", "Tenerife: *F. teydea*")) + pca_theme + theme(legend.text = element_markdown()) + ggtitle("Order") + scale_y_continuous(labels = scales::number_format(accuracy = 0.01)) + guides(color = "none"))
+
+# Class NMDS
+set.seed(306202)
+class_uw_dist <- UniFrac(microb_fr_class_symp, weighted = FALSE)
+ord <- metaMDS(class_uw_dist, k = 4)
+scrs <- scores(ord, display = 'sites')
+scrs <- cbind(as.data.frame(scrs), Species_Label = sample_data(microb_fr_class_symp)$Species_Label)
+cent <- aggregate(cbind(NMDS1, NMDS2) ~ Species_Label, data = scrs, FUN = mean)
+(class_NMDS_uw <- ggplot(scrs, aes(x = NMDS1, y = NMDS2, shape = Species_Label, fill = Species_Label)) + geom_point(size = 10) + geom_point(data = cent, aes(y = NMDS2, x = NMDS1, fill = Species_Label), size = 15, stroke = 1.5, color = "black") + scale_fill_manual(name = "Host species", breaks = c("Gran_Canaria_F_c_bakeri", "Tenerife_F_c_canariensis", "Gran_Canaria_F_polatzeki", "Tenerife_F_teydea"), values = c("#31A354", "#708238", "#1F78B4", "#A6CEE3"), labels = c("Gran Canaria: *F.c. bakeri*", "Tenerife: *F.c. canariensis*", "Gran Canaria: *F. polatzeki*", "Tenerife: *F. teydea*")) + scale_shape_manual(name = "Host species", breaks = c("Gran_Canaria_F_c_bakeri", "Tenerife_F_c_canariensis", "Gran_Canaria_F_polatzeki", "Tenerife_F_teydea"), values = c(23, 22, 21, 25), labels = c("Gran Canaria: *F.c. bakeri*", "Tenerife: *F.c. canariensis*", "Gran Canaria: *F. polatzeki*", "Tenerife: *F. teydea*")) + pca_theme + theme(legend.text = element_markdown()) + ggtitle("Class") + scale_y_continuous(labels = scales::number_format(accuracy = 0.01)) + guides(color = "none"))
+
+# Phylum NMDS
+set.seed(306202)
+phylum_uw_dist <- UniFrac(microb_fr_phylum_symp, weighted = FALSE)
+ord <- metaMDS(phylum_uw_dist, k = 4)
+scrs <- scores(ord, display = 'sites')
+scrs <- cbind(as.data.frame(scrs), Species_Label = sample_data(microb_fr_phylum_symp)$Species_Label)
+cent <- aggregate(cbind(NMDS1, NMDS2) ~ Species_Label, data = scrs, FUN = mean)
+(phylum_NMDS_uw <- ggplot(scrs, aes(x = NMDS1, y = NMDS2, shape = Species_Label, fill = Species_Label)) + geom_point(size = 10) + geom_point(data = cent, aes(y = NMDS2, x = NMDS1, fill = Species_Label), size = 15, stroke = 1.5, color = "black") + scale_fill_manual(name = "Host species", breaks = c("Gran_Canaria_F_c_bakeri", "Tenerife_F_c_canariensis", "Gran_Canaria_F_polatzeki", "Tenerife_F_teydea"), values = c("#31A354", "#708238", "#1F78B4", "#A6CEE3"), labels = c("Gran Canaria: *F.c. bakeri*", "Tenerife: *F.c. canariensis*", "Gran Canaria: *F. polatzeki*", "Tenerife: *F. teydea*")) + scale_shape_manual(name = "Host species", breaks = c("Gran_Canaria_F_c_bakeri", "Tenerife_F_c_canariensis", "Gran_Canaria_F_polatzeki", "Tenerife_F_teydea"), values = c(23, 22, 21, 25), labels = c("Gran Canaria: *F.c. bakeri*", "Tenerife: *F.c. canariensis*", "Gran Canaria: *F. polatzeki*", "Tenerife: *F. teydea*")) + pca_theme + theme(legend.text = element_markdown()) + ggtitle("Phylum") + scale_y_continuous(labels = scales::number_format(accuracy = 0.01)) + guides(color = "none"))
+
+png(paste0(outputDir, "/Figures/NMDSSymp_AllLevels_UW_UniFrac.png"), width = 1900, height = 1200, res = 50)
+ggarrange(otu_NMDS_uw, species_NMDS_uw, genus_NMDS_uw, family_NMDS_uw, order_NMDS_uw, class_NMDS_uw, phylum_NMDS_uw, common.legend = T)
+dev.off()
+
+```
+
+## PERMANOVA - Unweighted UniFrac (sympatric)
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+(otu_test <- adonis2(otu_uw_dist ~ Species_Label, data = meta(microb_fr_otu_symp), by = "margin", permutations = 9999))
+(species_test <- adonis2(species_uw_dist ~ Species_Label, data = meta(microb_fr_species_symp), by = "margin", permutations = 9999))
+(genus_test <- adonis2(genus_uw_dist ~ Species_Label, data = meta(microb_fr_genus_symp), by = "margin", permutations = 9999))
+(family_test <- adonis2(family_uw_dist ~ Species_Label, data = meta(microb_fr_family_symp), by = "margin", permutations = 9999))
+(order_test <- adonis2(order_uw_dist ~ Species_Label, data = meta(microb_fr_order_symp), by = "margin", permutations = 9999))
+(class_test <- adonis2(class_uw_dist ~ Species_Label, data = meta(microb_fr_class_symp), by = "margin", permutations = 9999))
+(phylum_test <- adonis2(phylum_uw_dist ~ Species_Label, data = meta(microb_fr_phylum_symp), by = "margin", permutations = 9999))
+
+```
+
+# Weighted UniFrac - NMDS & PERMANOVA (sympatric)
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# OTU NMDS
+set.seed(306202)
+otu_w_dist <- UniFrac(microb_fr_otu_symp, weighted = TRUE)
+ord <- metaMDS(otu_w_dist, k = 4)
+scrs <- scores(ord, display = 'sites')
+scrs <- cbind(as.data.frame(scrs), Species_Label = sample_data(microb_fr_otu_symp)$Species_Label, Island_Mainland = sample_data(microb_fr_otu_symp)$Island_Mainland, Chaff_Blue = sample_data(microb_fr_otu_symp)$Chaff_Blue)
+cent <- aggregate(cbind(NMDS1, NMDS2) ~ Species_Label, data = scrs, FUN = mean)
+(otu_NMDS_w <- ggplot(scrs, aes(x = NMDS1, y = NMDS2, shape = Species_Label, fill = Species_Label)) + geom_point(size = 10) + geom_point(data = cent, aes(y = NMDS2, x = NMDS1, fill = Species_Label), size = 15, stroke = 1.5, color = "black") + scale_fill_manual(name = "Host species", breaks = c("Gran_Canaria_F_c_bakeri", "Tenerife_F_c_canariensis", "Gran_Canaria_F_polatzeki", "Tenerife_F_teydea"), values = c("#31A354", "#708238", "#1F78B4", "#A6CEE3"), labels = c("Gran Canaria: *F.c. bakeri*", "Tenerife: *F.c. canariensis*", "Gran Canaria: *F. polatzeki*", "Tenerife: *F. teydea*")) + scale_shape_manual(name = "Host species", breaks = c("Gran_Canaria_F_c_bakeri", "Tenerife_F_c_canariensis", "Gran_Canaria_F_polatzeki", "Tenerife_F_teydea"), values = c(23, 22, 21, 25), labels = c("Gran Canaria: *F.c. bakeri*", "Tenerife: *F.c. canariensis*", "Gran Canaria: *F. polatzeki*", "Tenerife: *F. teydea*")) + pca_theme + theme(legend.text = element_markdown()) + ggtitle("OTU") + scale_y_continuous(labels = scales::number_format(accuracy = 0.01)) + guides(color = "none"))
+
+# Species NMDS
+set.seed(306202)
+species_w_dist <- UniFrac(microb_fr_species_symp, weighted = TRUE)
+ord <- metaMDS(species_w_dist, k = 4)
+scrs <- scores(ord, display = 'sites')
+scrs <- cbind(as.data.frame(scrs), Species_Label = sample_data(microb_fr_species_symp)$Species_Label)
+cent <- aggregate(cbind(NMDS1, NMDS2) ~ Species_Label, data = scrs, FUN = mean)
+(species_NMDS_w <- ggplot(scrs, aes(x = NMDS1, y = NMDS2, shape = Species_Label, fill = Species_Label)) + geom_point(size = 10) + geom_point(data = cent, aes(y = NMDS2, x = NMDS1, fill = Species_Label), size = 15, stroke = 1.5, color = "black") + scale_fill_manual(name = "Host species", breaks = c("Gran_Canaria_F_c_bakeri", "Tenerife_F_c_canariensis", "Gran_Canaria_F_polatzeki", "Tenerife_F_teydea"), values = c("#31A354", "#708238", "#1F78B4", "#A6CEE3"), labels = c("Gran Canaria: *F.c. bakeri*", "Tenerife: *F.c. canariensis*", "Gran Canaria: *F. polatzeki*", "Tenerife: *F. teydea*")) + scale_shape_manual(name = "Host species", breaks = c("Gran_Canaria_F_c_bakeri", "Tenerife_F_c_canariensis", "Gran_Canaria_F_polatzeki", "Tenerife_F_teydea"), values = c(23, 22, 21, 25), labels = c("Gran Canaria: *F.c. bakeri*", "Tenerife: *F.c. canariensis*", "Gran Canaria: *F. polatzeki*", "Tenerife: *F. teydea*")) + pca_theme + theme(legend.text = element_markdown()) + ggtitle("Species") + scale_y_continuous(labels = scales::number_format(accuracy = 0.01)) + guides(color = "none"))
+
+# Genus NMDS
+set.seed(306202)
+genus_w_dist <- UniFrac(microb_fr_genus_symp, weighted = TRUE)
+ord <- metaMDS(genus_w_dist, k = 4)
+scrs <- scores(ord, display = 'sites')
+scrs <- cbind(as.data.frame(scrs), Species_Label = sample_data(microb_fr_genus_symp)$Species_Label)
+cent <- aggregate(cbind(NMDS1, NMDS2) ~ Species_Label, data = scrs, FUN = mean)
+(genus_NMDS_w <- ggplot(scrs, aes(x = NMDS1, y = NMDS2, shape = Species_Label, fill = Species_Label)) + geom_point(size = 10) + geom_point(data = cent, aes(y = NMDS2, x = NMDS1, fill = Species_Label), size = 15, stroke = 1.5, color = "black") + scale_fill_manual(name = "Host species", breaks = c("Gran_Canaria_F_c_bakeri", "Tenerife_F_c_canariensis", "Gran_Canaria_F_polatzeki", "Tenerife_F_teydea"), values = c("#31A354", "#708238", "#1F78B4", "#A6CEE3"), labels = c("Gran Canaria: *F.c. bakeri*", "Tenerife: *F.c. canariensis*", "Gran Canaria: *F. polatzeki*", "Tenerife: *F. teydea*")) + scale_shape_manual(name = "Host species", breaks = c("Gran_Canaria_F_c_bakeri", "Tenerife_F_c_canariensis", "Gran_Canaria_F_polatzeki", "Tenerife_F_teydea"), values = c(23, 22, 21, 25), labels = c("Gran Canaria: *F.c. bakeri*", "Tenerife: *F.c. canariensis*", "Gran Canaria: *F. polatzeki*", "Tenerife: *F. teydea*")) + pca_theme + theme(legend.text = element_markdown()) + ggtitle("Genus") + scale_y_continuous(labels = scales::number_format(accuracy = 0.01)) + guides(color = "none"))
+
+# Family NMDS
+set.seed(306202)
+family_w_dist <- UniFrac(microb_fr_family_symp, weighted = TRUE)
+ord <- metaMDS(family_w_dist, k = 4)
+scrs <- scores(ord, display = 'sites')
+scrs <- cbind(as.data.frame(scrs), Species_Label = sample_data(microb_fr_family_symp)$Species_Label)
+cent <- aggregate(cbind(NMDS1, NMDS2) ~ Species_Label, data = scrs, FUN = mean)
+(family_NMDS_w <- ggplot(scrs, aes(x = NMDS1, y = NMDS2, shape = Species_Label, fill = Species_Label)) + geom_point(size = 10) + geom_point(data = cent, aes(y = NMDS2, x = NMDS1, fill = Species_Label), size = 15, stroke = 1.5, color = "black") + scale_fill_manual(name = "Host species", breaks = c("Gran_Canaria_F_c_bakeri", "Tenerife_F_c_canariensis", "Gran_Canaria_F_polatzeki", "Tenerife_F_teydea"), values = c("#31A354", "#708238", "#1F78B4", "#A6CEE3"), labels = c("Gran Canaria: *F.c. bakeri*", "Tenerife: *F.c. canariensis*", "Gran Canaria: *F. polatzeki*", "Tenerife: *F. teydea*")) + scale_shape_manual(name = "Host species", breaks = c("Gran_Canaria_F_c_bakeri", "Tenerife_F_c_canariensis", "Gran_Canaria_F_polatzeki", "Tenerife_F_teydea"), values = c(23, 22, 21, 25), labels = c("Gran Canaria: *F.c. bakeri*", "Tenerife: *F.c. canariensis*", "Gran Canaria: *F. polatzeki*", "Tenerife: *F. teydea*")) + pca_theme + theme(legend.text = element_markdown()) + ggtitle("Family") + scale_y_continuous(labels = scales::number_format(accuracy = 0.01)) + guides(color = "none"))
+
+# Order NMDS
+set.seed(306202)
+order_w_dist <- UniFrac(microb_fr_order_symp, weighted = TRUE)
+ord <- metaMDS(order_w_dist, k = 4)
+scrs <- scores(ord, display = 'sites')
+scrs <- cbind(as.data.frame(scrs), Species_Label = sample_data(microb_fr_order_symp)$Species_Label)
+cent <- aggregate(cbind(NMDS1, NMDS2) ~ Species_Label, data = scrs, FUN = mean)
+(order_NMDS_w <- ggplot(scrs, aes(x = NMDS1, y = NMDS2, shape = Species_Label, fill = Species_Label)) + geom_point(size = 10) + geom_point(data = cent, aes(y = NMDS2, x = NMDS1, fill = Species_Label), size = 15, stroke = 1.5, color = "black") + scale_fill_manual(name = "Host species", breaks = c("Gran_Canaria_F_c_bakeri", "Tenerife_F_c_canariensis", "Gran_Canaria_F_polatzeki", "Tenerife_F_teydea"), values = c("#31A354", "#708238", "#1F78B4", "#A6CEE3"), labels = c("Gran Canaria: *F.c. bakeri*", "Tenerife: *F.c. canariensis*", "Gran Canaria: *F. polatzeki*", "Tenerife: *F. teydea*")) + scale_shape_manual(name = "Host species", breaks = c("Gran_Canaria_F_c_bakeri", "Tenerife_F_c_canariensis", "Gran_Canaria_F_polatzeki", "Tenerife_F_teydea"), values = c(23, 22, 21, 25), labels = c("Gran Canaria: *F.c. bakeri*", "Tenerife: *F.c. canariensis*", "Gran Canaria: *F. polatzeki*", "Tenerife: *F. teydea*")) + pca_theme + theme(legend.text = element_markdown()) + ggtitle("Order") + scale_y_continuous(labels = scales::number_format(accuracy = 0.01)) + guides(color = "none"))
+
+# Class NMDS
+set.seed(306202)
+class_w_dist <- UniFrac(microb_fr_class_symp, weighted = TRUE)
+ord <- metaMDS(class_w_dist, k = 4)
+scrs <- scores(ord, display = 'sites')
+scrs <- cbind(as.data.frame(scrs), Species_Label = sample_data(microb_fr_class_symp)$Species_Label)
+cent <- aggregate(cbind(NMDS1, NMDS2) ~ Species_Label, data = scrs, FUN = mean)
+(class_NMDS_w <- ggplot(scrs, aes(x = NMDS1, y = NMDS2, shape = Species_Label, fill = Species_Label)) + geom_point(size = 10) + geom_point(data = cent, aes(y = NMDS2, x = NMDS1, fill = Species_Label), size = 15, stroke = 1.5, color = "black") + scale_fill_manual(name = "Host species", breaks = c("Gran_Canaria_F_c_bakeri", "Tenerife_F_c_canariensis", "Gran_Canaria_F_polatzeki", "Tenerife_F_teydea"), values = c("#31A354", "#708238", "#1F78B4", "#A6CEE3"), labels = c("Gran Canaria: *F.c. bakeri*", "Tenerife: *F.c. canariensis*", "Gran Canaria: *F. polatzeki*", "Tenerife: *F. teydea*")) + scale_shape_manual(name = "Host species", breaks = c("Gran_Canaria_F_c_bakeri", "Tenerife_F_c_canariensis", "Gran_Canaria_F_polatzeki", "Tenerife_F_teydea"), values = c(23, 22, 21, 25), labels = c("Gran Canaria: *F.c. bakeri*", "Tenerife: *F.c. canariensis*", "Gran Canaria: *F. polatzeki*", "Tenerife: *F. teydea*")) + pca_theme + theme(legend.text = element_markdown()) + ggtitle("Class") + scale_y_continuous(labels = scales::number_format(accuracy = 0.01)) + guides(color = "none"))
+
+# Phylum NMDS
+set.seed(306202)
+phylum_w_dist <- UniFrac(microb_fr_phylum_symp, weighted = TRUE)
+ord <- metaMDS(phylum_w_dist, k = 4)
+scrs <- scores(ord, display = 'sites')
+scrs <- cbind(as.data.frame(scrs), Species_Label = sample_data(microb_fr_phylum_symp)$Species_Label)
+cent <- aggregate(cbind(NMDS1, NMDS2) ~ Species_Label, data = scrs, FUN = mean)
+(phylum_NMDS_w <- ggplot(scrs, aes(x = NMDS1, y = NMDS2, shape = Species_Label, fill = Species_Label)) + geom_point(size = 10) + geom_point(data = cent, aes(y = NMDS2, x = NMDS1, fill = Species_Label), size = 15, stroke = 1.5, color = "black") + scale_fill_manual(name = "Host species", breaks = c("Gran_Canaria_F_c_bakeri", "Tenerife_F_c_canariensis", "Gran_Canaria_F_polatzeki", "Tenerife_F_teydea"), values = c("#31A354", "#708238", "#1F78B4", "#A6CEE3"), labels = c("Gran Canaria: *F.c. bakeri*", "Tenerife: *F.c. canariensis*", "Gran Canaria: *F. polatzeki*", "Tenerife: *F. teydea*")) + scale_shape_manual(name = "Host species", breaks = c("Gran_Canaria_F_c_bakeri", "Tenerife_F_c_canariensis", "Gran_Canaria_F_polatzeki", "Tenerife_F_teydea"), values = c(23, 22, 21, 25), labels = c("Gran Canaria: *F.c. bakeri*", "Tenerife: *F.c. canariensis*", "Gran Canaria: *F. polatzeki*", "Tenerife: *F. teydea*")) + pca_theme + theme(legend.text = element_markdown()) + ggtitle("Phylum") + scale_y_continuous(labels = scales::number_format(accuracy = 0.01)) + guides(color = "none"))
+
+png(paste0(outputDir, "/Figures/NMDSSymp_AllLevels_W_UniFrac.png"), width = 1900, height = 1200, res = 50)
+ggarrange(otu_NMDS_w, species_NMDS_w, genus_NMDS_w, family_NMDS_w, order_NMDS_w, class_NMDS_w, phylum_NMDS_w, common.legend = T)
+dev.off()
+
+```
+
+## PERMANOVA - Weighted UniFrac (sympatric)
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+(otu_test <- adonis2(otu_w_dist ~ Species_Label, data = meta(microb_fr_otu_symp), by = "margin", permutations = 9999))
+(species_test <- adonis2(species_w_dist ~ Species_Label, data = meta(microb_fr_species_symp), by = "margin", permutations = 9999))
+(genus_test <- adonis2(genus_w_dist ~ Species_Label, data = meta(microb_fr_genus_symp), by = "margin", permutations = 9999))
+(family_test <- adonis2(family_w_dist ~ Species_Label, data = meta(microb_fr_family_symp), by = "margin", permutations = 9999))
+(order_test <- adonis2(order_w_dist ~ Species_Label, data = meta(microb_fr_order_symp), by = "margin", permutations = 9999))
+(class_test <- adonis2(class_w_dist ~ Species_Label, data = meta(microb_fr_class_symp), by = "margin", permutations = 9999))
+(phylum_test <- adonis2(phylum_w_dist ~ Species_Label, data = meta(microb_fr_phylum_symp), by = "margin", permutations = 9999))
+
+```
+
+
+```{r sessionInfo, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+sessioninfo::session_info()|>
+  details::details(
+    summary = 'Current session info',
+    open    = TRUE
+  )
+
+```
