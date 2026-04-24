@@ -260,12 +260,11 @@ Host distance
 
 ```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
 
-# mitogenome tree
-fringilla_tree <-  read.tree(file = paste0(dataDir, "/mt_Fringilla_aln.fasta.contree"))
 
-str(fringilla_tree)
+#nuclear genome
 
-fringilla_tree$tip.label <- gsub("\\_mtDNA","", fringilla_tree$tip.label)
+fringilla_tree <-  read.tree(file = paste0(dataDir, "/variants_microbiome_subset_miss0.5_mac3_noZ_subsample.phy.contree"))
+
 
 annot <- read_delim(paste0(dataDir, "/WGS_Fringilla_samples.tsv"))
 
@@ -606,7 +605,7 @@ Join bray and jaccard output
 mantel_out <- rbind(mantel_out_bray, mantel_out_jaccard)
 head(mantel_out)
 
-write.csv(mantel_out, paste0(dataDir, "/output_mantel_phylogDistance.csv"), row.names=FALSE)
+write.csv(mantel_out, paste0(dataDir, "/output_mantel_phylogDistance_nuclearTree.csv"), row.names=FALSE)
 
 ```
 
@@ -1517,7 +1516,7 @@ var_bray_ind_family;var_jaccard_ind_family
 
 check <- out_varpart_ind %>% filter(variable == "diet")
 
-write.csv(out_varpart_ind, paste0(dataDir, "/output_varpart.csv"), row.names=FALSE)
+write.csv(out_varpart_ind, paste0(dataDir, "/output_varpart_nuclearTree.csv"), row.names=FALSE)
 
 ```
 

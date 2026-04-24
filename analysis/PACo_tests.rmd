@@ -167,14 +167,23 @@ rownames(random_host_dist) <- sample_host
 ```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
 
 
-neutral <- readRDS(paste0(dataDir, "/ps_neutral_otu.rds" ))
+neutral <- readRDS(paste0(dataDir, "/ps_neutral_otuFix.rds" ))
+
 #otu_table()   OTU Table:          [ 10459 taxa and 209 samples ]:
 #sample_data() Sample Data:        [ 209 samples by 50 sample variables ]:
 
+#neutral <- readRDS(paste0(dataDir, "/ps_overlap_neutral_speciesFix.rds" ))
+#otu_table()   OTU Table:          [ 1883 taxa and 209 samples ]:
+#sample_data() Sample Data:        [ 209 samples by 50 sample variables ]:
 
 nonneutral <- readRDS(paste0(dataDir, "/ps_nonneutral_otu.rds" ))
 #otu_table()   OTU Table:          [ 1509 taxa and 209 samples ]:
 #sample_data() Sample Data:        [ 209 samples by 50 sample variables ]:
+
+nonneutral <- readRDS(paste0(dataDir, "/ps_overlap_nonneutral_speciesFix.rds" ))
+#otu_table()   OTU Table:          [ 558 taxa and 209 samples ]:
+#sample_data() Sample Data:        [ 209 samples by 50 sample variables ]:
+
 
 tax_table(neutral)
 neutral_otus <- neutral %>% tax_table %>% data.frame
@@ -223,7 +232,6 @@ otu <- microb_overlap %>% otu_table %>% as.data.frame %>% as.matrix
 
 # convert to binary
 otu <- otu %>% apply(2, function(x) ifelse(x > 0, 1, 0)) %>% as.matrix
-otu %>% head(3)
 
 setdiff(rownames(otu), rownames(host_dist))
 setdiff(rownames(core_across_meta), rownames(otu))
@@ -285,8 +293,6 @@ y_overlap_random <- vegan::protest(X = H_PCo, Y = P_PCo, symmetric = TRUE)
 #Correlation in a symmetric Procrustes rotation: 0.0376 
 #Significance:  0.001 
 
-
-+++++++++++++++++++++
 ```
 
 # PACO test neutral otus
@@ -299,7 +305,7 @@ otu <- ps_neutral_otu %>% otu_table %>% as.data.frame %>% as.matrix
 
 # convert to binary
 otu <- otu %>% apply(2, function(x) ifelse(x > 0, 1, 0)) %>% as.matrix
-otu %>% head(3)
+
 
 setdiff(rownames(otu), rownames(host_dist))
 setdiff(rownames(microb_overlap_meta), rownames(otu))
@@ -337,7 +343,7 @@ sqrt(1-proc_obj_neutral$ss)
 # goodness of fit
 H_PCo <- paco_data$H_PCo
 P_PCo <- paco_data$P_PCo
-
+++++++++++++++++
 y_neutral <- vegan::protest(X = H_PCo, Y = P_PCo, symmetric = TRUE)
 #Procrustes Sum of Squares (m12 squared):        0.985 
 #Correlation in a symmetric Procrustes rotation: 0.1223 
@@ -379,7 +385,7 @@ otu <- ps_nonneutral_genus %>% otu_table %>% as.data.frame %>% as.matrix
 
 # convert to binary
 otu <- otu %>% apply(2, function(x) ifelse(x > 0, 1, 0)) %>% as.matrix
-otu %>% head(3)
+
 
 paco_data <- prepare_paco_data(H = host_dist, P = microb_dist_nonneutral, HP = otu)
 paco_data %>% str
@@ -459,6 +465,652 @@ rownames(procr_p_random) <- c("all", "neutral", "non-neutral")
 
 ```
 
+test on species level 
+
+
+Microbiome 
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+microb_fr_fix <- readRDS(paste0(dataDir, "/microb_overlap_OTU99_fr_taxFix.rds"))
+microb_fr <- speedyseq::tax_glom(microb_fr_fix, "Species",  NArm = FALSE)
+
+# Add TipID microbiome to match stuff later on
+sample_data(microb_fr)$TipID_microbiome <- paste(sample_data(microb_fr)$Lab_Code, sample_data(microb_fr)$Species_Label, sep = "_")
+
+microb_fr_meta <- microb_fr%>% sample_data %>% data.frame 
+nrow(microb_fr_meta)
+
+
+```
+
+# Overlap WGS data
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+microb_overlap <- microb_fr %>% subset_samples(Genus == "Fringilla" & WGS_data == 1 & Lab_Code != "132" & Lab_Code != "252" & Lab_Code != "89")
+microb_overlap <- biomeUtils::removeZeros(microb_overlap)
+microb_overlap_meta <- microb_overlap%>% sample_data %>% data.frame 
+
+```
+
+#subset based on neutral expectations (neutral vs non-neutral)
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+
+neutral <- readRDS(paste0(dataDir, "/ps_overlap_neutral_speciesFix.rds" ))
+#otu_table()   OTU Table:          [ 1883 taxa and 209 samples ]:
+#sample_data() Sample Data:        [ 209 samples by 50 sample variables ]:
+
+nonneutral <- readRDS(paste0(dataDir, "/ps_overlap_nonneutral_speciesFix.rds" ))
+#otu_table()   OTU Table:          [ 558 taxa and 209 samples ]:
+#sample_data() Sample Data:        [ 209 samples by 50 sample variables ]:
+
+
+tax_table(neutral)
+neutral_species <- neutral %>% tax_table %>% data.frame
+keep_neutral <- rownames(neutral_species)
+keep_neutral_species <- neutral_species %>% dplyr::select(Species)
+keep_neutral_species$prediction <- paste("neutral") 
+ps_neutral_species <- prune_taxa(keep_neutral, microb_overlap)
+neutral_meta <- ps_neutral_species %>% sample_data %>% data.frame 
+
+nonneutral_species <- nonneutral %>% tax_table %>% data.frame
+keep_nonneutral <- rownames(nonneutral_species)
+keep_nonneutral_species <- nonneutral_species %>% dplyr::select(Species)
+keep_nonneutral_species$prediction <- paste("non-neutral") 
+ps_nonneutral_species <- prune_taxa(keep_nonneutral, microb_overlap)
+nonneutral_meta <- ps_nonneutral_species %>% sample_data %>% data.frame 
+
+df_species <- rbind(keep_neutral_species, keep_nonneutral_species) 
+str(df_species)
+
+```
+
+
+Distance matrix
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# overlap
+microb_dist <- microb_overlap %>% phy_tree %>% cophenetic %>%  as.matrix
+str(microb_dist)
+
+# neutral
+microb_dist_neutral <- ps_neutral_species %>% phy_tree %>% cophenetic %>%  as.matrix
+
+# nonneutral
+microb_dist_nonneutral <- ps_nonneutral_species %>% phy_tree %>% cophenetic %>%  as.matrix
+
+```
+
+# PACO test core across overlap species
+
+Prepare data for PACo Test
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+otu <- microb_overlap %>% otu_table %>% as.data.frame %>% as.matrix 
+
+# convert to binary
+otu <- otu %>% apply(2, function(x) ifelse(x > 0, 1, 0)) %>% as.matrix
+
+setdiff(rownames(otu), rownames(host_dist))
+setdiff(rownames(core_across_meta), rownames(otu))
+setdiff(rownames(core_across_meta), rownames(host_dist))
+
+paco_data <- prepare_paco_data(H = host_dist, P = microb_dist, HP = otu)
+paco_data %>% str
+
+paco_data = add_pcoord(paco_data, correction = "cailliez")
+paco_data %>% names
+
+paco_random <-  prepare_paco_data(H = random_host_dist, P = microb_dist, HP = otu)
+
+paco_random = add_pcoord(paco_random, correction = "cailliez")
+paco_random %>% names
+
+```
+
+PACo Test
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+overlap_test <- PACo(paco_data, nperm = 10, seed = 05062024, method = 'quasiswap', symmetric = TRUE) 
+overlap_test$gof
+
+# Proc
+proc_obj_across <- overlap_test$proc
+str(proc_obj_across)
+sqrt(1-proc_obj_across$ss)
+
+# goodness of fit
+
+H_PCo <- paco_data$H_PCo
+P_PCo <- paco_data$P_PCo
+
+y_overlap <- vegan::protest(X = H_PCo, Y = P_PCo, symmetric = TRUE)
+++++++++++++++++++
+#Procrustes Sum of Squares (m12 squared):        0.9974 
+#Correlation in a symmetric Procrustes rotation: 0.05114 
+#Significance:  0.001 
+
+
+
+overlap_random <- PACo(paco_random, nperm = 10, seed = 05062024, method = 'quasiswap', symmetric = TRUE) 
+overlap_random$gof
+
+# Proc
+proc_obj_overlap_random <- overlap_random$proc
+str(proc_obj_overlap_random)
+sqrt(1-proc_obj_overlap_random$ss)
+
+# goodness of fit
+
+H_PCo <- paco_random$H_PCo
+P_PCo <- paco_random$P_PCo
+
+y_overlap_random <- vegan::protest(X = H_PCo, Y = P_PCo, symmetric = TRUE)
+#Procrustes Sum of Squares (m12 squared):        0.9986 
+#Correlation in a symmetric Procrustes rotation: 0.0376 
+#Significance:  0.001 
+
+```
+
+# PACO test neutral otus
+
+Prepare data for PACo Test
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+otu <- ps_neutral_otu %>% otu_table %>% as.data.frame %>% as.matrix 
+
+# convert to binary
+otu <- otu %>% apply(2, function(x) ifelse(x > 0, 1, 0)) %>% as.matrix
+
+
+setdiff(rownames(otu), rownames(host_dist))
+setdiff(rownames(microb_overlap_meta), rownames(otu))
+setdiff(rownames(microb_overlap_meta), rownames(host_dist))
+
+paco_data <- prepare_paco_data(H = host_dist, P = microb_dist_neutral, HP = otu)
+paco_data %>% str
+
+paco_data = add_pcoord(paco_data, correction = "cailliez")
+paco_data %>% names
+
+paco_random <-  prepare_paco_data(H = random_host_dist, P = microb_dist_neutral, HP = otu)
+
+paco_random = add_pcoord(paco_random, correction = "cailliez")
+paco_random %>% names
+
+```
+
+
+PACo Test
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# r0 method => the assumption that the column group tracks the evolution of the row group; therefore, maintaining the degree of the species in the row group
+
+neutral_test <- PACo(paco_data, nperm = 10, seed = 05062024, method = 'quasiswap', symmetric = TRUE) 
+neutral_test$gof
+
+# Proc
+proc_obj_neutral <- neutral_test$proc
+str(proc_obj_neutral)
+sqrt(1-proc_obj_neutral$ss)
+
+
+# goodness of fit
+H_PCo <- paco_data$H_PCo
+P_PCo <- paco_data$P_PCo
+
+y_neutral <- vegan::protest(X = H_PCo, Y = P_PCo, symmetric = TRUE)
+#Procrustes Sum of Squares (m12 squared):        0.985 
+#Correlation in a symmetric Procrustes rotation: 0.1223 
+#Significance:  0.001 
+
+
+#
+
+neutral_random <- PACo(paco_random, nperm = 10, seed = 05062024, method = 'quasiswap', symmetric = TRUE) 
+neutral_random$gof
+
+# Proc
+proc_obj_neutral_random <- neutral_random$proc
+str(proc_obj_neutral_random)
+sqrt(1-proc_obj_neutral_random$ss)
+
+# goodness of fit
+
+H_PCo <- paco_random$H_PCo
+P_PCo <- paco_random$P_PCo
+
+y_neutral_random <- vegan::protest(X = H_PCo, Y = P_PCo, symmetric = TRUE)
+#Procrustes Sum of Squares (m12 squared):        0.9878 
+#Correlation in a symmetric Procrustes rotation: 0.1106 
+#Significance:  0.037 
+
+
+
+```
+
+
+# PACO test non-neutral otus
+
+Prepare data for PACo Test
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+otu <- ps_nonneutral_genus %>% otu_table %>% as.data.frame %>% as.matrix 
+
+# convert to binary
+otu <- otu %>% apply(2, function(x) ifelse(x > 0, 1, 0)) %>% as.matrix
+
+
+paco_data <- prepare_paco_data(H = host_dist, P = microb_dist_nonneutral, HP = otu)
+paco_data %>% str
+
+paco_data = add_pcoord(paco_data, correction = "cailliez")
+paco_data %>% names
+
+paco_random <-  prepare_paco_data(H = random_host_dist, P = microb_dist_nonneutral, HP = otu)
+
+paco_random = add_pcoord(paco_random, correction = "cailliez")
+paco_random %>% names
+
+
+```
+
+PACo Test
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# r0 method => the assumption that the column group tracks the evolution of the row group; therefore, maintaining the degree of the species in the row group
+
+nonneutral_test <- PACo(paco_data, nperm = 10, seed = 05062024, method = 'quasiswap', symmetric = TRUE) 
+nonneutral_test$gof
+
+# Proc
+proc_obj_nonneutral <- nonneutral_test$proc
+str(proc_obj_nonneutral)
+sqrt(1-proc_obj_nonneutral$ss)
+
+# goodness of fit
+H_PCo <- paco_data$H_PCo
+P_PCo <- paco_data$P_PCo
+
+y_nonneutral <- vegan::protest(X = H_PCo, Y = P_PCo, symmetric = TRUE)
+#Procrustes Sum of Squares (m12 squared):        0.9952 
+#Correlation in a symmetric Procrustes rotation: 0.06906 
+#Significance:  0.001 
+
+
+nonneutral_random <- PACo(paco_random, nperm = 10, seed = 05062024, method = 'quasiswap', symmetric = TRUE) 
+nonneutral_random$gof
+
+# Proc
+proc_obj_nonneutral_random <- nonneutral_random$proc
+str(proc_obj_nonneutral_random)
+sqrt(1-proc_obj_nonneutral_random$ss)
+
+# goodness of fit
+
+H_PCo <- paco_random$H_PCo
+P_PCo <- paco_random$P_PCo
+
+y_nonneutral_random <- vegan::protest(X = H_PCo, Y = P_PCo, symmetric = TRUE)
+
+#Procrustes Sum of Squares (m12 squared):        0.997 
+#Correlation in a symmetric Procrustes rotation: 0.05513 
+#Significance:  1 
+
+
+```
+
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+procr_p_host <- c(y_overlap$signif, y_neutral$signif, y_nonneutral$signif) 
+p_adj_bonferroni <- round(p.adjust(as.numeric(procr_p),method = "bonferroni"),3)
+
+procr_p_host <- as.data.frame(cbind(procr_p_host, p_adj_bonferroni))
+rownames(procr_p_host) <- c("all", "neutral", "non-neutral")
+
+procr_p_random <- c(y_overlap_random$signif, y_neutral_random$signif, y_nonneutral_random$signif) 
+p_adj_bonferroni <- round(p.adjust(as.numeric(procr_p_random),method = "bonferroni"),3)
+
+procr_p_random <- as.data.frame(cbind(procr_p_random, p_adj_bonferroni))
+rownames(procr_p_random) <- c("all", "neutral", "non-neutral")
+
+
+```
+
+
+test on Genus level
+
+
+Microbiome 
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+microb_fr_fix <- readRDS(paste0(dataDir, "/microb_overlap_OTU99_fr_taxFix.rds"))
+microb_fr <- speedyseq::tax_glom(microb_fr_fix, "Genus",  NArm = FALSE)
+
+# Add TipID microbiome to match stuff later on
+sample_data(microb_fr)$TipID_microbiome <- paste(sample_data(microb_fr)$Lab_Code, sample_data(microb_fr)$Species_Label, sep = "_")
+
+microb_fr_meta <- microb_fr%>% sample_data %>% data.frame 
+nrow(microb_fr_meta)
+
+
+```
+
+# Overlap WGS data
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+microb_overlap <- microb_fr %>% subset_samples(Genus == "Fringilla" & WGS_data == 1 & Lab_Code != "132" & Lab_Code != "252" & Lab_Code != "89")
+microb_overlap <- biomeUtils::removeZeros(microb_overlap)
+microb_overlap_meta <- microb_overlap%>% sample_data %>% data.frame 
+
+```
+
+#subset based on neutral expectations (neutral vs non-neutral)
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+
+neutral <- readRDS(paste0(dataDir, "/ps_overlap_neutral_speciesFix.rds" ))
+#otu_table()   OTU Table:          [ 1883 taxa and 209 samples ]:
+#sample_data() Sample Data:        [ 209 samples by 50 sample variables ]:
+
+nonneutral <- readRDS(paste0(dataDir, "/ps_overlap_nonneutral_speciesFix.rds" ))
+#otu_table()   OTU Table:          [ 558 taxa and 209 samples ]:
+#sample_data() Sample Data:        [ 209 samples by 50 sample variables ]:
+
+
+tax_table(neutral)
+neutral_species <- neutral %>% tax_table %>% data.frame
+keep_neutral <- rownames(neutral_species)
+keep_neutral_species <- neutral_species %>% dplyr::select(Species)
+keep_neutral_species$prediction <- paste("neutral") 
+ps_neutral_species <- prune_taxa(keep_neutral, microb_overlap)
+neutral_meta <- ps_neutral_species %>% sample_data %>% data.frame 
+
+nonneutral_species <- nonneutral %>% tax_table %>% data.frame
+keep_nonneutral <- rownames(nonneutral_species)
+keep_nonneutral_species <- nonneutral_species %>% dplyr::select(Species)
+keep_nonneutral_species$prediction <- paste("non-neutral") 
+ps_nonneutral_species <- prune_taxa(keep_nonneutral, microb_overlap)
+nonneutral_meta <- ps_nonneutral_species %>% sample_data %>% data.frame 
+
+df_species <- rbind(keep_neutral_species, keep_nonneutral_species) 
+str(df_species)
+
+```
+
+
+Distance matrix
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# overlap
+microb_dist <- microb_overlap %>% phy_tree %>% cophenetic %>%  as.matrix
+str(microb_dist)
+
+# neutral
+microb_dist_neutral <- ps_neutral_species %>% phy_tree %>% cophenetic %>%  as.matrix
+
+# nonneutral
+microb_dist_nonneutral <- ps_nonneutral_species %>% phy_tree %>% cophenetic %>%  as.matrix
+
+```
+
+# PACO test core across overlap species
+
+Prepare data for PACo Test
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+otu <- microb_overlap %>% otu_table %>% as.data.frame %>% as.matrix 
+
+# convert to binary
+otu <- otu %>% apply(2, function(x) ifelse(x > 0, 1, 0)) %>% as.matrix
+
+setdiff(rownames(otu), rownames(host_dist))
+setdiff(rownames(core_across_meta), rownames(otu))
+setdiff(rownames(core_across_meta), rownames(host_dist))
+
+paco_data <- prepare_paco_data(H = host_dist, P = microb_dist, HP = otu)
+paco_data %>% str
+
+paco_data = add_pcoord(paco_data, correction = "cailliez")
+paco_data %>% names
+
+paco_random <-  prepare_paco_data(H = random_host_dist, P = microb_dist, HP = otu)
+
+paco_random = add_pcoord(paco_random, correction = "cailliez")
+paco_random %>% names
+
+```
+
+PACo Test
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+overlap_test <- PACo(paco_data, nperm = 10, seed = 05062024, method = 'quasiswap', symmetric = TRUE) 
+overlap_test$gof
+
+# Proc
+proc_obj_across <- overlap_test$proc
+str(proc_obj_across)
+sqrt(1-proc_obj_across$ss)
+
+# goodness of fit
+
+H_PCo <- paco_data$H_PCo
+P_PCo <- paco_data$P_PCo
+
+y_overlap <- vegan::protest(X = H_PCo, Y = P_PCo, symmetric = TRUE)
+++++++++++++++++++
+#Procrustes Sum of Squares (m12 squared):        0.9974 
+#Correlation in a symmetric Procrustes rotation: 0.05114 
+#Significance:  0.001 
+
+
+
+overlap_random <- PACo(paco_random, nperm = 10, seed = 05062024, method = 'quasiswap', symmetric = TRUE) 
+overlap_random$gof
+
+# Proc
+proc_obj_overlap_random <- overlap_random$proc
+str(proc_obj_overlap_random)
+sqrt(1-proc_obj_overlap_random$ss)
+
+# goodness of fit
+
+H_PCo <- paco_random$H_PCo
+P_PCo <- paco_random$P_PCo
+
+y_overlap_random <- vegan::protest(X = H_PCo, Y = P_PCo, symmetric = TRUE)
+#Procrustes Sum of Squares (m12 squared):        0.9986 
+#Correlation in a symmetric Procrustes rotation: 0.0376 
+#Significance:  0.001 
+
+```
+
+# PACO test neutral otus
+
+Prepare data for PACo Test
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+otu <- ps_neutral_otu %>% otu_table %>% as.data.frame %>% as.matrix 
+
+# convert to binary
+otu <- otu %>% apply(2, function(x) ifelse(x > 0, 1, 0)) %>% as.matrix
+
+
+setdiff(rownames(otu), rownames(host_dist))
+setdiff(rownames(microb_overlap_meta), rownames(otu))
+setdiff(rownames(microb_overlap_meta), rownames(host_dist))
+
+paco_data <- prepare_paco_data(H = host_dist, P = microb_dist_neutral, HP = otu)
+paco_data %>% str
+
+paco_data = add_pcoord(paco_data, correction = "cailliez")
+paco_data %>% names
+
+paco_random <-  prepare_paco_data(H = random_host_dist, P = microb_dist_neutral, HP = otu)
+
+paco_random = add_pcoord(paco_random, correction = "cailliez")
+paco_random %>% names
+
+```
+
+
+PACo Test
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# r0 method => the assumption that the column group tracks the evolution of the row group; therefore, maintaining the degree of the species in the row group
+
+neutral_test <- PACo(paco_data, nperm = 10, seed = 05062024, method = 'quasiswap', symmetric = TRUE) 
+neutral_test$gof
+
+# Proc
+proc_obj_neutral <- neutral_test$proc
+str(proc_obj_neutral)
+sqrt(1-proc_obj_neutral$ss)
+
+
+# goodness of fit
+H_PCo <- paco_data$H_PCo
+P_PCo <- paco_data$P_PCo
+
+y_neutral <- vegan::protest(X = H_PCo, Y = P_PCo, symmetric = TRUE)
+#Procrustes Sum of Squares (m12 squared):        0.985 
+#Correlation in a symmetric Procrustes rotation: 0.1223 
+#Significance:  0.001 
+
+
+#
+
+neutral_random <- PACo(paco_random, nperm = 10, seed = 05062024, method = 'quasiswap', symmetric = TRUE) 
+neutral_random$gof
+
+# Proc
+proc_obj_neutral_random <- neutral_random$proc
+str(proc_obj_neutral_random)
+sqrt(1-proc_obj_neutral_random$ss)
+
+# goodness of fit
+
+H_PCo <- paco_random$H_PCo
+P_PCo <- paco_random$P_PCo
+
+y_neutral_random <- vegan::protest(X = H_PCo, Y = P_PCo, symmetric = TRUE)
+#Procrustes Sum of Squares (m12 squared):        0.9878 
+#Correlation in a symmetric Procrustes rotation: 0.1106 
+#Significance:  0.037 
+
+
+
+```
+
+
+# PACO test non-neutral otus
+
+Prepare data for PACo Test
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+otu <- ps_nonneutral_genus %>% otu_table %>% as.data.frame %>% as.matrix 
+
+# convert to binary
+otu <- otu %>% apply(2, function(x) ifelse(x > 0, 1, 0)) %>% as.matrix
+
+
+paco_data <- prepare_paco_data(H = host_dist, P = microb_dist_nonneutral, HP = otu)
+paco_data %>% str
+
+paco_data = add_pcoord(paco_data, correction = "cailliez")
+paco_data %>% names
+
+paco_random <-  prepare_paco_data(H = random_host_dist, P = microb_dist_nonneutral, HP = otu)
+
+paco_random = add_pcoord(paco_random, correction = "cailliez")
+paco_random %>% names
+
+
+```
+
+PACo Test
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# r0 method => the assumption that the column group tracks the evolution of the row group; therefore, maintaining the degree of the species in the row group
+
+nonneutral_test <- PACo(paco_data, nperm = 10, seed = 05062024, method = 'quasiswap', symmetric = TRUE) 
+nonneutral_test$gof
+
+# Proc
+proc_obj_nonneutral <- nonneutral_test$proc
+str(proc_obj_nonneutral)
+sqrt(1-proc_obj_nonneutral$ss)
+
+# goodness of fit
+H_PCo <- paco_data$H_PCo
+P_PCo <- paco_data$P_PCo
+
+y_nonneutral <- vegan::protest(X = H_PCo, Y = P_PCo, symmetric = TRUE)
+#Procrustes Sum of Squares (m12 squared):        0.9952 
+#Correlation in a symmetric Procrustes rotation: 0.06906 
+#Significance:  0.001 
+
+
+nonneutral_random <- PACo(paco_random, nperm = 10, seed = 05062024, method = 'quasiswap', symmetric = TRUE) 
+nonneutral_random$gof
+
+# Proc
+proc_obj_nonneutral_random <- nonneutral_random$proc
+str(proc_obj_nonneutral_random)
+sqrt(1-proc_obj_nonneutral_random$ss)
+
+# goodness of fit
+
+H_PCo <- paco_random$H_PCo
+P_PCo <- paco_random$P_PCo
+
+y_nonneutral_random <- vegan::protest(X = H_PCo, Y = P_PCo, symmetric = TRUE)
+
+#Procrustes Sum of Squares (m12 squared):        0.997 
+#Correlation in a symmetric Procrustes rotation: 0.05513 
+#Significance:  1 
+
+
+```
+
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+procr_p_host <- c(y_overlap$signif, y_neutral$signif, y_nonneutral$signif) 
+p_adj_bonferroni <- round(p.adjust(as.numeric(procr_p),method = "bonferroni"),3)
+
+procr_p_host <- as.data.frame(cbind(procr_p_host, p_adj_bonferroni))
+rownames(procr_p_host) <- c("all", "neutral", "non-neutral")
+
+procr_p_random <- c(y_overlap_random$signif, y_neutral_random$signif, y_nonneutral_random$signif) 
+p_adj_bonferroni <- round(p.adjust(as.numeric(procr_p_random),method = "bonferroni"),3)
+
+procr_p_random <- as.data.frame(cbind(procr_p_random, p_adj_bonferroni))
+rownames(procr_p_random) <- c("all", "neutral", "non-neutral")
+
+
+```
 Test on core families
 
 

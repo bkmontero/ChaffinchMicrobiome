@@ -186,7 +186,7 @@ str(tree_meta)
 
 
 
-png(paste0(outputDir, "/exploration/fringilla_miss0.5_mac3_noZ_subsample_gtr_asc.png"),width=2300, height=3700,res=350)
+png(paste0(outputDir, "/01_Exploration/fringilla_miss0.5_mac3_noZ_subsample_gtr_asc.png"),width=3300, height=3700,res=350)
 ggarrange(t1, t2, ncol = 2, common.legend = TRUE, legend = "bottom")
 dev.off()
 
