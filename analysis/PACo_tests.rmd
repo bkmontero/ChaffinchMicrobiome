@@ -102,16 +102,15 @@ Host distance
 
 ```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
 
-# Individual tree
-fringilla_tree <-  read.tree(file = paste0(dataDir, "/mtFr_edit_trim_aln.fas.treefile"))
+# mitogenome tree
+fringilla_tree <-  read.tree(file = paste0(dataDir, "/mt_Fringilla_aln.fasta.contree"))
 
-fringilla_tree <- drop.tip(fringilla_tree , "OL629048.1")
+str(fringilla_tree)
 
-fringilla_tree$tip.label <- gsub("\\_NC","", fringilla_tree$tip.label)
+fringilla_tree$tip.label <- gsub("\\_mtDNA","", fringilla_tree$tip.label)
 
 annot <- read_delim(paste0(dataDir, "/WGS_Fringilla_samples.tsv"))
 
-annot %>% data.frame %>% tail
 
 table(annot$Microb)
 
@@ -261,9 +260,11 @@ H_PCo <- paco_data$H_PCo
 P_PCo <- paco_data$P_PCo
 
 y_overlap <- vegan::protest(X = H_PCo, Y = P_PCo, symmetric = TRUE)
-#Procrustes Sum of Squares (m12 squared):        0.9956 
-#Correlation in a symmetric Procrustes rotation: 0.06663 
+
+#Procrustes Sum of Squares (m12 squared):        0.9974 
+#Correlation in a symmetric Procrustes rotation: 0.05114 
 #Significance:  0.001 
+
 
 
 overlap_random <- PACo(paco_random, nperm = 10, seed = 05062024, method = 'quasiswap', symmetric = TRUE) 
@@ -280,11 +281,12 @@ H_PCo <- paco_random$H_PCo
 P_PCo <- paco_random$P_PCo
 
 y_overlap_random <- vegan::protest(X = H_PCo, Y = P_PCo, symmetric = TRUE)
-#Procrustes Sum of Squares (m12 squared):        0.9972 
-#Correlation in a symmetric Procrustes rotation: 0.05295 
+#Procrustes Sum of Squares (m12 squared):        0.9986 
+#Correlation in a symmetric Procrustes rotation: 0.0376 
 #Significance:  0.001 
 
 
++++++++++++++++++++++
 ```
 
 # PACO test neutral otus

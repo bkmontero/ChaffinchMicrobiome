@@ -1,0 +1,200 @@
+---
+title: 'draw mt tree Fringilla'
+author: "B. K. Montero and M. Gillingham"
+date: "`r Sys.Date()`"
+output: html_document
+
+---
+
+## LOAD LIBRARIES
+
+```{r libraries, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+
+rm(list = ls())
+
+# basics
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+library(stringr)
+library(vegan)
+library(magrittr)
+library(ggplot2)
+library(ggpubr)
+library(rlist) 
+library(grid)
+library(tsiR) 
+library(ape)
+library(treedataverse)
+library(treedata.table)
+library(ggh4x)
+library(ggtext)
+
+```
+
+## WORKING DIRECTORIES
+
+```{r source, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/workingDirectories.R")
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/CleanScripts/graphics_param.R")
+
+```
+
+iqtree nuclear genome
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+#nuclear genome
+
+fringilla_tree <-  read.tree(file = paste0(dataDir, "/variants_microbiome_subset_miss0.5_mac3_noZ_subsample.phy.contree"))
+
+
+# annotation data frame
+annot <- read_delim(paste0(dataDir, "/WGS_Fringilla_samples.tsv"))
+names(annot)
+
+head(annot$WGS_ID)
+
+head(annot$TipID)
+
+setdiff(fringilla_tree$tip.label, annot$TipID)
+setdiff(annot$TipID, fringilla_tree$tip.label)
+
+#rename row and col names to match metadata 
+fringilla_tree$tip.label <- annot[match(fringilla_tree$tip.label, annot$WGS_ID),]$TipID
+
+# subset tree matching IDs with microbiome data 
+annot <- as.data.frame(annot)
+
+fringilla_tree_subset <- as.treedata.table(tree = fringilla_tree, data = annot, name_column = "TipID")
+
+fringilla_tree_subset <- fringilla_tree_subset$phy
+str(fringilla_tree_subset)
+
+#Brambling as root
+fringilla_rootedtree = root(fringilla_tree_subset, outgroup = "2A357348_Tenerife_F_teydea", resolve.root = TRUE)
+plot(fringilla_rootedtree)
+
+
+##join full dataset
+fringilla_rootedtree$tip.label
+
+# make meta same size as tree
+annot$label <- annot$TipID
+
+# remove levels from legend
+annot_filtered <- annot %>%
+  filter(TipID %in% fringilla_rootedtree$tip.label)
+
+# join with the filtered data
+tree_meta <- full_join(fringilla_rootedtree, annot_filtered, by = "label")
+str(tree_meta)
+
+(t1 <- ggplot(tree_meta, aes(x, y)) + geom_tree() + theme_tree() +  guides(colour = guide_stringlegend(ncol = 2)) + geom_tiplab(aes(color=Species_Label, fill=Species_Label), size = 2) + SpeciesLabel.color + SpeciesLabel.fill + theme(legend.text = element_markdown(),legend.position="right", legend.direction = "vertical", legend.title=element_blank())) 
+
+# Basic tree with bootstrap values
+
+(t1 <- ggplot(tree_meta, aes(x, y)) + 
+  geom_tree() + 
+  theme_tree() +  
+  guides(colour = guide_stringlegend(ncol = 4)) + 
+  geom_tiplab(aes(color=Species_Label, fill=Species_Label), size = 1.5) + 
+  # Only show bootstrap values >= 70
+  geom_nodelab(aes(label=ifelse(as.numeric(label) >= 70, label, "")), 
+               size=2.5, 
+               nudge_x = -0.0004,
+               nudge_y = 0.5) +
+  SpeciesLabel.color + 
+  SpeciesLabel.fill + 
+  hexpand(0.05) +
+  theme(legend.position="bottom", 
+        legend.direction = "horizontal", 
+        legend.title=element_blank(), 
+        legend.text=element_text(size=7)))
+
+
+
+#mitogenome
+fringilla_tree <-  read.tree(file = paste0(dataDir, "/mt_Fringilla_aln.fasta.contree"))
+
+fringilla_tree$tip.label <- gsub("\\_mtDNA","", fringilla_tree$tip.label)
+
+# annotation data frame
+annot <- read_delim(paste0(dataDir, "/WGS_Fringilla_samples.tsv"))
+names(annot)
+
+head(annot$WGS_ID)
+
+head(annot$TipID)
+
+setdiff(fringilla_tree$tip.label, annot$TipID)
+setdiff(annot$TipID, fringilla_tree$tip.label)
+
+#rename row and col names to match metadata 
+fringilla_tree$tip.label <- annot[match(fringilla_tree$tip.label, annot$WGS_ID),]$TipID
+
+# subset tree matching IDs with microbiome data 
+annot <- as.data.frame(annot)
+
+fringilla_tree_subset <- as.treedata.table(tree = fringilla_tree, data = annot, name_column = "TipID")
+
+fringilla_tree_subset <- fringilla_tree_subset$phy
+str(fringilla_tree_subset)
+
+#Brambling as root
+fringilla_rootedtree = root(fringilla_tree_subset, outgroup = "2A357348_Tenerife_F_teydea", resolve.root = TRUE)
+plot(fringilla_rootedtree)
+
+
+##join full dataset
+fringilla_rootedtree$tip.label
+
+# make meta same size as tree
+annot$label <- annot$TipID
+
+# remove levels from legend
+annot_filtered <- annot %>%
+  filter(TipID %in% fringilla_rootedtree$tip.label)
+
+# join with the filtered data
+tree_meta <- full_join(fringilla_rootedtree, annot_filtered, by = "label")
+str(tree_meta)
+
+(t2 <- ggplot(tree_meta, aes(x, y)) + geom_tree() + theme_tree() +  guides(colour = guide_stringlegend(ncol = 2)) + geom_tiplab(aes(color=Species_Label, fill=Species_Label), size = 2) + SpeciesLabel.color + SpeciesLabel.fill + theme(legend.text = element_markdown(),legend.position="right", legend.direction = "vertical", legend.title=element_blank())) 
+
+# Basic tree with bootstrap values
+
+(t2 <- ggplot(tree_meta, aes(x, y)) + 
+  geom_tree() + 
+  theme_tree() +  
+  guides(colour = guide_stringlegend(ncol = 4)) + 
+  geom_tiplab(aes(color=Species_Label, fill=Species_Label), size = 1.5) + 
+  # Only show bootstrap values >= 70
+  geom_nodelab(aes(label=ifelse(as.numeric(label) >= 70, label, "")), 
+               size=2.5, 
+               nudge_x = -0.0004,
+               nudge_y = 0.5) +
+  SpeciesLabel.color + 
+  SpeciesLabel.fill + 
+  hexpand(0.05) +
+  theme(legend.position="bottom", 
+        legend.direction = "horizontal", 
+        legend.title=element_blank(), 
+        legend.text=element_text(size=7)))
+
+
+
+png(paste0(outputDir, "/exploration/fringilla_miss0.5_mac3_noZ_subsample_gtr_asc.png"),width=2300, height=3700,res=350)
+ggarrange(t1, t2, ncol = 2, common.legend = TRUE, legend = "bottom")
+dev.off()
+
+
+
+png(paste0(outputDir, "/exploration/variants_default_filters_miss0.5_mac3_noZnoMt_subsample.png"),width=2300, height=3700,res=350)
+t1
+dev.off()
+
+
+```

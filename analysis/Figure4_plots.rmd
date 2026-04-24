@@ -71,7 +71,12 @@ Variance partitioning
 
 ```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
 
-varpart_out <- read.csv(paste0(dataDir, "/output_varpart_speciesFix.csv"))
+# mitogenome results
+varpart_out <- read.csv(paste0(dataDir, "/output_varpart.csv"))
+
+# nuclear Tree results
+#varpart_out <- read.csv(paste0(dataDir, "/output_varpart_nuclearTree.csv"))
+
 
 ```
 
@@ -79,7 +84,7 @@ Mantel test
 
 ```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
 
-mantel_out <- read.csv(paste0(dataDir, "/output_mantel_weightedfst_speciesFix.csv"))
+mantel_out <- read.csv(paste0(dataDir, "/output_mantel_weightedfst.csv"))
 
 ```
 
@@ -173,7 +178,7 @@ ind_sum$tax <- factor(ind_sum$tax,levels=c("OTU99","Species","Genus","Family","O
 
 (varPar <- ggplot(ind_sum, aes(y = tax, x = percent2, fill = order, color = order)) + 
         geom_bar(position = "stack", stat = "identity", linewidth = 0.25, color = "black") + 
-        geom_bar(position = "stack", stat = "identity", linewidth = 0.5, show_guide = FALSE) +
+        geom_bar(position = "stack", stat = "identity", linewidth = 0.5, show.legend = FALSE) +
         scale_x_continuous("% variance explained",  limits = c(0, 25), expand = c(0,0)) +
         scale_fill_manual(values = levels(ind_sum$varFill), limits=names(ind_sum$varFill), name="")+ 
         scale_color_manual(values = c("white", "white","white", "white","white"), limits=names(ind_sum$varFill), name="") + 
@@ -300,10 +305,12 @@ df_sf <- st_as_sf(my_points, coords = c('longitude', 'latitude'))
 # get centroids per island / mainland 
 centroids_sf <- df_sf %>%
   group_by(Island_Mainland) %>% 
-  summarize(geometry = st_union(geometry)) %>% 
-  st_centroid %>%   
-  dplyr::mutate(lon = sf::st_coordinates(.)[,1],
-                lat = sf::st_coordinates(.)[,2])
+  dplyr::summarize(geometry = st_union(geometry)) %>%   # <-- add dplyr::
+  st_centroid() %>%   
+  dplyr::mutate(
+    lon = sf::st_coordinates(.)[,1],
+    lat = sf::st_coordinates(.)[,2]
+  )
 str(centroids_sf)
 rownames(centroids_sf) <- centroids_sf$Island_Mainland
 
@@ -369,33 +376,46 @@ names(jaccard_divergence_species)[2] <- "j.beta_median"
 ```
 
 
-Inbreeding coefficients
+Inbreeding coefficients and FRoh
 
 ```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
 
 metadata <- read_delim(paste0(dataDir, "/WGS_Fringilla_samples.tsv"), delim = ",")
 
-ind_het <- read_delim(paste0(dataDir, "/chaffinch_bluefinch_miss0.5_mac3_noZ.het"), delim = "\t",
-           col_names = c("WGS_ID","ho", "he", "nsites", "f"), skip = 1)
-ind_het
-
 ind_het_meta <- left_join(ind_het, metadata, by ="WGS_ID")
 ind_het_meta %>% data.frame %>% head
+
+ind_het <- read_delim(paste0(dataDir, "/fringilla_variants_microbiome.het"), delim = "\t",
+           col_names = c("TipID_microbiome","ho", "he", "nsites", "f"), skip = 1)
+
+head(metadata$TipID_microbiome, 30)
+names(metadata) 
+ind_het
+
+ind_het_meta <- left_join(ind_het, metadata, by ="TipID_microbiome")
+ind_het_meta %>% data.frame %>% head
+
+
+#froh
+froh <- read_delim(paste0(dataDir, "/fringilla_microbiome_roh_rg_filtered.csv"), delim = ",")
+names(froh) <- c("TipID_microbiome", "total_length_bp", "froh")
+
+
+froh_meta <- left_join(froh, metadata, by ="TipID_microbiome")
+froh_meta %>% data.frame %>% head
 ```
 
 Join df
 
 ```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
 
-ind_het_meta %>% data.frame %>% head(2)
-ind_het_meta$Region_Species
-
 # species
-het_bray_species <- left_join(ind_het_meta, bray_divergence_species, by = "TipID_microbiome")
-het_bray_species <- subset(het_bray_species, subset = !is.na(het_bray_species$b.beta_median))
+roh_bray_species <- left_join(froh_meta, bray_divergence_species, by = "TipID_microbiome")
+roh_bray_species <- subset(roh_bray_species, subset = !is.na(roh_bray_species$b.beta_median))
 
-het_jacc_species <- left_join(ind_het_meta, jaccard_divergence_species, by = "TipID_microbiome")
-het_jacc_species <- subset(het_jacc_species, subset = !is.na(het_jacc_species$j.beta_median))
+roh_jacc_species <- left_join(froh_meta, jaccard_divergence_species, by = "TipID_microbiome")
+roh_jacc_species <- subset(roh_jacc_species, subset = !is.na(roh_jacc_species$j.beta_median))
+
 ```
 
 # FST and inbreeding plots
@@ -491,9 +511,9 @@ levels(mantel_out$signifFill)[levels(mantel_out$signifFill)=="n.s."] <- "white"
           strip.background = element_blank(),
           strip.text.x = element_blank()))
 
-(p_bray_het <- ggplot(het_bray_species, aes(y = b.beta_median, x = f)) + 
+(p_bray_het <- ggplot(roh_bray_species, aes(y = b.beta_median, x = froh)) + 
         geom_point(size = 5, alpha = 0.2) + 
-        xlab(expression("Inbreeding coef"~italic((f)))) +
+        xlab(expression(italic('F'[ROH])))+
         ylab("Divergence (Bray-Curtis)") + 
         geom_smooth(method = "lm", colour = "darkred", alpha = 0.2,lwd=2) + scatter_theme + ggtitle("") + sl_theme +
         theme(legend.position="top", 
@@ -506,9 +526,9 @@ levels(mantel_out$signifFill)[levels(mantel_out$signifFill)=="n.s."] <- "white"
           strip.background = element_blank(),
           strip.text.x = element_blank()))
 
-(p_jacc_het <- ggplot(het_jacc_species, aes(y = j.beta_median, x = f)) + 
+(p_jacc_het <- ggplot(roh_jacc_species, aes(y = j.beta_median, x = froh)) + 
         geom_point(size = 5, alpha = 0.2) + 
-        xlab(expression("Inbreeding coef"~italic((f)))) +
+        xlab(expression(italic('F'[ROH])))+
         ylab("Divergence (Jaccard)") + 
         geom_smooth(method = "lm", colour = "black", alpha = 0.2,lwd=2) + scatter_theme + ggtitle("") + 
         sl_theme +
@@ -523,35 +543,36 @@ levels(mantel_out$signifFill)[levels(mantel_out$signifFill)=="n.s."] <- "white"
           strip.text.x = element_blank()))
 
 
-Bray_dist_f <- data.frame(cbind(beta_median = het_bray_species$b.beta_median,f =het_bray_species$f,Distance_name="Bray"))
-Jaccard_dist_f <- data.frame(cbind(beta_median = het_jacc_species$j.beta_median,f =het_jacc_species$f,Distance_name="Jaccard"))
+Bray_dist_f <- data.frame(cbind(beta_median = roh_bray_species$b.beta_median,froh =roh_bray_species$froh,Distance_name="Bray"))
+Jaccard_dist_f <- data.frame(cbind(beta_median = roh_jacc_species$j.beta_median,froh =roh_jacc_species$froh,Distance_name="Jaccard"))
 
-dist_f_df <- rbind(Bray_dist_f,Jaccard_dist_f)
+dist_froh_df <- rbind(Bray_dist_f,Jaccard_dist_f)
+head(dist_froh_df)
 
-dist_f_df$f <- as.numeric(dist_f_df$f)
-dist_f_df$beta_median <- as.numeric(dist_f_df$beta_median)
+dist_froh_df$froh <- as.numeric(dist_froh_df$froh)
+dist_froh_df$beta_median <- as.numeric(dist_froh_df$beta_median)
 
 
 
-het_bray_species$sf <- scale(het_bray_species$f)
+roh_bray_species$sf <- scale(roh_bray_species$froh)
 
-glmm_bray_species <- glmmTMB(b.beta_median ~  f + (1|Species_Label), data = het_bray_species, na.action = na.fail, family = gaussian)
+glmm_bray_species <- glmmTMB(b.beta_median ~  froh + (1|Species_Label), data = roh_bray_species, na.action = na.fail, family = gaussian)
 confint(glmm_bray_species)
 
-glmm_jacc_species <- glmmTMB(j.beta_median ~  f + (1|Species_Label), data = het_jacc_species, na.action = na.fail, family = gaussian)
+glmm_jacc_species <- glmmTMB(j.beta_median ~  froh + (1|Species_Label), data = roh_jacc_species, na.action = na.fail, family = gaussian)
 confint(glmm_jacc_species)
 
 
-(effect_bray <- as.data.frame(effect('f', glmm_bray_species, confint=list(alpha = .95))))
+(effect_bray <- as.data.frame(effect('froh', glmm_bray_species, confint=list(alpha = .95))))
 
-(effect_jac <- as.data.frame(effect('f', glmm_jacc_species, confint=list(alpha = .95))))
+(effect_jac <- as.data.frame(effect('froh', glmm_jacc_species, confint=list(alpha = .95))))
 
-(fit_Bray <- ggplot(het_bray_species, aes(y = b.beta_median, x = f))+ 
+(fit_Bray <- ggplot(roh_bray_species, aes(y = b.beta_median, x = froh))+ 
         geom_point(size = 5, alpha = 0.2) + 
-        xlab(expression("Inbreeding coef"~italic((f)))) +
+        xlab(expression(italic('F'[ROH])))+
         ylab("Divergence (Bray-Curtis)") +
-        geom_line(data = effect_bray, aes(x = f, y = fit), colour = "darkred",lwd=2) +
-        geom_ribbon(data = effect_bray,aes(x = f, y = fit,ymin = lower, ymax = upper), alpha = .2)+ scatter_theme + ggtitle("") + sl_theme +
+        geom_line(data = effect_bray, aes(x = froh, y = fit), colour = "darkred",lwd=2) +
+        geom_ribbon(data = effect_bray,aes(x = froh, y = fit,ymin = lower, ymax = upper), alpha = .2)+ scatter_theme + ggtitle("") + sl_theme +
         theme(legend.position="top", 
           axis.text.x = element_text(angle = 0,  size = 16), axis.text.y = element_text(angle = 0,  size = 16),
           axis.title = element_text(size = 18), 
@@ -564,12 +585,12 @@ confint(glmm_jacc_species)
 
 
 
-(p_jacc_het <- ggplot(het_jacc_species, aes(y = j.beta_median, x = f)) + 
+(p_jacc_het <- ggplot(roh_jacc_species, aes(y = j.beta_median, x = froh)) + 
         geom_point(size = 5, alpha = 0.2) + 
-        xlab(expression("Inbreeding coef"~italic((f)))) +
+        xlab(expression(italic('F'[ROH])))+
         ylab("Divergence (Jaccard)") +
-        geom_line(data = effect_jac, aes(x = f, y = fit), colour = "black",lwd=2) +
-        geom_ribbon(data = effect_jac,aes(x = f, y = fit,ymin = lower, ymax = upper), alpha = .2) + scatter_theme + ggtitle("") + 
+        geom_line(data = effect_jac, aes(x = froh, y = fit), colour = "black",lwd=2) +
+        geom_ribbon(data = effect_jac,aes(x = froh, y = fit,ymin = lower, ymax = upper), alpha = .2) + scatter_theme + ggtitle("") + 
         sl_theme +
         theme(legend.position="top", 
           axis.text.x = element_text(angle = 0,  size = 16), axis.text.y = element_text(angle = 0,  size = 16),
@@ -591,13 +612,13 @@ effect_df <- rbind(effect_bray, effect_jac)
 
 
 
-(p_het <- ggplot(dist_f_df, aes(y = beta_median, x = f, color = Distance_name)) + 
+(p_het <- ggplot(dist_froh_df, aes(y = beta_median, x = as.numeric(froh), color = Distance_name)) + 
         geom_point(size = 5, alpha = 0.2, colour = 'black') + 
        scale_color_manual(values = c("darkred","black")) + 
-        xlab(expression("Inbreeding coef"~italic((f)))) +
+         xlab(expression(italic('F'[ROH])))+
         ylab("Divergence") + 
-        geom_line(data = effect_df, aes(x = f, y = fit),lwd=2) +
-        geom_ribbon(data = effect_df,aes(x = f, y = fit,ymin = lower, ymax = upper), alpha = 0.1, colour = NA) + scatter_theme + ggtitle("") + 
+        geom_line(data = effect_df, aes(x = froh, y = fit),lwd=2) +
+        geom_ribbon(data = effect_df,aes(x = froh, y = fit,ymin = lower, ymax = upper), alpha = 0.1, colour = NA) + scatter_theme + ggtitle("") + 
         sl_theme + 
          facet_wrap(.~factor(Distance_name), strip.position = "top") + 
         theme(legend.position="none", 
@@ -609,7 +630,6 @@ effect_df <- rbind(effect_bray, effect_jac)
           panel.spacing = unit(2, "lines"),
           strip.background = element_blank(),
           strip.text.x = element_blank()))
-
 
 
 
@@ -637,31 +657,30 @@ effect_df <- rbind(effect_bray, effect_jac)
 
 
 
-glmm_out <- read.csv(paste0(dataDir, "/glmm_fst_het_output_miss0.5_mac3_noZ_speciesFix.csv"))
+glmm_out <- read.csv(paste0(dataDir, "/glmm_fst_roh_output_miss0.5_mac3_noZ_speciesFix.csv"))
 head(glmm_out)
+
 colnames(glmm_out) <- c("term","Estimate","Std_Error","z_value","P","lower","upper","data","taxonomy","dist")
 head(glmm_out)
 
+glmm_out$order <- factor(glmm_out$taxonomy, levels = c("OTU99", "species" ,"genus", "family", "order", "class", "phylum"), labels = c("OTU99", "Species" , "Genus", "Family", "Order", "Class", "Phylum"))
 
-glmm_out$order <- factor(glmm_out$taxonomy, levels = c("OTU99", "species" ,"genus", "family", "order", "class", "phylum"), labels = c("OTU99", "Species", "Genus", "Family", "Order", "Class", "Phylum"))
-
-glmm_out$signif <- ifelse(glmm_out$P < 0.05 & glmm_out$P > 0.005, "< 0.05", ifelse(glmm_out$P < 0.005 & glmm_out$P > 0.0005 , "< 0.005", ifelse(glmm_out$P < 0.0005, "< 0.0005", "n.s.")))
+glmm_out$signif <- ifelse(glmm_out$P < 0.05 & glmm_out$P > 0.005, "< 0.05", ifelse(glmm_out$P < 0.005 & glmm_out$P > 0.0005 , "< 0.005", ifelse(glmm_out$P < 0.0005, "< 0.0005", "n.s")))
 table(glmm_out$signif)
+
+head(glmm_out)
 check <- glmm_out %>% filter(P < 0.05)
 
 glmm_out$signifFill <- as.factor(glmm_out$signif)
 levels(glmm_out$signifFill)[levels(glmm_out$signifFill)=="< 0.05"] <- "#999999"
 levels(glmm_out$signifFill)[levels(glmm_out$signifFill)=="< 0.005"] <- "#333333"
 levels(glmm_out$signifFill)[levels(glmm_out$signifFill)=="< 0.0005"] <- "#000000"
-levels(glmm_out$signifFill)[levels(glmm_out$signifFill)=="n.s."] <- "white"
+levels(glmm_out$signifFill)[levels(glmm_out$signifFill)=="n.s"] <- "white"
 
-glmm_out %>% filter(term == "scale(f)", data == "all")
-
-head(glmm_out)
-head(tail)
+glmm_out$term <- gsub('[[:digit:]]+', '', glmm_out$term)
 
 
-(p_glmm <- glmm_out %>% filter(term == "scale(f)", data == "all") %>% 
+(p_glmm <- glmm_out %>% filter(term == "scale(froh)", data == "all") %>% 
     ggplot(aes(x = Estimate, y = order)) + 
       geom_linerange(aes(xmin = lower, xmax = upper), linewidth = 1.5, color = "#000000") +
       geom_point(aes(fill = signif, color = signif), pch =21, size = 5) +
@@ -691,5 +710,5 @@ head(tail)
 
 ((varPar + inset_element(euler_bray, 0.3, 0.18, 0.48, 0.99) + inset_element(euler_jacc, 0.82, 0.18, 1, 0.99)) / (p_fst) / p_mantel / (p_het) / p_glmm ) + plot_annotation(tag_levels= list(c("A", "", "", "B", "", "C", "")))  &  theme(plot.tag = element_text(size = 24))
 
-ggsave(paste0(outputDir, "/Figures/Figure4.png"),width=3000, height=4369.2, units = "px",dpi=300)
+ggsave(paste0(outputDir, "/Figures/Figure4_nuclearTreeFroh.png"),width=3000, height=4369.2, units = "px",dpi=300)
 ```

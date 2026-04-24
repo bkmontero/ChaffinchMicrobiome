@@ -1503,6 +1503,7 @@ ind_het_meta %>% data.frame %>% head
 froh <- read_delim(paste0(dataDir, "/fringilla_microbiome_roh_rg_filtered.csv"), delim = ",")
 names(froh) <- c("TipID_microbiome", "total_length_bp", "froh")
 
+
 froh_meta <- left_join(froh, metadata, by ="TipID_microbiome")
 froh_meta %>% data.frame %>% head
 
@@ -1514,61 +1515,61 @@ Join df
 
 ```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
 
-ind_het_meta %>% data.frame %>% head(2)
-ind_het_meta$Region_Species
+froh_meta %>% data.frame %>% head(2)
+froh_meta$Region_Species
 
 # OTU
-het_bray_otu <- left_join(ind_het_meta, bray_divergence_otu, by = "TipID_microbiome")
-head(het_bray_otu)
-het_bray_otu <- subset(het_bray_otu, subset = !is.na(het_bray_otu$b.beta_median))
+roh_bray_otu <- left_join(froh_meta, bray_divergence_otu, by = "TipID_microbiome")
+head(roh_bray_otu)
+roh_bray_otu <- subset(roh_bray_otu, subset = !is.na(roh_bray_otu$b.beta_median))
 
-het_jacc_otu <- left_join(ind_het_meta, jaccard_divergence_otu, by = "TipID_microbiome")
-het_jacc_otu <- subset(het_jacc_otu, subset = !is.na(het_jacc_otu$j.beta_median))
+roh_jacc_otu <- left_join(froh_meta, jaccard_divergence_otu, by = "TipID_microbiome")
+roh_jacc_otu <- subset(roh_jacc_otu, subset = !is.na(roh_jacc_otu$j.beta_median))
 
 
 # species
-het_bray_species <- left_join(ind_het_meta, bray_divergence_species, by = "TipID_microbiome")
-het_bray_species <- subset(het_bray_species, subset = !is.na(het_bray_species$b.beta_median))
+roh_bray_species <- left_join(froh_meta, bray_divergence_species, by = "TipID_microbiome")
+roh_bray_species <- subset(roh_bray_species, subset = !is.na(roh_bray_species$b.beta_median))
 
-het_jacc_species <- left_join(ind_het_meta, jaccard_divergence_species, by = "TipID_microbiome")
-het_jacc_species <- subset(het_jacc_species, subset = !is.na(het_jacc_species$j.beta_median))
+roh_jacc_species <- left_join(froh_meta, jaccard_divergence_species, by = "TipID_microbiome")
+roh_jacc_species <- subset(roh_jacc_species, subset = !is.na(roh_jacc_species$j.beta_median))
 
 
 
 # genus
-het_bray_genus <- left_join(ind_het_meta, bray_divergence_genus, by = "TipID_microbiome")
-het_bray_genus <- subset(het_bray_genus, subset = !is.na(het_bray_genus$b.beta_median))
+roh_bray_genus <- left_join(froh_meta, bray_divergence_genus, by = "TipID_microbiome")
+roh_bray_genus <- subset(roh_bray_genus, subset = !is.na(roh_bray_genus$b.beta_median))
 
-het_jacc_genus <- left_join(ind_het_meta, jaccard_divergence_genus, by = "TipID_microbiome")
-het_jacc_genus <- subset(het_jacc_genus, subset = !is.na(het_jacc_genus$j.beta_median))
+roh_jacc_genus <- left_join(froh_meta, jaccard_divergence_genus, by = "TipID_microbiome")
+roh_jacc_genus <- subset(roh_jacc_genus, subset = !is.na(roh_jacc_genus$j.beta_median))
 
 # family
-het_bray_family <- left_join(ind_het_meta, bray_divergence_family, by = "TipID_microbiome")
-het_bray_family <- subset(het_bray_family, subset = !is.na(het_bray_family$b.beta_median))
+roh_bray_family <- left_join(froh_meta, bray_divergence_family, by = "TipID_microbiome")
+roh_bray_family <- subset(roh_bray_family, subset = !is.na(roh_bray_family$b.beta_median))
 
-het_jacc_family <- left_join(ind_het_meta, jaccard_divergence_family, by = "TipID_microbiome")
-het_jacc_family <- subset(het_jacc_family, subset = !is.na(het_jacc_family$j.beta_median))
+roh_jacc_family <- left_join(froh_meta, jaccard_divergence_family, by = "TipID_microbiome")
+roh_jacc_family <- subset(roh_jacc_family, subset = !is.na(roh_jacc_family$j.beta_median))
 
 # order
-het_bray_order <- left_join(ind_het_meta, bray_divergence_order, by = "TipID_microbiome")
-het_bray_order <- subset(het_bray_order, subset = !is.na(het_bray_order$b.beta_median))
+roh_bray_order <- left_join(froh_meta, bray_divergence_order, by = "TipID_microbiome")
+roh_bray_order <- subset(roh_bray_order, subset = !is.na(roh_bray_order$b.beta_median))
 
-het_jacc_order <- left_join(ind_het_meta, jaccard_divergence_order, by = "TipID_microbiome")
-het_jacc_order <- subset(het_jacc_order, subset = !is.na(het_jacc_order$j.beta_median))
+roh_jacc_order <- left_join(froh_meta, jaccard_divergence_order, by = "TipID_microbiome")
+roh_jacc_order <- subset(roh_jacc_order, subset = !is.na(roh_jacc_order$j.beta_median))
 
 # class
-het_bray_class <- left_join(ind_het_meta, bray_divergence_class, by = "TipID_microbiome")
-het_bray_class <- subset(het_bray_class, subset = !is.na(het_bray_class$b.beta_median))
+roh_bray_class <- left_join(froh_meta, bray_divergence_class, by = "TipID_microbiome")
+roh_bray_class <- subset(roh_bray_class, subset = !is.na(roh_bray_class$b.beta_median))
 
-het_jacc_class <- left_join(ind_het_meta, jaccard_divergence_class, by = "TipID_microbiome")
-het_jacc_class <- subset(het_jacc_class, subset = !is.na(het_jacc_class$j.beta_median))
+roh_jacc_class <- left_join(froh_meta, jaccard_divergence_class, by = "TipID_microbiome")
+roh_jacc_class <- subset(roh_jacc_class, subset = !is.na(roh_jacc_class$j.beta_median))
 
 # phylum
-het_bray_phylum <- left_join(ind_het_meta, bray_divergence_phylum, by = "TipID_microbiome")
-het_bray_phylum <- subset(het_bray_phylum, subset = !is.na(het_bray_phylum$b.beta_median))
+roh_bray_phylum <- left_join(froh_meta, bray_divergence_phylum, by = "TipID_microbiome")
+roh_bray_phylum <- subset(roh_bray_phylum, subset = !is.na(roh_bray_phylum$b.beta_median))
 
-het_jacc_phylum <- left_join(ind_het_meta, jaccard_divergence_phylum, by = "TipID_microbiome")
-het_jacc_phylum <- subset(het_jacc_phylum, subset = !is.na(het_jacc_phylum$j.beta_median))
+roh_jacc_phylum <- left_join(froh_meta, jaccard_divergence_phylum, by = "TipID_microbiome")
+roh_jacc_phylum <- subset(roh_jacc_phylum, subset = !is.na(roh_jacc_phylum$j.beta_median))
 
 ```
 
@@ -1577,56 +1578,56 @@ Join chaff df
 ```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
 
 # OTU
-het_bray_chaff_otu <- left_join(ind_het_meta, bray_divergence_chaff_otu, by = "TipID_microbiome")
-het_bray_chaff_otu <- subset(het_bray_chaff_otu, subset = !is.na(het_bray_chaff_otu$b.beta_median))
+roh_bray_chaff_otu <- left_join(froh_meta, bray_divergence_chaff_otu, by = "TipID_microbiome")
+roh_bray_chaff_otu <- subset(roh_bray_chaff_otu, subset = !is.na(roh_bray_chaff_otu$b.beta_median))
 
-het_jacc_chaff_otu <- left_join(ind_het_meta, jaccard_divergence_chaff_otu, by = "TipID_microbiome")
-het_jacc_chaff_otu <- subset(het_jacc_chaff_otu, subset = !is.na(het_jacc_chaff_otu$j.beta_median))
+roh_jacc_chaff_otu <- left_join(froh_meta, jaccard_divergence_chaff_otu, by = "TipID_microbiome")
+roh_jacc_chaff_otu <- subset(roh_jacc_chaff_otu, subset = !is.na(roh_jacc_chaff_otu$j.beta_median))
 
 
 # species
-het_bray_chaff_species <- left_join(ind_het_meta, bray_divergence_chaff_species, by = "TipID_microbiome")
-het_bray_chaff_species <- subset(het_bray_chaff_species, subset = !is.na(het_bray_chaff_species$b.beta_median))
+roh_bray_chaff_species <- left_join(froh_meta, bray_divergence_chaff_species, by = "TipID_microbiome")
+roh_bray_chaff_species <- subset(roh_bray_chaff_species, subset = !is.na(roh_bray_chaff_species$b.beta_median))
 
-het_jacc_chaff_species <- left_join(ind_het_meta, jaccard_divergence_chaff_species, by = "TipID_microbiome")
-het_jacc_chaff_species <- subset(het_jacc_chaff_species, subset = !is.na(het_jacc_chaff_species$j.beta_median))
+roh_jacc_chaff_species <- left_join(froh_meta, jaccard_divergence_chaff_species, by = "TipID_microbiome")
+roh_jacc_chaff_species <- subset(roh_jacc_chaff_species, subset = !is.na(roh_jacc_chaff_species$j.beta_median))
 
 
 
 # genus
-het_bray_chaff_genus <- left_join(ind_het_meta, bray_divergence_chaff_genus, by = "TipID_microbiome")
-het_bray_chaff_genus <- subset(het_bray_chaff_genus, subset = !is.na(het_bray_chaff_genus$b.beta_median))
+roh_bray_chaff_genus <- left_join(froh_meta, bray_divergence_chaff_genus, by = "TipID_microbiome")
+roh_bray_chaff_genus <- subset(roh_bray_chaff_genus, subset = !is.na(roh_bray_chaff_genus$b.beta_median))
 
-het_jacc_chaff_genus <- left_join(ind_het_meta, jaccard_divergence_chaff_genus, by = "TipID_microbiome")
-het_jacc_chaff_genus <- subset(het_jacc_chaff_genus, subset = !is.na(het_jacc_chaff_genus$j.beta_median))
+roh_jacc_chaff_genus <- left_join(froh_meta, jaccard_divergence_chaff_genus, by = "TipID_microbiome")
+roh_jacc_chaff_genus <- subset(roh_jacc_chaff_genus, subset = !is.na(roh_jacc_chaff_genus$j.beta_median))
 
 # family
-het_bray_chaff_family <- left_join(ind_het_meta, bray_divergence_chaff_family, by = "TipID_microbiome")
-het_bray_chaff_family <- subset(het_bray_chaff_family, subset = !is.na(het_bray_chaff_family$b.beta_median))
+roh_bray_chaff_family <- left_join(froh_meta, bray_divergence_chaff_family, by = "TipID_microbiome")
+roh_bray_chaff_family <- subset(roh_bray_chaff_family, subset = !is.na(roh_bray_chaff_family$b.beta_median))
 
-het_jacc_chaff_family <- left_join(ind_het_meta, jaccard_divergence_chaff_family, by = "TipID_microbiome")
-het_jacc_chaff_family <- subset(het_jacc_chaff_family, subset = !is.na(het_jacc_chaff_family$j.beta_median))
+roh_jacc_chaff_family <- left_join(froh_meta, jaccard_divergence_chaff_family, by = "TipID_microbiome")
+roh_jacc_chaff_family <- subset(roh_jacc_chaff_family, subset = !is.na(roh_jacc_chaff_family$j.beta_median))
 
 # order
-het_bray_chaff_order <- left_join(ind_het_meta, bray_divergence_chaff_order, by = "TipID_microbiome")
-het_bray_chaff_order <- subset(het_bray_chaff_order, subset = !is.na(het_bray_chaff_order$b.beta_median))
+roh_bray_chaff_order <- left_join(froh_meta, bray_divergence_chaff_order, by = "TipID_microbiome")
+roh_bray_chaff_order <- subset(roh_bray_chaff_order, subset = !is.na(roh_bray_chaff_order$b.beta_median))
 
-het_jacc_chaff_order <- left_join(ind_het_meta, jaccard_divergence_chaff_order, by = "TipID_microbiome")
-het_jacc_chaff_order <- subset(het_jacc_chaff_order, subset = !is.na(het_jacc_chaff_order$j.beta_median))
+roh_jacc_chaff_order <- left_join(froh_meta, jaccard_divergence_chaff_order, by = "TipID_microbiome")
+roh_jacc_chaff_order <- subset(roh_jacc_chaff_order, subset = !is.na(roh_jacc_chaff_order$j.beta_median))
 
 # class
-het_bray_chaff_class <- left_join(ind_het_meta, bray_divergence_chaff_class, by = "TipID_microbiome")
-het_bray_chaff_class <- subset(het_bray_chaff_class, subset = !is.na(het_bray_chaff_class$b.beta_median))
+roh_bray_chaff_class <- left_join(froh_meta, bray_divergence_chaff_class, by = "TipID_microbiome")
+roh_bray_chaff_class <- subset(roh_bray_chaff_class, subset = !is.na(roh_bray_chaff_class$b.beta_median))
 
-het_jacc_chaff_class <- left_join(ind_het_meta, jaccard_divergence_chaff_class, by = "TipID_microbiome")
-het_jacc_chaff_class <- subset(het_jacc_chaff_class, subset = !is.na(het_jacc_chaff_class$j.beta_median))
+roh_jacc_chaff_class <- left_join(froh_meta, jaccard_divergence_chaff_class, by = "TipID_microbiome")
+roh_jacc_chaff_class <- subset(roh_jacc_chaff_class, subset = !is.na(roh_jacc_chaff_class$j.beta_median))
 
 # phylum
-het_bray_chaff_phylum <- left_join(ind_het_meta, bray_divergence_chaff_phylum, by = "TipID_microbiome")
-het_bray_chaff_phylum <- subset(het_bray_chaff_phylum, subset = !is.na(het_bray_chaff_phylum$b.beta_median))
+roh_bray_chaff_phylum <- left_join(froh_meta, bray_divergence_chaff_phylum, by = "TipID_microbiome")
+roh_bray_chaff_phylum <- subset(roh_bray_chaff_phylum, subset = !is.na(roh_bray_chaff_phylum$b.beta_median))
 
-het_jacc_chaff_phylum <- left_join(ind_het_meta, jaccard_divergence_chaff_phylum, by = "TipID_microbiome")
-het_jacc_chaff_phylum <- subset(het_jacc_chaff_phylum, subset = !is.na(het_jacc_chaff_phylum$j.beta_median))
+roh_jacc_chaff_phylum <- left_join(froh_meta, jaccard_divergence_chaff_phylum, by = "TipID_microbiome")
+roh_jacc_chaff_phylum <- subset(roh_jacc_chaff_phylum, subset = !is.na(roh_jacc_chaff_phylum$j.beta_median))
 
 ```
 
@@ -1637,55 +1638,55 @@ library(glmmTMB)
 library(car)
 
 # OTU
-glmm_bray_otu <- glmmTMB(b.beta_median ~  scale(f) + (1|Species_Label), data = het_bray_otu, na.action = na.fail, family = gaussian)
+glmm_bray_otu <- glmmTMB(b.beta_median ~  scale(froh) + (1|Species_Label), data = roh_bray_otu, na.action = na.fail, family = gaussian)
 summary(glmm_bray_otu)
 confint(glmm_bray_otu)
 
-glmm_bray_chaff_otu <- glmmTMB(b.beta_median ~  scale(f) + (1|Species_Label), data = het_bray_chaff_otu, na.action = na.fail, family = gaussian)
+glmm_bray_chaff_otu <- glmmTMB(b.beta_median ~  scale(froh) + (1|Species_Label), data = roh_bray_chaff_otu, na.action = na.fail, family = gaussian)
 confint(glmm_bray_chaff_otu)
 
 
 # species
-glmm_bray_species <- glmmTMB(b.beta_median ~  scale(f) + (1|Species_Label), data = het_bray_species, na.action = na.fail, family = gaussian)
+glmm_bray_species <- glmmTMB(b.beta_median ~  scale(froh) + (1|Species_Label), data = roh_bray_species, na.action = na.fail, family = gaussian)
 confint(glmm_bray_species)
 
-glmm_bray_chaff_species <- glmmTMB(b.beta_median ~  scale(f) + (1|Species_Label), data = het_bray_chaff_species, na.action = na.fail, family = gaussian)
+glmm_bray_chaff_species <- glmmTMB(b.beta_median ~  scale(froh) + (1|Species_Label), data = roh_bray_chaff_species, na.action = na.fail, family = gaussian)
 confint(glmm_bray_chaff_species)
 
 
 # genus
-glmm_bray_genus <- glmmTMB(b.beta_median ~  scale(f) + (1|Species_Label), data = het_bray_genus, na.action = na.fail, family = gaussian)
+glmm_bray_genus <- glmmTMB(b.beta_median ~  scale(froh) + (1|Species_Label), data = roh_bray_genus, na.action = na.fail, family = gaussian)
 confint(glmm_bray_genus)
 
-glmm_bray_chaff_genus <- glmmTMB(b.beta_median ~  scale(f) + (1|Species_Label), data = het_bray_chaff_genus, na.action = na.fail, family = gaussian)
+glmm_bray_chaff_genus <- glmmTMB(b.beta_median ~  scale(froh) + (1|Species_Label), data = roh_bray_chaff_genus, na.action = na.fail, family = gaussian)
 confint(glmm_bray_chaff_genus)
 
 # family
-glmm_bray_family <- glmmTMB(b.beta_median ~  scale(f) + (1|Species_Label), data = het_bray_family, na.action = na.fail, family = gaussian)
+glmm_bray_family <- glmmTMB(b.beta_median ~  scale(froh) + (1|Species_Label), data = roh_bray_family, na.action = na.fail, family = gaussian)
 confint(glmm_bray_family)
 
-glmm_bray_chaff_family <- glmmTMB(b.beta_median ~  scale(f) + (1|Species_Label), data = het_bray_chaff_family, na.action = na.fail, family = gaussian)
+glmm_bray_chaff_family <- glmmTMB(b.beta_median ~  scale(froh) + (1|Species_Label), data = roh_bray_chaff_family, na.action = na.fail, family = gaussian)
 confint(glmm_bray_chaff_family)
 
 # order
-glmm_bray_order <- glmmTMB(b.beta_median ~  scale(f) + (1|Species_Label), data = het_bray_order, na.action = na.fail, family = gaussian)
+glmm_bray_order <- glmmTMB(b.beta_median ~  scale(froh) + (1|Species_Label), data = roh_bray_order, na.action = na.fail, family = gaussian)
 confint(glmm_bray_order)
 
-glmm_bray_chaff_order <- glmmTMB(b.beta_median ~  scale(f) + (1|Species_Label), data = het_bray_chaff_order, na.action = na.fail, family = gaussian)
+glmm_bray_chaff_order <- glmmTMB(b.beta_median ~  scale(froh) + (1|Species_Label), data = roh_bray_chaff_order, na.action = na.fail, family = gaussian)
 confint(glmm_bray_chaff_order)
 
 # class
-glmm_bray_class <- glmmTMB(b.beta_median ~  scale(f) + (1|Species_Label), data = het_bray_class, na.action = na.fail, family = gaussian)
+glmm_bray_class <- glmmTMB(b.beta_median ~  scale(froh) + (1|Species_Label), data = roh_bray_class, na.action = na.fail, family = gaussian)
 confint(glmm_bray_class)
 
-glmm_bray_chaff_class <- glmmTMB(b.beta_median ~  scale(f) + (1|Species_Label), data = het_bray_chaff_class, na.action = na.fail, family = gaussian)
+glmm_bray_chaff_class <- glmmTMB(b.beta_median ~  scale(froh) + (1|Species_Label), data = roh_bray_chaff_class, na.action = na.fail, family = gaussian)
 confint(glmm_bray_chaff_class)
 
 # phylum
-glmm_bray_phylum <- glmmTMB(b.beta_median ~  scale(f) + (1|Species_Label), data = het_bray_phylum, na.action = na.fail, family = gaussian)
+glmm_bray_phylum <- glmmTMB(b.beta_median ~  scale(froh) + (1|Species_Label), data = roh_bray_phylum, na.action = na.fail, family = gaussian)
 confint(glmm_bray_phylum)
 
-glmm_bray_chaff_phylum <- glmmTMB(b.beta_median ~  scale(f) + (1|Species_Label), data = het_bray_chaff_phylum, na.action = na.fail, family = gaussian)
+glmm_bray_chaff_phylum <- glmmTMB(b.beta_median ~  scale(froh) + (1|Species_Label), data = roh_bray_chaff_phylum, na.action = na.fail, family = gaussian)
 confint(glmm_bray_chaff_phylum)
 
 ```
@@ -1695,55 +1696,55 @@ glmm test jaccard
 ```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
 
 # OTU
-glmm_jacc_otu <- glmmTMB(j.beta_median ~  scale(f) + (1|Species_Label), data = het_jacc_otu, na.action = na.fail, family = gaussian)
+glmm_jacc_otu <- glmmTMB(j.beta_median ~  scale(froh) + (1|Species_Label), data = roh_jacc_otu, na.action = na.fail, family = gaussian)
 confint(glmm_jacc_otu)
 
-glmm_jacc_chaff_otu <- glmmTMB(j.beta_median ~  scale(f) + (1|Species_Label), data = het_jacc_chaff_otu, na.action = na.fail, family = gaussian)
+glmm_jacc_chaff_otu <- glmmTMB(j.beta_median ~  scale(froh) + (1|Species_Label), data = roh_jacc_chaff_otu, na.action = na.fail, family = gaussian)
 confint(glmm_jacc_chaff_otu)
 
 
 # species
-glmm_jacc_species <- glmmTMB(j.beta_median ~  scale(f) + (1|Species_Label), data = het_jacc_species, na.action = na.fail, family = gaussian)
+glmm_jacc_species <- glmmTMB(j.beta_median ~  scale(froh) + (1|Species_Label), data = roh_jacc_species, na.action = na.fail, family = gaussian)
 confint(glmm_jacc_species)
 
-glmm_jacc_chaff_species <- glmmTMB(j.beta_median ~  scale(f) + (1|Species_Label), data = het_jacc_chaff_species, na.action = na.fail, family = gaussian)
+glmm_jacc_chaff_species <- glmmTMB(j.beta_median ~  scale(froh) + (1|Species_Label), data = roh_jacc_chaff_species, na.action = na.fail, family = gaussian)
 confint(glmm_jacc_chaff_species)
 
 
 
 # genus
-glmm_jacc_genus <- glmmTMB(j.beta_median ~  scale(f) + (1|Species_Label), data = het_jacc_genus, na.action = na.fail, family = gaussian)
+glmm_jacc_genus <- glmmTMB(j.beta_median ~  scale(froh) + (1|Species_Label), data = roh_jacc_genus, na.action = na.fail, family = gaussian)
 confint(glmm_jacc_genus)
 
-glmm_jacc_chaff_genus <- glmmTMB(j.beta_median ~  scale(f) + (1|Species_Label), data = het_jacc_chaff_genus, na.action = na.fail, family = gaussian)
+glmm_jacc_chaff_genus <- glmmTMB(j.beta_median ~  scale(froh) + (1|Species_Label), data = roh_jacc_chaff_genus, na.action = na.fail, family = gaussian)
 confint(glmm_jacc_chaff_genus)
 
 # family
-glmm_jacc_family <- glmmTMB(j.beta_median ~  scale(f) + (1|Species_Label), data = het_jacc_family, na.action = na.fail, family = gaussian)
+glmm_jacc_family <- glmmTMB(j.beta_median ~  scale(froh) + (1|Species_Label), data = roh_jacc_family, na.action = na.fail, family = gaussian)
 confint(glmm_jacc_family)
 
-glmm_jacc_chaff_family <- glmmTMB(j.beta_median ~  scale(f) + (1|Species_Label), data = het_jacc_chaff_family, na.action = na.fail, family = gaussian)
+glmm_jacc_chaff_family <- glmmTMB(j.beta_median ~  scale(froh) + (1|Species_Label), data = roh_jacc_chaff_family, na.action = na.fail, family = gaussian)
 confint(glmm_jacc_chaff_family)
 
 # order
-glmm_jacc_order <- glmmTMB(j.beta_median ~  scale(f) + (1|Species_Label), data = het_jacc_order, na.action = na.fail, family = gaussian)
+glmm_jacc_order <- glmmTMB(j.beta_median ~  scale(froh) + (1|Species_Label), data = roh_jacc_order, na.action = na.fail, family = gaussian)
 confint(glmm_jacc_order)
 
-glmm_jacc_chaff_order <- glmmTMB(j.beta_median ~  scale(f) + (1|Species_Label), data = het_jacc_chaff_order, na.action = na.fail, family = gaussian)
+glmm_jacc_chaff_order <- glmmTMB(j.beta_median ~  scale(froh) + (1|Species_Label), data = roh_jacc_chaff_order, na.action = na.fail, family = gaussian)
 confint(glmm_jacc_chaff_order)
 
 # class
-glmm_jacc_class <- glmmTMB(j.beta_median ~  scale(f) + (1|Species_Label), data = het_jacc_class, na.action = na.fail, family = gaussian)
+glmm_jacc_class <- glmmTMB(j.beta_median ~  scale(froh) + (1|Species_Label), data = roh_jacc_class, na.action = na.fail, family = gaussian)
 confint(glmm_jacc_class)
 
-glmm_jacc_chaff_class <- glmmTMB(j.beta_median ~  scale(f) + (1|Species_Label), data = het_jacc_chaff_class, na.action = na.fail, family = gaussian)
+glmm_jacc_chaff_class <- glmmTMB(j.beta_median ~  scale(froh) + (1|Species_Label), data = roh_jacc_chaff_class, na.action = na.fail, family = gaussian)
 confint(glmm_jacc_chaff_class)
 
 # phylum
-glmm_jacc_phylum <- glmmTMB(j.beta_median ~  scale(f) + (1|Species_Label), data = het_jacc_phylum, na.action = na.fail, family = gaussian)
+glmm_jacc_phylum <- glmmTMB(j.beta_median ~  scale(froh) + (1|Species_Label), data = roh_jacc_phylum, na.action = na.fail, family = gaussian)
 confint(glmm_jacc_phylum)
 
-glmm_jacc_chaff_phylum <- glmmTMB(j.beta_median ~  scale(f) + (1|Species_Label), data = het_jacc_chaff_phylum, na.action = na.fail, family = gaussian)
+glmm_jacc_chaff_phylum <- glmmTMB(j.beta_median ~  scale(froh) + (1|Species_Label), data = roh_jacc_chaff_phylum, na.action = na.fail, family = gaussian)
 confint(glmm_jacc_chaff_phylum)
 
 ```
@@ -1932,7 +1933,7 @@ merge bray and jaccard
 
 glmm_out <- rbind(summ_glmm_bray, summ_glmm_jacc)
 
-write.csv(glmm_out, paste0(dataDir, "/glmm_fst_het_output_miss0.5_mac3_noZ_speciesFix.csv"))
+write.csv(glmm_out, paste0(dataDir, "/glmm_fst_roh_output_miss0.5_mac3_noZ_speciesFix.csv"))
 ```
 
 
@@ -2022,9 +2023,9 @@ levels(mantel_out$signifFill)[levels(mantel_out$signifFill)=="n.s"] <- "white"
           strip.background = element_blank(),
           strip.text.x = element_blank()))
 
-(p_bray_het <- ggplot(het_bray_species, aes(y = b.beta_median, x = f)) + 
+(p_bray_het <- ggplot(roh_bray_species, aes(y = b.beta_median, x = froh)) + 
         geom_point(size = 5, alpha = 0.2) + 
-        xlab("Inbreeding coef (f)") +
+        xlab("FROH") +
         ylab("Divergence (Bray-Curtis)") + 
         geom_smooth(method = "lm", colour = "darkred", alpha = 0.2,lwd=3) + scatter_theme + ggtitle("") + sl_theme +
         theme(legend.position="bottom", 
@@ -2037,9 +2038,9 @@ levels(mantel_out$signifFill)[levels(mantel_out$signifFill)=="n.s"] <- "white"
           strip.text.x = element_blank(),
           axis.line = element_line(colour = 'black', size = 2)))
 
-(p_jacc_het <- ggplot(het_jacc_species, aes(y = j.beta_median, x = f)) + 
+(p_jacc_het <- ggplot(roh_jacc_species, aes(y = j.beta_median, x = froh)) + 
         geom_point(size = 5, alpha = 0.2) + 
-        xlab("Inbreeding coef (f)") +
+        xlab("FROH") +
         ylab("Divergence (Jaccard)") + 
         geom_smooth(method = "lm", colour = "black", alpha = 0.2,lwd=3) + scatter_theme + ggtitle("") + 
         sl_theme +
@@ -2053,8 +2054,10 @@ levels(mantel_out$signifFill)[levels(mantel_out$signifFill)=="n.s"] <- "white"
           strip.text.x = element_blank(),
           axis.line = element_line(colour = 'black', size = 2)))
 
-glmm_out <- read.csv(paste0(dataDir, "/glmm_fst_het_output_miss0.5_mac3_noZ_speciesFix.csv"))
+glmm_out <- read.csv(paste0(dataDir, "/glmm_fst_roh_output_miss0.5_mac3_noZ_speciesFix.csv"))
 head(glmm_out)
+glmm_out_het <- read.csv(paste0(dataDir, "/glmm_fst_het_output_miss0.5_mac3_noZ_speciesFix.csv"))
+head(glmm_out_het)
 
 colnames(glmm_out) <- c("term","Estimate","Std_Error","z_value","P","lower","upper","data","taxonomy","dist")
 head(glmm_out)
@@ -2075,7 +2078,7 @@ levels(glmm_out$signifFill)[levels(glmm_out$signifFill)=="n.s"] <- "white"
 
 glmm_out$term <- gsub('[[:digit:]]+', '', glmm_out$term)
 
-(p_glmm <- glmm_out %>% filter(term == "scale(f)", data == "all") %>% 
+(p_glmm <- glmm_out %>% filter(term == "scale(froh)", data == "all") %>% 
     ggplot(aes(x = Estimate, y = order)) + 
       geom_linerange(aes(xmin = lower, xmax = upper), linewidth = 2.5, color = "#000000") +
       geom_point(aes(fill = signif, color = signif), pch =21, size = 8) +
@@ -2095,7 +2098,7 @@ glmm_out$term <- gsub('[[:digit:]]+', '', glmm_out$term)
           strip.text.x = element_blank()))
 
 
-png(paste0(outputDir, "/Figures/Fst_het_speciesFix.png"),width=2800, height=4100,res=150)
+png(paste0(outputDir, "/Figures/Fst_roh_speciesFix.png"),width=2800, height=4100,res=150)
 
 pushViewport(viewport(layout = grid.layout(40, 10)))
 vplayout <- function(x, y) viewport(layout.pos.row = x, layout.pos.col = y)
@@ -2115,12 +2118,12 @@ dev.off()
 
 Adding individual inbreeding coefficients to microbiome metadata
 ```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
-names(ind_het_meta)
+names(froh_meta)
 names(sample_data(microb_overlap_otu))
 
-ind_het_meta$Lab_Code <- as.character(ind_het_meta$"16S_Lab_Code")
+froh_meta$Lab_Code <- as.character(froh_meta$"16S_Lab_Code")
 
-f_df <- data.frame(cbind(Lab_Code = ind_het_meta$Lab_Code, f = as.numeric(ind_het_meta$f)))
+f_df <- data.frame(cbind(Lab_Code = froh_meta$Lab_Code, f = as.numeric(froh_meta$f)))
 f_df <- f_df %>% drop_na()
 f_df$f <- as.numeric(f_df$f)
 f_df$Lab_Code
