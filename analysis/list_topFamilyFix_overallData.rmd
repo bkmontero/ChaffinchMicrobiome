@@ -1,0 +1,263 @@
+```{r loadLibraries, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=(width.cutoff=45), paged.print=FALSE}
+
+
+rm(list = ls())
+
+#general
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+library(stringr)
+library(vegan)
+library(magrittr)
+library(ggplot2)
+library(ggpubr)
+library(MicEco)
+library(rlist) 
+library(grid)
+library(tsiR) 
+library(ape)
+library(treedataverse)
+library(ggh4x)
+
+# phyloseq section
+library(phyloseq)
+library(Biostrings)
+library(DECIPHER)
+library(speedyseq)
+library(microbiome)
+library(metagMisc)
+library(phylosmith)
+library(seqateurs)
+library(treedata.table)
+library(microViz)
+#rmd
+library(details)
+library(knitr)
+library(kableExtra)
+
+# PACo 
+library(ape)
+library(paco)
+library(future)
+library(doParallel)
+library(future)
+library(future.apply)
+library(multcomp)
+
+```
+
+## WORKING DIRECTORIES
+
+```{r source, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, results="hide"}
+
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/workingDirectories.R")
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/CleanScripts/graphics_param.R")
+
+```
+
+## PREPARE DATA
+
+Microbiome 
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+microb_fr <- readRDS(paste0(dataDir, "/microb_overlap_OTU99_fr.rds" ))
+microb_fr_filter <-  microb_fr %>% subset_taxa(Class != "NA" & Order != "NA" & Family != "NA")
+
+microb_fr_fix <- tax_fix(microb_fr_filter)
+microb_fr <- microb_fr_fix
+
+microb_fr <- biomeUtils::removeZeros(microb_fr)
+
+# Add TipID microbiome to match stuff later on
+sample_data(microb_fr)$TipID_microbiome <- paste(sample_data(microb_fr)$Lab_Code, sample_data(microb_fr)$Species_Label, sep = "_")
+
+microb_fr_meta <- microb_fr%>% sample_data %>% data.frame 
+nrow(microb_fr_meta)
+
+
+```
+
+# Overlap WGS data
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+microb_overlap <- microb_fr %>% subset_samples(Genus == "Fringilla" & WGS_data == 1 & Lab_Code != "132" & Lab_Code != "252" & Lab_Code != "89")
+#microb_overlap <- microb_fr %>% subset_samples(Genus == "Fringilla" & Chaff_Blue == "Chaffinch" & WGS_data == 1 & Lab_Code != "132" & Lab_Code != "252" & Lab_Code != "89")
+
+microb_overlap <- biomeUtils::removeZeros(microb_overlap)
+microb_overlap_meta <- microb_overlap%>% sample_data %>% data.frame 
+
+```
+
+#phloseq list top taxa
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+ps_Enterobacteriaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list = "Enterobacteriaceae")
+ps_Beijerinckiaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list = "Beijerinckiaceae")
+ps_Rhizobiaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list = "Rhizobiaceae")
+ps_Mycobacteriaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list = "Mycobacteriaceae")
+ps_Propionibacteriaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list = "Propionibacteriaceae")
+ps_Microbacteriaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list = "Microbacteriaceae")
+ps_Nakamurellaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list = "Nakamurellaceae")
+
+
+ps_Enterobacteriaceae <- speedyseq::tax_glom(ps_Enterobacteriaceae, "Species",  NArm = FALSE)
+ps_Beijerinckiaceae <- speedyseq::tax_glom(ps_Beijerinckiaceae, "Species",  NArm = FALSE)
+ps_Rhizobiaceae <- speedyseq::tax_glom(ps_Rhizobiaceae, "Species",  NArm = FALSE)
+ps_Mycobacteriaceae <- speedyseq::tax_glom(ps_Mycobacteriaceae, "Species",  NArm = FALSE)
+ps_Propionibacteriaceae <- speedyseq::tax_glom(ps_Propionibacteriaceae, "Species",  NArm = FALSE)
+ps_Microbacteriaceae <- speedyseq::tax_glom(ps_Microbacteriaceae, "Species",  NArm = FALSE)
+ps_Nakamurellaceae <- speedyseq::tax_glom(ps_Nakamurellaceae, "Species",  NArm = FALSE)
+
+nrow(tax_table(ps_Enterobacteriaceae) %>% data.frame %>% dplyr::select(Species))
+#61
+nrow(tax_table(ps_Beijerinckiaceae) %>% data.frame %>% dplyr::select(Species))
+#60
+nrow(tax_table(ps_Rhizobiaceae) %>% data.frame %>% dplyr::select(Species))
+#65
+nrow(tax_table(ps_Mycobacteriaceae) %>% data.frame %>% dplyr::select(Species))
+#62
+nrow(tax_table(ps_Propionibacteriaceae) %>% data.frame %>% dplyr::select(Species))
+#33
+nrow(tax_table(ps_Microbacteriaceae) %>% data.frame %>% dplyr::select(Species))
+#101
+nrow(tax_table(ps_Nakamurellaceae) %>% data.frame %>% dplyr::select(Species))
+#8
+
+#                       n_taxa           Species_edit                              #                                     
+#ps_Beijerinckiaceae        393     Beijerinckiaceae
+#ps_Enterobacteriaceae      249   Enterobacteriaceae
+#ps_Microbacteriaceae       385    Microbacteriaceae
+#ps_Mycobacteriaceae        279     Mycobacteriaceae
+#ps_Nakamurellaceae          44      Nakamurellaceae
+#ps_Propionibacteriaceae    172 Propionibacteriaceae
+#ps_Rhizobiaceae            297         Rhizobiaceae
+
+```
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+ps_Acetobacteraceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Acetobacteraceae")
+ps_Enterobacteriaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Enterobacteriaceae")
+ps_Burkholderiaceae_B<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Burkholderiaceae_B")
+ps_Burkholderiaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Burkholderiaceae")
+ps_Pseudomonadaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Pseudomonadaceae")
+ps_Sphingomonadaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Sphingomonadaceae")
+ps_Devosiaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Devosiaceae")
+ps_Xanthobacteraceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Xanthobacteraceae")
+ps_Beijerinckiaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Beijerinckiaceae")
+ps_Polyangiaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Polyangiaceae")
+ps_Isosphaeraceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Isosphaeraceae")
+ps_Lactobacillaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Lactobacillaceae")
+ps_Staphylococcaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Staphylococcaceae")
+ps_Rhizobiaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Rhizobiaceae")
+ps_Solirubrobacteraceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Solirubrobacteraceae")
+ps_70_9<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="70-9")
+ps_Ilumatobacteraceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Ilumatobacteraceae")
+ps_Micromonosporaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Micromonosporaceae")
+ps_Mycobacteriaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Mycobacteriaceae")
+ps_Pseudonocardiaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Pseudonocardiaceae")
+ps_Nocardioidaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Nocardioidaceae")
+ps_Propionibacteriaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Propionibacteriaceae")
+ps_Dermatophilaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Dermatophilaceae")
+ps_Microbacteriaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Microbacteriaceae")
+ps_Micrococcaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Micrococcaceae")
+ps_Cellulomonadaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Cellulomonadaceae")
+ps_Kineococcaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Kineococcaceae")
+ps_Streptomycetaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Streptomycetaceae")
+ps_Nakamurellaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Nakamurellaceae")
+ps_Jatrophihabitantaceae<-microb_overlap %>% tax_select(strict_matches= TRUE, ranks_searched = "Family", tax_list ="Jatrophihabitantaceae")
+
+
+(ps_Acetobacteraceae<- speedyseq::tax_glom(ps_Acetobacteraceae, "Species",  NArm = FALSE))
+(ps_Enterobacteriaceae<- speedyseq::tax_glom(ps_Enterobacteriaceae, "Species",  NArm = FALSE))
+(ps_Burkholderiaceae_B<- speedyseq::tax_glom(ps_Burkholderiaceae_B, "Species",  NArm = FALSE))
+(ps_Burkholderiaceae<- speedyseq::tax_glom(ps_Burkholderiaceae, "Species",  NArm = FALSE))
+(ps_Pseudomonadaceae<- speedyseq::tax_glom(ps_Pseudomonadaceae, "Species",  NArm = FALSE))
+(ps_Sphingomonadaceae<- speedyseq::tax_glom(ps_Sphingomonadaceae, "Species",  NArm = FALSE))
+(ps_Devosiaceae<- speedyseq::tax_glom(ps_Devosiaceae, "Species",  NArm = FALSE))
+(ps_Xanthobacteraceae<- speedyseq::tax_glom(ps_Xanthobacteraceae, "Species",  NArm = FALSE))
+(ps_Beijerinckiaceae<- speedyseq::tax_glom(ps_Beijerinckiaceae, "Species",  NArm = FALSE))
+(ps_Polyangiaceae<- speedyseq::tax_glom(ps_Polyangiaceae, "Species",  NArm = FALSE))
+(ps_Isosphaeraceae<- speedyseq::tax_glom(ps_Isosphaeraceae, "Species",  NArm = FALSE))
+(ps_Lactobacillaceae<- speedyseq::tax_glom(ps_Lactobacillaceae, "Species",  NArm = FALSE))
+(ps_Staphylococcaceae<- speedyseq::tax_glom(ps_Staphylococcaceae, "Species",  NArm = FALSE))
+(ps_Rhizobiaceae<- speedyseq::tax_glom(ps_Rhizobiaceae, "Species",  NArm = FALSE))
+(ps_Solirubrobacteraceae<- speedyseq::tax_glom(ps_Solirubrobacteraceae, "Species",  NArm = FALSE))
+(ps_70_9<- speedyseq::tax_glom(ps_70_9, "Species",  NArm = FALSE))
+(ps_Ilumatobacteraceae<- speedyseq::tax_glom(ps_Ilumatobacteraceae, "Species",  NArm = FALSE))
+(ps_Micromonosporaceae<- speedyseq::tax_glom(ps_Micromonosporaceae, "Species",  NArm = FALSE))
+(ps_Mycobacteriaceae<- speedyseq::tax_glom(ps_Mycobacteriaceae, "Species",  NArm = FALSE))
+(ps_Pseudonocardiaceae<- speedyseq::tax_glom(ps_Pseudonocardiaceae, "Species",  NArm = FALSE))
+(ps_Nocardioidaceae<- speedyseq::tax_glom(ps_Nocardioidaceae, "Species",  NArm = FALSE))
+(ps_Propionibacteriaceae<- speedyseq::tax_glom(ps_Propionibacteriaceae, "Species",  NArm = FALSE))
+(ps_Dermatophilaceae<- speedyseq::tax_glom(ps_Dermatophilaceae, "Species",  NArm = FALSE))
+(ps_Microbacteriaceae<- speedyseq::tax_glom(ps_Microbacteriaceae, "Species",  NArm = FALSE))
+(ps_Micrococcaceae<- speedyseq::tax_glom(ps_Micrococcaceae, "Species",  NArm = FALSE))
+(ps_Cellulomonadaceae<- speedyseq::tax_glom(ps_Cellulomonadaceae, "Species",  NArm = FALSE))
+(ps_Kineococcaceae<- speedyseq::tax_glom(ps_Kineococcaceae, "Species",  NArm = FALSE))
+(ps_Streptomycetaceae<- speedyseq::tax_glom(ps_Streptomycetaceae, "Species",  NArm = FALSE))
+(ps_Nakamurellaceae<- speedyseq::tax_glom(ps_Nakamurellaceae, "Species",  NArm = FALSE))
+(ps_Jatrophihabitantaceae<- speedyseq::tax_glom(ps_Jatrophihabitantaceae, "Species",  NArm = FALSE))
+
+```
+
+# put everything in a list 
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+ps_list <- mget(ls(pattern = "\\ps"))
+ps_list <- within(ps_list, rm("ps_list")) 
+names(ps_list)
+
+saveRDS(ps_list, paste0(dataDir, "/list_ps_coreFamily_taxglomSpecies.rds"))
+
+
+```
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+(ps_Acetobacteraceae<- speedyseq::tax_glom(ps_Acetobacteraceae, "OTU_ID",  NArm = FALSE))
+(ps_Enterobacteriaceae<- speedyseq::tax_glom(ps_Enterobacteriaceae, "OTU_ID",  NArm = FALSE))
+(ps_Burkholderiaceae_B<- speedyseq::tax_glom(ps_Burkholderiaceae_B, "OTU_ID",  NArm = FALSE))
+(ps_Burkholderiaceae<- speedyseq::tax_glom(ps_Burkholderiaceae, "OTU_ID",  NArm = FALSE))
+(ps_Pseudomonadaceae<- speedyseq::tax_glom(ps_Pseudomonadaceae, "OTU_ID",  NArm = FALSE))
+(ps_Sphingomonadaceae<- speedyseq::tax_glom(ps_Sphingomonadaceae, "OTU_ID",  NArm = FALSE))
+(ps_Devosiaceae<- speedyseq::tax_glom(ps_Devosiaceae, "OTU_ID",  NArm = FALSE))
+(ps_Xanthobacteraceae<- speedyseq::tax_glom(ps_Xanthobacteraceae, "OTU_ID",  NArm = FALSE))
+(ps_Beijerinckiaceae<- speedyseq::tax_glom(ps_Beijerinckiaceae, "OTU_ID",  NArm = FALSE))
+(ps_Polyangiaceae<- speedyseq::tax_glom(ps_Polyangiaceae, "OTU_ID",  NArm = FALSE))
+(ps_Isosphaeraceae<- speedyseq::tax_glom(ps_Isosphaeraceae, "OTU_ID",  NArm = FALSE))
+(ps_Lactobacillaceae<- speedyseq::tax_glom(ps_Lactobacillaceae, "OTU_ID",  NArm = FALSE))
+(ps_Staphylococcaceae<- speedyseq::tax_glom(ps_Staphylococcaceae, "OTU_ID",  NArm = FALSE))
+(ps_Rhizobiaceae<- speedyseq::tax_glom(ps_Rhizobiaceae, "OTU_ID",  NArm = FALSE))
+(ps_Solirubrobacteraceae<- speedyseq::tax_glom(ps_Solirubrobacteraceae, "OTU_ID",  NArm = FALSE))
+(ps_70_9<- speedyseq::tax_glom(ps_70_9, "OTU_ID",  NArm = FALSE))
+(ps_Ilumatobacteraceae<- speedyseq::tax_glom(ps_Ilumatobacteraceae, "OTU_ID",  NArm = FALSE))
+(ps_Micromonosporaceae<- speedyseq::tax_glom(ps_Micromonosporaceae, "OTU_ID",  NArm = FALSE))
+(ps_Mycobacteriaceae<- speedyseq::tax_glom(ps_Mycobacteriaceae, "OTU_ID",  NArm = FALSE))
+(ps_Pseudonocardiaceae<- speedyseq::tax_glom(ps_Pseudonocardiaceae, "OTU_ID",  NArm = FALSE))
+(ps_Nocardioidaceae<- speedyseq::tax_glom(ps_Nocardioidaceae, "OTU_ID",  NArm = FALSE))
+(ps_Propionibacteriaceae<- speedyseq::tax_glom(ps_Propionibacteriaceae, "OTU_ID",  NArm = FALSE))
+(ps_Dermatophilaceae<- speedyseq::tax_glom(ps_Dermatophilaceae, "OTU_ID",  NArm = FALSE))
+(ps_Microbacteriaceae<- speedyseq::tax_glom(ps_Microbacteriaceae, "OTU_ID",  NArm = FALSE))
+(ps_Micrococcaceae<- speedyseq::tax_glom(ps_Micrococcaceae, "OTU_ID",  NArm = FALSE))
+(ps_Cellulomonadaceae<- speedyseq::tax_glom(ps_Cellulomonadaceae, "OTU_ID",  NArm = FALSE))
+(ps_Kineococcaceae<- speedyseq::tax_glom(ps_Kineococcaceae, "OTU_ID",  NArm = FALSE))
+(ps_Streptomycetaceae<- speedyseq::tax_glom(ps_Streptomycetaceae, "OTU_ID",  NArm = FALSE))
+(ps_Nakamurellaceae<- speedyseq::tax_glom(ps_Nakamurellaceae, "OTU_ID",  NArm = FALSE))
+(ps_Jatrophihabitantaceae<- speedyseq::tax_glom(ps_Jatrophihabitantaceae, "OTU_ID",  NArm = FALSE))
+
+```
+
+# put everything in a list 
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+ps_list <- mget(ls(pattern = "\\ps"))
+ps_list <- within(ps_list, rm("ps_list")) 
+names(ps_list)
+
+saveRDS(ps_list, paste0(dataDir, "/list_ps_coreFamily_taxglomOTU_overallData.rds"))
+
+
+```

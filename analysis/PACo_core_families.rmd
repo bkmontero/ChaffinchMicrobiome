@@ -1,0 +1,437 @@
+---
+title: 'PACo Test'
+author: "B. K. Montero and M. Gillingham"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+## LOAD LIBRARIES
+
+```{r loadLibraries, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=(width.cutoff=45), paged.print=FALSE}
+
+
+rm(list = ls())
+
+#general
+library(dplyr)
+library(tidyr)
+library(tidyverse)
+library(stringr)
+library(vegan)
+library(magrittr)
+library(ggplot2)
+library(ggpubr)
+library(MicEco)
+library(rlist) 
+library(grid)
+library(tsiR) 
+library(ape)
+library(treedataverse)
+library(ggh4x)
+
+# phyloseq section
+library(phyloseq)
+library(Biostrings)
+library(DECIPHER)
+library(speedyseq)
+library(microbiome)
+library(metagMisc)
+library(phylosmith)
+library(seqateurs)
+library(treedata.table)
+library(microViz)
+
+#rmd
+library(details)
+library(knitr)
+library(kableExtra)
+
+# PACo 
+library(ape)
+library(paco)
+library(future)
+library(doParallel)
+library(future)
+library(future.apply)
+library(multcomp)
+
+```
+
+## WORKING DIRECTORIES
+
+```{r source, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, results="hide"}
+
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/workingDirectories.R")
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/CleanScripts/graphics_param.R")
+
+```
+
+## PREPARE DATA
+
+Microbiome 
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+microb_fr_fix <- readRDS(paste0(dataDir, "/microb_overlap_OTU99_fr_taxFix.rds"))
+#microb_fr <- speedyseq::tax_glom(microb_fr_fix, "OTU_ID",  NArm = FALSE)
+microb_fr <- speedyseq::tax_glom(microb_fr_fix, "Species",  NArm = FALSE)
+
+
+# Add TipID microbiome to match stuff later on
+sample_data(microb_fr)$TipID_microbiome <- paste(sample_data(microb_fr)$Lab_Code, sample_data(microb_fr)$Species_Label, sep = "_")
+
+microb_fr_meta <- microb_fr%>% sample_data %>% data.frame 
+nrow(microb_fr_meta)
+
+
+```
+
+# Overlap WGS data
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+microb_overlap <- microb_fr %>% subset_samples(Genus == "Fringilla" & WGS_data == 1 & Lab_Code != "132" & Lab_Code != "252" & Lab_Code != "89")
+microb_overlap <- biomeUtils::removeZeros(microb_overlap)
+microb_overlap_meta <- microb_overlap%>% sample_data %>% data.frame 
+
+```
+
+Host distance
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# mitogenome tree
+fringilla_tree <-  read.tree(file = paste0(dataDir, "/mt_Fringilla_aln.fasta.contree"))
+
+str(fringilla_tree)
+
+fringilla_tree$tip.label <- gsub("\\_mtDNA","", fringilla_tree$tip.label)
+
+annot <- read_delim(paste0(dataDir, "/WGS_Fringilla_samples.tsv"))
+
+
+table(annot$Microb)
+
+#rename row and col names to match microbiome and diet matrices 
+annot$TipID_microbiome
+
+fringilla_tree$tip.label <- annot[match(fringilla_tree$tip.label, annot$WGS_ID),]$TipID_microbiome
+
+# subset tree matching IDs with microbiome data 
+fringilla_tree_subset <- as.treedata.table(tree = fringilla_tree, data = microb_overlap_meta, name_column = "TipID_microbiome")
+
+fringilla_tree_subset <- fringilla_tree_subset$phy
+str(fringilla_tree_subset)
+
+fringilla_rootedtree = root(fringilla_tree_subset, outgroup = "149_Tenerife_F_teydea", resolve.root = TRUE)
+
+meta_subset <- annot %>% dplyr::filter(Microb == 1) %>% data.frame
+meta_subset$label <- meta_subset$TipID_microbiome 
+meta_subset %>% names
+meta_subset %>% head
+class(meta_subset$label)
+
+tree_meta_microb <- full_join(fringilla_rootedtree, meta_subset, by = "label")
+
+(t1 <- ggplot(tree_meta_microb, aes(x, y)) + geom_tree() + theme_tree() + geom_tiplab(aes(color=Species_Label, fill=Species_Label), size = 3) + SpeciesLabel.color + SpeciesLabel.fill + theme(legend.position="bottom", legend.direction = "horizontal", legend.title=element_blank()))
+
+host_tree <- list(fringilla_rootedtree)
+summary(host_tree)
+
+# Host distance matrix
+host_dist <- fringilla_rootedtree %>% cophenetic 
+
+host_dist %>% dim
+str(host_dist)
+#host_dist <- as.dist(host_dist)
+
+```
+
+
+random host tree
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+random_host_dist <- host_dist
+
+sample_host <- sample(colnames(random_host_dist))
+colnames(random_host_dist) <- sample_host
+rownames(random_host_dist) <- sample_host
+
+```
+
+
+Test on core families
+
+
+## read top taxa list 
+
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+ps_list <- readRDS(paste0(dataDir, "/list_ps_coreFamily_taxglomSpecies.rds"))
+#ps_list <- readRDS(paste0(dataDir, "/list_ps_coreFamily_taxglomGenus.rds"))
+
+#ps_list <- readRDS(paste0(dataDir, "/list_ps_coreFamily_taxglomOTU.rds"))
+
+
+ps_list[[1]]
+```
+
+count_taxa
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+count_tax <- list()
+
+for (i in 1:length(ps_list)) {
+    count_tax[[i]] <- ntaxa(ps_list[[i]])
+    names(count_tax)[i] <- names(ps_list)[i]
+}
+
+count_tax_df<- as.data.frame(t(data.frame(lapply(count_tax, type.convert), stringsAsFactors=FALSE)))
+names(count_tax_df) <- "n_taxa"
+
+check <- count_tax_df %>% data.frame %>% dplyr::filter(n_taxa < 5)
+nrow(check)
+
+remove <- rownames(check)
+
+# remove from phyloseq list
+ps_list_filter <- within(ps_list, rm(list=remove))
+length(ps_list_filter)
+#[1] 27
+```
+
+distance
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+dist_l <- list()
+
+for (i in 1:length(ps_list_filter)) {
+    dist_l[[i]] <- cophenetic(phy_tree(ps_list_filter[[i]]))
+    names(dist_l)[i] <- paste0("microb_dist_", str_remove(names(ps_list_filter)[i], "ps_"))
+}
+
+names(dist_l)
+
+```
+
+otu
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+otu_l <- list()
+
+for (i in 1:length(ps_list_filter)) {
+
+    otu_l[[i]] <- as.matrix(as.data.frame(otu_table(ps_list_filter[[i]])))
+    otu_l[[i]] <- as.matrix(apply(otu_l[[i]], 2,function(x) ifelse(x > 0, 1, 0)))
+    names(otu_l)[i] <- paste0("otu_", str_remove(names(ps_list_filter)[i], "ps_"))
+}
+
+setdiff(rownames(otu_l[[1]]), rownames(host_dist))
+setdiff(rownames(microb_overlap_meta), rownames(otu_l[[1]]))
+setdiff(rownames(microb_overlap_meta), rownames(host_dist))
+
+```
+
+
+Prepare data for PACo Test
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+paco_data_l <- list()
+
+for (i in 1:length(ps_list_filter)) {
+    paco_data_l[[i]] <- prepare_paco_data(H = host_dist, P = dist_l[[i]], HP = otu_l[[i]])
+    paco_data_l[[i]] = add_pcoord(paco_data_l[[i]], correction = "cailliez")
+    names(paco_data_l)[i] <- paste0("paco_data_", str_remove(names(ps_list_filter)[i], "ps_"))
+}
+
+names(paco_data_l)
+
+
+paco_data_l[[1]]
+
+H_PCo <- paco_data_l[[1]]$H_PCo
+P_PCo <- paco_data_l[[1]]$P_PCo
+
+
+paco_data_random_l <- list()
+
+for (i in 1:length(ps_list_filter)) {
+    paco_data_random_l[[i]] <- prepare_paco_data(H = random_host_dist, P = dist_l[[i]], HP = otu_l[[i]])
+    paco_data_random_l[[i]] = add_pcoord(paco_data_random_l[[i]], correction = "cailliez")
+    names(paco_data_random_l)[i] <- paste0("paco_data_", str_remove(names(ps_list_filter)[i], "ps_"))
+}
+
+names(paco_data_random_l)
+
+
+paco_data_random_l[[1]]
+
+H_PCo_random <- paco_data_random_l[[1]]$H_PCo
+P_PCo_random <- paco_data_random_l[[1]]$P_PCo
+
+
+```
+
+paco test
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+paco_each = function(D, nperm=99, seed=3843){
+    PACo(D, nperm=nperm, seed=seed, method='quasiswap', symmetric=TRUE)
+}
+
+paco_res_l = future_lapply(paco_data_l, paco_each, nperm=99, future.packages=c('paco'))
+paco_res_l %>% length
+paco_res_l[[1]]
+
+
+# goodness of fit
+gof = lapply(paco_res_l, function(x) as.vector(x$gof)) %>% 
+        do.call(rbind, .) %>%
+        as.data.frame
+
+gof$ss %>% as.numeric 
+class(gof)
+head(gof)
+gof$R2 <- sqrt(1-as.numeric(gof$ss))
+
+gof_df <- data.frame(Test= rownames(gof), p = as.numeric(gof$p), ss = as.numeric(gof$ss), n = as.numeric(gof$n), R2 = as.numeric(gof$R2))
+
+gof_df$Species_edit <- str_remove(gof_df$Test, "paco_data_")
+
+#add number of OTU column 
+count_tax_df$Species_edit <- str_remove(rownames(count_tax_df), "ps_")
+gof_df <- left_join(gof_df, count_tax_df, by = "Species_edit")
+head(gof_df)
+
+
+
+# get p values from protest 
+procrustes_each = function(D){
+    protest(X = D$H_PCo, Y = D$P_PCo, symmetric=TRUE, seed = 3999)
+}
+procr_res_l = future_lapply(paco_data_l, procrustes_each,  future.packages=c('vegan', future.seed=TRUE))
+procr_res_l[[1]]
+
+# for loading results instead of re-running
+#saveRDS(procr_res_l, paste0(dataDir, "/procr_res_l.RDS"))
+
+# goodness of fit
+procr_ss = lapply(procr_res_l, function(x) as.vector(x$ss)) %>% 
+        do.call(rbind, .) %>%
+        as.data.frame
+procr_p = lapply(procr_res_l, function(x) as.vector(x$signif)) %>% 
+        do.call(rbind, .) %>%
+        as.data.frame
+procr_df <- cbind(procr_ss, procr_p)
+names(procr_df) <- c("ss", "p")
+procr_df$p_adj_bonferroni <- round(p.adjust(as.numeric(procr_df$p),method = "bonferroni"),3)
+procr_df$p_adj_fdr <- round(p.adjust(as.numeric(procr_df$p),method = "fdr"),3)
+
+head(procr_df)
+procr_df$Test <- rownames(procr_df)
+names(procr_df) <- c("procr_ss", "procr_p", "p_adj_bonferroni", "p_adj_fdr", "Test")
+
+sort(procr_df$p_adj_bonferroni) 
+sort(procr_df$p_adj_fdr) 
+
+gof$ss %>% as.numeric 
+class(gof)
+head(gof)
+gof$R2 <- sqrt(1-as.numeric(gof$ss))
+
+gof_df <- data.frame(Test= rownames(gof), p = as.numeric(gof$p), ss = as.numeric(gof$ss), n = as.numeric(gof$n), R2 = as.numeric(gof$R2))
+head(gof_df)
+
+out_merge_df <- left_join(gof_df, procr_df, by = "Test")
+head(out_merge_df)
+write.csv(out_merge_df, paste0(dataDir, "/paco_output_Species.csv"))
+
+#write.csv(out_merge_df, paste0(dataDir, "/paco_output_Genus.csv"))
+#write.csv(out_merge_df, paste0(dataDir, "/paco_output_OTU.csv"))
+
+```
+
+paco test random
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+paco_each = function(D, nperm=99, seed=3843){
+    PACo(D, nperm=nperm, seed=seed, method='quasiswap', symmetric=TRUE)
+}
+
+paco_res_random_l = future_lapply(paco_data_random_l, paco_each, nperm=99, future.packages=c('paco'))
+paco_res_random_l %>% length
+paco_res_random_l[[1]]
+
+
+# goodness of fit
+gof_random = lapply(paco_res_random_l, function(x) as.vector(x$gof)) %>% 
+        do.call(rbind, .) %>%
+        as.data.frame
+
+gof_random$ss %>% as.numeric 
+class(gof_random)
+head(gof_random)
+gof_random$R2 <- sqrt(1-as.numeric(gof_random$ss))
+
+gof_random_df <- data.frame(Test= rownames(gof_random), p = as.numeric(gof_random$p), ss = as.numeric(gof_random$ss), n = as.numeric(gof_random$n), R2 = as.numeric(gof_random$R2))
+
+gof_random_df$Species_edit <- str_remove(gof_random_df$Test, "paco_data_")
+
+#add number of OTU column 
+count_tax_df$Species_edit <- str_remove(rownames(count_tax_df), "ps_")
+gof_random_df <- left_join(gof_random_df, count_tax_df, by = "Species_edit")
+head(gof_random_df)
+
+sort(gof_random_df$p)
+
+procrustes_each = function(D){
+    protest(X = D$H_PCo, Y = D$P_PCo, symmetric=TRUE, nperm=99, seed = 3999)
+}
+procr_res_random_l = future_lapply(paco_data_random_l, procrustes_each,  future.packages=c('vegan', future.seed=TRUE))
+procr_res_random_l[[1]]
+
+
+# goodness of fit
+procr_ss = lapply(procr_res_random_l, function(x) as.vector(x$ss)) %>% 
+        do.call(rbind, .) %>%
+        as.data.frame
+procr_p = lapply(procr_res_random_l, function(x) as.vector(x$signif)) %>% 
+        do.call(rbind, .) %>%
+        as.data.frame
+procr_df <- cbind(procr_ss, procr_p)
+names(procr_df) <- c("ss", "p")
+procr_df$p_adj_bonferroni <- round(p.adjust(as.numeric(procr_df$p),method = "bonferroni"),3)
+procr_df$p_adj_fdr <- round(p.adjust(as.numeric(procr_df$p),method = "fdr"),3)
+
+head(procr_df)
+procr_df$Test <- rownames(procr_df)
+names(procr_df) <- c("procr_ss", "procr_p", "p_adj_bonferroni", "p_adj_fdr", "Test")
+
+sort(procr_df$p_adj_bonferroni) 
+sort(procr_df$p_adj_fdr) 
+
+gof_random$ss %>% as.numeric 
+class(gof_random)
+head(gof_random)
+gof_random$R2 <- sqrt(1-as.numeric(gof_random$ss))
+
+gof_random_df <- data.frame(Test= rownames(gof_random), p = as.numeric(gof_random$p), ss = as.numeric(gof_random$ss), n = as.numeric(gof_random$n), R2 = as.numeric(gof_random$R2))
+head(gof_random_df)
+
+out_merge_random_df <- left_join(gof_random_df, procr_df, by = "Test")
+head(out_merge_random_df)
+
+
+write.csv(out_merge_random_df, paste0(dataDir, "/paco_output_Species_random.csv"))
+#write.csv(out_merge_random_df, paste0(dataDir, "/paco_output_OTU_random.csv"))
+
+
+```

@@ -2,10 +2,7 @@
 title: 'Fst '
 author: "B. K. Montero and M. Gillingham"
 date: "`r Sys.Date()`"
-output: 
-  rmdformats::downcute:
-    code_folding: hide
-    toc_depth: 2
+output: html_document
 
 ---
 
@@ -31,7 +28,6 @@ library(grid)
 library(tsiR) 
 library(ape)
 library(ggh4x)
-
 # phyloseq section
 library(phyloseq)
 library(microViz)
@@ -68,7 +64,7 @@ source("~/Dropbox/FringillaMicrobiome/05_Scripts/CleanScripts/graphics_param.R")
 
 Rarefied 16S
 
-```{r psObject_16S, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+```{r psObject, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
 
 microb_fr_otu <- readRDS(paste0(dataDir, "/microb_overlap_OTU99_fr_taxFix.rds"))
 microb_fr_species <- speedyseq::tax_glom(microb_fr_otu, "Species")
@@ -79,7 +75,7 @@ microb_fr_class <- speedyseq::tax_glom(microb_fr_otu, "Class")
 microb_fr_phylum <- speedyseq::tax_glom(microb_fr_otu, "Phylum")
 
 # check for NAs
-tax_micro <- tax_table(microb_fr_otu) %>% data.frame
+tax_micro <- tax_table(microb_fr) %>% data.frame
 table(is.na(tax_micro$Genus))
 
 # TipId 
@@ -105,7 +101,7 @@ microb_fr_meta_phylum <- sample_data(microb_fr_phylum) %>% data.frame
 
 Diet data
 
-```{r psObject_diet, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+```{r psObject, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
 
 diet_fr <- readRDS(paste0(dataDir, "/diet_overlap_OTU99_fr.rds"))
 
@@ -248,7 +244,7 @@ subsample microbiome equal sample size
 
 
 ```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
-set.seed(24)
+
 sample_ps <- function(ps, FUN = sample, ...){
   ids <- sample_names(ps)
   sampled_ids <- FUN(ids, ...)
@@ -769,7 +765,19 @@ Mantel Bray-Curtis
 (mantel_bray_fst_otu <- vegan::mantel(bray_dist_otu, fst_dist, method = "pearson", permutations = 9999))
 str(mantel_bray_fst_otu)
 df_otu <- data.frame(test="mantel", data = "all", taxonomy = "OTU99", dist="Bray-Curtis", r=mantel_bray_fst_otu$statistic, p=mantel_bray_fst_otu$signif)
-
+#Mantel statistic based on Pearson's product-moment correlation 
+#
+#Call:
+#vegan::mantel(xdis = bray_dist_otu, ydis = fst_dist, method = "pearson",      #permutations = 9999) 
+#
+#Mantel statistic r: 0.311 
+#      Significance: 0.0288 
+#
+#Upper quantiles of permutations (null model):
+#  90%   95% 97.5%   99% 
+#0.224 0.275 0.318 0.373 
+#Permutation: free
+#Number of permutations: 9999
 
 
 (mantel_bray_fst_otu_chaff <- vegan::mantel(bray_dist_otu_chaff, fst_dist_chaff, method = "pearson", permutations = 9999))
@@ -780,14 +788,43 @@ df_otu_chaff <- data.frame(test="mantel", data = "all", taxonomy = "OTU99", dist
 (mantel_bray_geo_otu  <- vegan::mantel.partial(bray_dist_otu, fst_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
 df_otu_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "OTU99", dist="Bray-Curtis", r=mantel_bray_geo_otu$statistic, p=mantel_bray_geo_otu$signif)
 
+#Partial Mantel statistic based on Pearson's product-moment correlation 
+#
+#Call:
+#vegan::mantel.partial(xdis = bray_dist_otu, ydis = fst_dist,      zdis = as.dist(#log10(geo_dist + 1)), method = "pearson",      permutations = 9999) 
+#
+#Mantel statistic r: 0.3216 
+#      Significance: 0.0309 
+#
+#Upper quantiles of permutations (null model):
+#  90%   95% 97.5%   99% 
+#0.226 0.282 0.338 0.397 
+#Permutation: free
+#Number of permutations: 9999
+
+
 
 (mantel_bray_geo_otu_chaff  <- vegan::mantel.partial(bray_dist_otu_chaff, fst_dist_chaff, as.dist(log10(geo_dist_chaff+1)), method = "pearson", permutations = 9999))
 df_otu_chaff_partial <- data.frame(test="partial-mantel", data = "chaffinch", taxonomy = "OTU99", dist="Bray-Curtis", r=mantel_bray_geo_otu_chaff$statistic, p=mantel_bray_geo_otu_chaff$signif)
 
 
+
 vegan::mantel(fst_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999)
 
+#Mantel statistic r: -0.1602 
+#      Significance: 0.7297 
+
+
+
 vegan::mantel(fst_dist_chaff, as.dist(log10(geo_dist_chaff+1)), method = "pearson", permutations = 9999)
+#Mantel statistic r: 0.6181 
+#      Significance: 4e-04 
+#
+#Upper quantiles of permutations (null model):
+#  90%   95% 97.5%   99% 
+#0.295 0.349 0.398 0.457 
+#Permutation: free
+#Number of permutations: 9999
 
 bray = as.vector(bray_dist_otu)
 jacc = as.vector(jaccard_dist_otu)
@@ -990,16 +1027,51 @@ Mantel Jaccard
 (mantel_jaccard_fst_otu <- vegan::mantel(jaccard_dist_otu, fst_dist, method = "pearson", permutations = 9999))
 str(mantel_jaccard_fst_otu)
 df_otu <- data.frame(test="mantel", data = "all", taxonomy = "OTU99", dist="Bray-Curtis", r=mantel_jaccard_fst_otu$statistic, p=mantel_jaccard_fst_otu$signif)
+#Call:
+#vegan::mantel(xdis = jaccard_dist_otu, ydis = fst_dist, #method = "pearson",      permutations = 9999) 
+#
+#Mantel statistic r: -0.1776 
+#      Significance: 0.7905 
+#
+#Upper quantiles of permutations (null model):
+#  90%   95% 97.5%   99% 
+#0.272 0.356 0.442 0.544 
 
 (mantel_jaccard_fst_otu_chaff <- vegan::mantel(jaccard_dist_otu_chaff, fst_dist_chaff, method = "pearson", permutations = 9999))
 df_otu_chaff <- data.frame(test="mantel", data = "all", taxonomy = "OTU99", dist="Bray-Curtis", r=mantel_jaccard_fst_otu$statistic, p=mantel_jaccard_fst_otu$signif)
+
+#vegan::mantel(xdis = jaccard_dist_otu_chaff, ydis = #fst_dist_chaff,      method = "pearson", permutations = #9999) 
+#
+#Mantel statistic r: 0.186 
+#      Significance: 0.2027 
+#
+#Upper quantiles of permutations (null model):
+#  90%   95% 97.5%   99% 
+#0.287 0.360 0.424 0.486 
 
 
 (mantel_jaccard_geo_otu  <- vegan::mantel.partial(jaccard_dist_otu, fst_dist, as.dist(log10(geo_dist+1)), method = "pearson", permutations = 9999))
 df_otu_partial <- data.frame(test="partial-mantel", data = "all", taxonomy = "OTU99", dist="Bray-Curtis", r=mantel_jaccard_geo_otu$statistic, p=mantel_jaccard_geo_otu$signif)
 
+#vegan::mantel.partial(xdis = jaccard_dist_otu, ydis = #fst_dist,      zdis = as.dist(log10(geo_dist + 1)), method# = "pearson",      permutations = 9999) 
+#
+#Mantel statistic r: -0.04104 
+#      Significance: 0.5445 
+#
+#Upper quantiles of permutations (null model):
+#  90%   95% 97.5%   99% 
+#0.268 0.349 0.438 0.537  
+
 (mantel_jaccard_geo_otu_chaff  <- vegan::mantel.partial(jaccard_dist_otu_chaff, fst_dist_chaff, as.dist(log10(geo_dist_chaff+1)), method = "pearson", permutations = 9999))
 df_otu_chaff_partial <- data.frame(test="partial-mantel", data = "chaffinch", taxonomy = "OTU99", dist="Bray-Curtis", r=mantel_jaccard_geo_otu_chaff$statistic, p=mantel_jaccard_geo_otu_chaff$signif)
+#vegan::mantel.partial(xdis = jaccard_dist_otu_chaff, ydis = #fst_dist_chaff,      zdis = as.dist(log10(geo_dist_chaff +# 1)), method = "pearson",      permutations = 9999) 
+#
+#Mantel statistic r: -0.3766 
+#      Significance: 0.9204 
+#
+#Upper quantiles of permutations (null model):
+#  90%   95% 97.5%   99% 
+#0.320 0.390 0.440 0.481 
 
 
 jacc = as.vector(jaccard_dist_otu)
@@ -1194,145 +1266,6 @@ write.csv(mantel_out, paste0(dataDir, "/output_mantel_weightedfst.csv"), row.nam
 
 ```
 
-```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
-## ============================================================
-## SENSITIVITY: resampling distribution of Mantel r and p
-## ============================================================
-## The Fst Mantel analysis above subsamples 9 individuals per
-## population. Each draw yields slightly different population-level
-## dissimilarities and therefore different Mantel r / p. Here we
-## repeat the full pipeline N times to characterise that uncertainty.
-
-# --- helper: subsample, merge per population, return pop-level distances ---
-make_pop_dists <- function(ps_level, n_per_pop = 9) {
-  
-  ElHierro    <- sample_ps(subset_samples(ps_level, Species_Label == "El_Hierro_F_c_ombriosa"),   size = n_per_pop)
-  Flores      <- sample_ps(subset_samples(ps_level, Species_Label == "Flores_F_moreletti"),        size = n_per_pop)
-  GranCanaria <- sample_ps(subset_samples(ps_level, Species_Label == "Gran_Canaria_F_c_bakeri"),   size = n_per_pop)
-  Polatzeki   <- sample_ps(subset_samples(ps_level, Species_Label == "Gran_Canaria_F_polatzeki"),  size = n_per_pop)
-  LaGomera    <- sample_ps(subset_samples(ps_level, Species_Label == "La_Gomera_F_c_canariensis"), size = n_per_pop)
-  LaPalma     <- sample_ps(subset_samples(ps_level, Species_Label == "La_Palma_F_c_palmae"),       size = n_per_pop)
-  Madeira     <- sample_ps(subset_samples(ps_level, Species_Label == "Madeira_F_maderensis"),      size = n_per_pop)
-  Mainland    <- sample_ps(subset_samples(ps_level, Species_Label == "Mainland_F_coelebs"),        size = n_per_pop)
-  SaoMiguel   <- sample_ps(subset_samples(ps_level, Species_Label == "Sao_Miguel_F_moreletti"),    size = n_per_pop)
-  Tenerife    <- sample_ps(subset_samples(ps_level, Species_Label == "Tenerife_F_c_canariensis"),  size = n_per_pop)
-  Teydea      <- sample_ps(subset_samples(ps_level, Species_Label == "Tenerife_F_teydea"),         size = n_per_pop)
-  
-  ps_sub_all   <- merge_phyloseq(ElHierro, Flores, GranCanaria, Polatzeki, LaGomera, LaPalma, Madeira, Mainland, SaoMiguel, Tenerife, Teydea) %>% removeZeros()
-  ps_sub_chaff <- merge_phyloseq(ElHierro, Flores, GranCanaria,            LaGomera, LaPalma, Madeira, Mainland, SaoMiguel, Tenerife)          %>% removeZeros()
-  
-  ps_merged_all   <- phyloseq::merge_samples(ps_sub_all,   "Species_Label", fun = sum)
-  ps_merged_chaff <- phyloseq::merge_samples(ps_sub_chaff, "Species_Label", fun = sum)
-  
-  otu_all   <- otu_table(ps_merged_all)[rownames(dist_mat), ]
-  otu_chaff <- otu_table(ps_merged_chaff)[rownames(dist_mat_chaff), ]
-  
-  list(
-    bray_all   = vegdist(otu_all,   method = "bray"),
-    jacc_all   = vegdist(otu_all,   method = "jaccard", binary = TRUE),
-    bray_chaff = vegdist(otu_chaff, method = "bray"),
-    jacc_chaff = vegdist(otu_chaff, method = "jaccard", binary = TRUE)
-  )
-}
-
-# --- helper: run mantel + partial mantel on one (taxonomy, distance) combo ---
-run_mantel_set <- function(d_all, d_chaff, dist_label, taxonomy_label, perms = 999) {
-  
-  m_all    <- vegan::mantel(d_all,   fst_dist,       method = "pearson", permutations = perms)
-  m_chaff  <- vegan::mantel(d_chaff, fst_dist_chaff, method = "pearson", permutations = perms)
-  pm_all   <- vegan::mantel.partial(d_all,   fst_dist,       as.dist(log10(geo_dist + 1)),       method = "pearson", permutations = perms)
-  pm_chaff <- vegan::mantel.partial(d_chaff, fst_dist_chaff, as.dist(log10(geo_dist_chaff + 1)), method = "pearson", permutations = perms)
-  
-  data.frame(
-    test     = c("mantel", "mantel", "partial-mantel", "partial-mantel"),
-    data     = c("all",    "chaffinch", "all",         "chaffinch"),
-    taxonomy = taxonomy_label,
-    dist     = dist_label,
-    r        = c(m_all$statistic, m_chaff$statistic, pm_all$statistic, pm_chaff$statistic),
-    p        = c(m_all$signif,    m_chaff$signif,    pm_all$signif,    pm_chaff$signif)
-  )
-}
-
-# --- one full iteration across all 7 levels x 2 subsets x 2 distances x 2 tests ---
-one_iteration <- function(iter, perms = 999) {
-  
-  d_otu     <- make_pop_dists(microb_fr_otu)
-  d_species <- make_pop_dists(microb_fr_species)
-  d_genus   <- make_pop_dists(microb_fr_genus)
-  d_family  <- make_pop_dists(microb_fr_family)
-  d_order   <- make_pop_dists(microb_fr_order)
-  d_class   <- make_pop_dists(microb_fr_class)
-  d_phylum  <- make_pop_dists(microb_fr_phylum)
-  
-  out <- rbind(
-    run_mantel_set(d_otu$bray_all,     d_otu$bray_chaff,     "Bray-Curtis", "OTU99",   perms),
-    run_mantel_set(d_otu$jacc_all,     d_otu$jacc_chaff,     "Jaccard",     "OTU99",   perms),
-    run_mantel_set(d_species$bray_all, d_species$bray_chaff, "Bray-Curtis", "Species", perms),
-    run_mantel_set(d_species$jacc_all, d_species$jacc_chaff, "Jaccard",     "Species", perms),
-    run_mantel_set(d_genus$bray_all,   d_genus$bray_chaff,   "Bray-Curtis", "Genus",   perms),
-    run_mantel_set(d_genus$jacc_all,   d_genus$jacc_chaff,   "Jaccard",     "Genus",   perms),
-    run_mantel_set(d_family$bray_all,  d_family$bray_chaff,  "Bray-Curtis", "Family",  perms),
-    run_mantel_set(d_family$jacc_all,  d_family$jacc_chaff,  "Jaccard",     "Family",  perms),
-    run_mantel_set(d_order$bray_all,   d_order$bray_chaff,   "Bray-Curtis", "Order",   perms),
-    run_mantel_set(d_order$jacc_all,   d_order$jacc_chaff,   "Jaccard",     "Order",   perms),
-    run_mantel_set(d_class$bray_all,   d_class$bray_chaff,   "Bray-Curtis", "Class",   perms),
-    run_mantel_set(d_class$jacc_all,   d_class$jacc_chaff,   "Jaccard",     "Class",   perms),
-    run_mantel_set(d_phylum$bray_all,  d_phylum$bray_chaff,  "Bray-Curtis", "Phylum",  perms),
-    run_mantel_set(d_phylum$jacc_all,  d_phylum$jacc_chaff,  "Jaccard",     "Phylum",  perms)
-  )
-  out$iter <- iter
-  out
-}
-
-# --- run N iterations ---
-N_ITER <- 1000
-
-# Sequential (simple, ~1-2 h on a single core depending on hardware):
-set.seed(42)
-mantel_resampled <- do.call(rbind, lapply(seq_len(N_ITER), one_iteration))
-
-# Parallel alternative (much faster on Linux):
-# library(future.apply)
-# plan(multisession, workers = 8)        # set to your core count
-# mantel_resampled <- do.call(rbind,
-#   future_lapply(seq_len(N_ITER), one_iteration, future.seed = 42))
-
-# --- summarise across draws ---
-mantel_summary <- mantel_resampled %>%
-  group_by(test, data, taxonomy, dist) %>%
-  summarise(
-    r_median = median(r),
-    r_lo     = quantile(r, 0.025),
-    r_hi     = quantile(r, 0.975),
-    p_median = median(p),
-    prop_sig = mean(p < 0.05),
-    .groups  = "drop"
-  )
-
-write.csv(mantel_resampled, paste0(dataDir, "/mantel_resampled_iterations.csv"), row.names = FALSE)
-write.csv(mantel_summary,   paste0(dataDir, "/mantel_resampled_summary.csv"),    row.names = FALSE)
-
-```
-
-```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
-mantel_resampled$order <- factor(mantel_resampled$taxonomy,
-  levels = c("OTU99","Species","Genus","Family","Order","Class","Phylum"))
-
-p_resample <- mantel_resampled %>%
-  filter(test == "partial-mantel") %>%
-  ggplot(aes(x = order, y = r, fill = data)) +
-    geom_hline(yintercept = 0, linetype = "dashed", colour = "grey50") +
-    geom_boxplot(outlier.size = 0.4, alpha = 0.7) +
-    facet_wrap(~ dist) +
-    labs(x = "", y = expression("Partial Mantel"~italic(r)~"(F"[ST]*" | geo)")) +
-    barplot_theme +
-    theme(legend.position = "bottom",
-          axis.text.x = element_text(angle = 35, hjust = 1, size = 28))
-
-ggsave(paste0(outputDir, "/Figures/Fst_mantel_resampling.png"),
-       p_resample, width = 360, height = 220, units = "mm", dpi = 200)
-
-```
 ## Calculate divergence
 
 microbiome distance matrix
@@ -2171,43 +2104,37 @@ dev.off()
 
 ```
 
+
+
 Adding individual inbreeding coefficients to microbiome metadata
 ```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
 names(froh_meta)
 names(sample_data(microb_overlap_otu))
 
-# Use FROH as the inbreeding coefficient (named `f` here for downstream
-# consistency with the ANCOM-BC formula below; this is FROH, not the
-# heterozygosity-based F from ind_het_meta).
 froh_meta$Lab_Code <- as.character(froh_meta$"16S_Lab_Code")
 
-f_df <- data.frame(
-  Lab_Code = froh_meta$Lab_Code,
-  f        = as.numeric(froh_meta$froh)
-) %>% drop_na()
+f_df <- data.frame(cbind(Lab_Code = froh_meta$Lab_Code, f = as.numeric(froh_meta$f)))
+f_df <- f_df %>% drop_na()
+f_df$f <- as.numeric(f_df$f)
+f_df$Lab_Code
+sample_data(microb_overlap_otu)$Lab_Code
 
-# Build the per-sample f table aligned to phyloseq sample order.
-# merge() does not guarantee row order, so we re-order explicitly and
-# assert alignment before pushing values into sample_data().
-Sample_df <- data.frame(sample_data(microb_overlap_otu)) %>%
-  tibble::rownames_to_column("rowid") %>%
-  left_join(f_df, by = "Lab_Code")
+Sample_df <- data.frame(sample_data(microb_overlap_otu))
+Sample_df <- merge(Sample_df,f_df ,by = "Lab_Code")
 
-Sample_df <- Sample_df[match(sample_names(microb_overlap_otu), Sample_df$rowid), ]
+Sample_df$Lab_Code == sample_data(microb_overlap_otu)$Lab_Code
+Sample_df$Lab_Code == sample_data(microb_overlap_genus)$Lab_Code
+Sample_df$Lab_Code == sample_data(microb_overlap_family)$Lab_Code
+Sample_df$Lab_Code == sample_data(microb_overlap_class)$Lab_Code
+Sample_df$Lab_Code == sample_data(microb_overlap_order)$Lab_Code
+Sample_df$Lab_Code == sample_data(microb_overlap_phylum)$Lab_Code
 
-stopifnot(all(Sample_df$rowid == sample_names(microb_overlap_otu)))
+sample_data(microb_overlap_otu)$f <- Sample_df$f
+sample_data(microb_overlap_genus)$f <- Sample_df$f
+sample_data(microb_overlap_family)$f <- Sample_df$f
+sample_data(microb_overlap_class)$f <- Sample_df$f
+sample_data(microb_overlap_order)$f <- Sample_df$f
+sample_data(microb_overlap_phylum)$f <- Sample_df$f
 
-sample_data(microb_overlap_otu)$f      <- Sample_df$f
-sample_data(microb_overlap_species)$f  <- Sample_df$f
-sample_data(microb_overlap_genus)$f    <- Sample_df$f
-sample_data(microb_overlap_family)$f   <- Sample_df$f
-sample_data(microb_overlap_order)$f    <- Sample_df$f
-sample_data(microb_overlap_class)$f    <- Sample_df$f
-sample_data(microb_overlap_phylum)$f   <- Sample_df$f
-
-microb_overlap_otu
-microb_overlap_phylum
 ```
-
-
 

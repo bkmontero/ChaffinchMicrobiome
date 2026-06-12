@@ -62,6 +62,7 @@ microb_fr_fix <- readRDS(paste0(dataDir, "/microb_overlap_OTU99_fr_taxFix.rds"))
 ```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
 
 microb_fr_otu <-  microb_fr_fix 
+microb_fr_species <- speedyseq::tax_glom(microb_fr_fix, "Species",  NArm = FALSE)
 microb_fr_genus <- speedyseq::tax_glom(microb_fr_fix, "Genus",  NArm = FALSE)
 microb_fr_family <- speedyseq::tax_glom(microb_fr_fix, "Family",  NArm = FALSE)
 microb_fr_order <- speedyseq::tax_glom(microb_fr_fix, "Order",  NArm = FALSE)
@@ -70,6 +71,17 @@ microb_fr_phylum <- speedyseq::tax_glom(microb_fr_fix, "Phylum",  NArm = FALSE)
 
 
 # add OTU_ID to tax tables
+
+
+#species
+tax_table(microb_fr_species) 
+
+# add OTU_ID to tax tables
+#species
+tax_table(microb_fr_species) <- tax_table(microb_fr_species)[,1:7]
+tax_table(microb_fr_species) <- cbind(tax_table(microb_fr_species), rownames(tax_table(microb_fr_species)))
+colnames(tax_table(microb_fr_species)) <- c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species", "OTU_ID")
+
 #genus
 tax_table(microb_fr_otu) 
 
@@ -105,15 +117,13 @@ colnames(tax_table(microb_fr_phylum)) <- c("Kingdom", "Phylum", "OTU_ID")
 
 # meta
 microb_fr_meta_otu <- sample_data(microb_fr_otu) %>% data.frame
+microb_fr_meta_species <- sample_data(microb_fr_species) %>% data.frame
 microb_fr_meta_genus <- sample_data(microb_fr_genus) %>% data.frame
 microb_fr_meta_family <- sample_data(microb_fr_family) %>% data.frame
 microb_fr_meta_order <- sample_data(microb_fr_order) %>% data.frame
 microb_fr_meta_class <- sample_data(microb_fr_class) %>% data.frame
 microb_fr_meta_phylum <- sample_data(microb_fr_phylum) %>% data.frame
 ```
-
-
-
 
 # fit neutral model OVERLAP DATA 
 https://github.com/DanielSprockett/tyRa/blob/master/R/modeling.R
@@ -123,6 +133,7 @@ https://github.com/DanielSprockett/tyRa/blob/master/R/modeling.R
 # tyRa function OTUs in columns and samples in rows
 
 pnm_otu <- tyRa::fit_sncm(spp = otu_table(microb_fr_otu)@.Data, pool=NULL, taxon=data.frame(tax_table(microb_fr_otu)))
+pnm_species <- tyRa::fit_sncm(spp = otu_table(microb_fr_species)@.Data, pool=NULL, taxon=data.frame(tax_table(microb_fr_species)))
 pnm_genus <- tyRa::fit_sncm(spp = otu_table(microb_fr_genus)@.Data, pool=NULL, taxon=data.frame(tax_table(microb_fr_genus)))
 pnm_family <- tyRa::fit_sncm(spp = otu_table(microb_fr_family)@.Data, pool=NULL, taxon=data.frame(tax_table(microb_fr_family)))
 pnm_order <- tyRa::fit_sncm(spp = otu_table(microb_fr_order)@.Data, pool=NULL, taxon=data.frame(tax_table(microb_fr_order)))
@@ -131,6 +142,8 @@ pnm_phylum <- tyRa::fit_sncm(spp = otu_table(microb_fr_phylum)@.Data, pool=NULL,
 
 
 (pnm_otu_plot <- plot_sncm_fit_col(pnm_otu, fill = NULL) + pca_theme +  ggtitle("OTU") +guides(shape = guide_legend(override.aes = list(size = 5)), fill = guide_legend(override.aes = list(size = 5)), size = guide_legend(override.aes = list(size = c(5, 3) , fill= c("black")))))
+
+(pnm_species_plot <- plot_sncm_fit(pnm_species, fill = NULL) + pca_theme + ggtitle("Species") + guides(shape = guide_legend(override.aes = list(size = 5)), fill = guide_legend(override.aes = list(size = 5)), size = guide_legend(override.aes = list(size = c(5, 3) , fill= c("black")))))
 
 
 (pnm_genus_plot <- plot_sncm_fit_col(pnm_genus, fill = NULL) + pca_theme + ggtitle("Genus") + guides(shape = guide_legend(override.aes = list(size = 5)), fill = guide_legend(override.aes = list(size = 5)), size = guide_legend(override.aes = list(size = c(5, 3) , fill= c("black")))))
@@ -183,14 +196,14 @@ neutral_otus <- pred_df_otu %>% filter(fit_class == "As predicted")
 keep_neutral <- rownames(neutral_otus)
 ps_neutral_otu <- prune_taxa(keep_neutral, microb_fr_otu)
 tax_table(microb_fr_otu)
-saveRDS(ps_neutral_otu, paste0(dataDir, "/ps_neutral_otu.rds"))
+saveRDS(ps_neutral_otu, paste0(dataDir, "/ps_neutral_otuFix.rds"))
 
 ##NON-NEUTRAL
 
 nonneutral_otus <- pred_df_otu %>% filter(fit_class != "As predicted")
 keep_nonneutral <- rownames(nonneutral_otus)
 ps_nonneutral_otu <- prune_taxa(keep_nonneutral, microb_fr_otu)
-saveRDS(ps_nonneutral_otu, paste0(dataDir, "/ps_nonneutral_otu.rds"))
+saveRDS(ps_nonneutral_otu, paste0(dataDir, "/ps_nonneutral_otuFix.rds"))
 
 ```
 

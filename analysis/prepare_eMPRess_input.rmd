@@ -359,7 +359,7 @@ host tree
 ```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
 
 # Host tree Iqtree
-fringilla_tree <-  read.tree(file = paste0(dataDir, "/mtFr_edit_trim_aln.fas.treefile"))
+fringilla_tree <-  read.tree(file = paste0(dataDir, "/mt_Fringilla_aln.fasta.contree"))
 
 str(fringilla_tree)
 fringilla_tree$tip.label <- gsub("\\_NC","", fringilla_tree$tip.label)
