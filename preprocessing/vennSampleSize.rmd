@@ -1,0 +1,437 @@
+---
+title: 'Sample sizes and corrected phyloseq objects'
+author: "B. K. Montero and M. Gillingham"
+date: "`r Sys.Date()`"
+output: 
+  rmdformats::downcute:
+    code_folding: hide
+    toc_depth: 2
+---
+
+## LOAD LIBRARIES
+
+```{r libraries, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+rm(list = ls())
+
+# basics
+library(dplyr)
+library(tidyr)
+library(stringr)
+
+# phyloseq
+library(phyloseq)
+library(biomeUtils)
+
+# venn diagram
+library(grid)
+library(VennDiagram)
+```
+
+## WORKING DIRECTORIES
+
+```{r source, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/workingDirectories.R")
+```
+
+## LOAD AND CORRECT PHYLOSEQ OBJECTS
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+# Sample 89 is a duplicate of 88 (lower sequencing depth, excluded)
+# Sample 398R is a re-extraction of 398; rename to merge
+
+apply_corrections <- function(ps) {
+  ps <- ps %>%
+    subset_samples(Lab_Code != "89") %>%
+    removeZeros()
+  sample_data(ps)$Lab_Code[sample_data(ps)$Lab_Code == "398R"] <- "398"
+  ps
+}
+
+# Microbiome (all Fringilla)
+microb_fr <- readRDS(paste0(dataDir, "/ps_OTU99_wAlpha_fr_taxFix.rds")) %>%
+  subset_samples(Genus == "Fringilla") %>%
+  apply_corrections()
+
+# Microbiome (Fringilla with diet overlap)
+microb_overlap_diet <- readRDS(paste0(dataDir, "/microb_overlap_OTU99_fr_taxFix.rds")) %>%
+  subset_samples(Genus == "Fringilla") %>%
+  apply_corrections()
+
+# Diet (all Fringilla)
+diet_fr <- readRDS(paste0(dataDir, "/ps_diet_rarefied.rds")) %>%
+  subset_samples(Genus == "Fringilla") %>%
+  apply_corrections()
+
+# Diet (Fringilla with microbiome overlap)
+diet_overlap_microb <- readRDS(paste0(dataDir, "/diet_overlap_OTU99_fr.rds")) %>%
+  apply_corrections()
+
+# WGS (Fringilla, microbiome-overlap, excluding low-quality WGS samples)
+wgs_qc_exclude <- c("132", "252")
+wgs_fr <- microb_fr %>%
+  subset_samples(WGS_data == 1 & !Lab_Code %in% wgs_qc_exclude)
+
+wgs_microb <- microb_overlap_diet %>%
+  subset_samples(WGS_data == 1 & !Lab_Code %in% wgs_qc_exclude)
+
+# Sanity check
+nrow(sample_data(microb_fr)) # 234
+nrow(sample_data(diet_fr)) # 276
+nrow(sample_data(microb_overlap_diet)) # 208
+nrow(sample_data(diet_overlap_microb)) # 208
+nrow(sample_data(wgs_fr)) # 106
+nrow(sample_data(wgs_microb)) # 103
+```
+
+## VERIFY SAMPLE SIZES
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+diet_codes <- sample_data(diet_fr)$Lab_Code
+microb_codes <- sample_data(microb_fr)$Lab_Code
+wgs_codes <- sample_data(wgs_fr)$Lab_Code
+
+# Total unique birds: should be 302
+length(unique(c(diet_codes, microb_codes, wgs_codes)))
+
+# Set differences
+length(setdiff(diet_codes, microb_codes)) # 68 diet-only
+length(setdiff(microb_codes, diet_codes)) # 26 microb-only
+length(setdiff(wgs_codes, microb_codes)) # 0  (all WGS birds in microbiome)
+length(setdiff(wgs_codes, diet_codes)) # 3  (3 WGS birds without diet)
+```
+
+## VENN DIAGRAM
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+# area1 = diet, area2 = microbiome, area3 = WGS
+# n12 = diet ∩ microbiome
+# n13 = diet ∩ WGS
+# n23 = microbiome ∩ WGS
+# n123 = all three
+
+png(paste0(outputDir, "/Figures/VennSampleSize.png"),
+  width = 320, height = 240, units = "mm", res = 1000
+)
+
+grid.newpage()
+draw.triple.venn(
+  area1 = 234, # microbiome
+  area2 = 276, # diet
+  area3 = 106, # WGS
+  n12 = 208, # diet ∩ microbiome
+  n13 = 106, # microbiome ∩ WGS
+  n23 = 103, # diet ∩ WGS
+  n123 = 103, # all three
+  category = c("", "", ""),
+  rotation = 1,
+  lwd = c(3, 3, 3),
+  fontfamily = rep("arial", 7),
+  col = "Black",
+  fill = c("grey", "black", "white"),
+  cex = 4, cat.cex = 2,
+  euler.d = TRUE, scaled = TRUE
+)
+
+dev.off()
+```
+
+## PER-POPULATION SUMMARY TABLE
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+# Build per-bird presence indicators
+diet_df <- data.frame(
+  Lab_Code = sample_data(diet_fr)$Lab_Code,
+  Species_Label = gsub(" ", "_", sample_data(diet_fr)$Species_Label),
+  in_diet = TRUE
+)
+
+microb_df <- data.frame(
+  Lab_Code = sample_data(microb_fr)$Lab_Code,
+  Species_Label = gsub(" ", "_", sample_data(microb_fr)$Species_Label),
+  in_microb = TRUE
+)
+
+wgs_df <- data.frame(
+  Lab_Code = sample_data(wgs_fr)$Lab_Code,
+  Species_Label = gsub(" ", "_", sample_data(wgs_fr)$Species_Label),
+  in_wgs = TRUE
+)
+
+all_birds <- bind_rows(diet_df, microb_df, wgs_df) %>%
+  group_by(Lab_Code, Species_Label) %>%
+  summarise(
+    in_diet = any(in_diet, na.rm = TRUE),
+    in_microb = any(in_microb, na.rm = TRUE),
+    in_wgs = any(in_wgs, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(across(starts_with("in_"), ~ replace_na(., FALSE)))
+
+# Per-population counts
+summary_table <- all_birds %>%
+  group_by(Species_Label) %>%
+  summarise(
+    Total_samples = n(),
+    N_microbiome = sum(in_microb),
+    N_diet = sum(in_diet),
+    N_WGS = sum(in_wgs),
+    Diet_and_Microb = sum(in_diet & in_microb),
+    All_three = sum(in_diet & in_microb & in_wgs),
+    .groups = "drop"
+  )
+
+# Verify totals (should be 302, 234, 276, 106, 208, 103)
+summary_table %>% summarise(
+  total       = sum(Total_samples),
+  micro       = sum(N_microbiome),
+  diet        = sum(N_diet),
+  wgs         = sum(N_WGS),
+  diet_microb = sum(Diet_and_Microb),
+  all_three   = sum(All_three)
+)
+
+# Add metadata
+bird_metadata <- data.frame(
+  Species_Label = gsub(" ", "_", sample_data(diet_fr)$Species_Label),
+  Archipelago_Mainland = sample_data(diet_fr)$Archipelago_Mainland,
+  Island_Mainland = sample_data(diet_fr)$Island_Mainland,
+  Genus = sample_data(diet_fr)$Genus,
+  Species = sample_data(diet_fr)$Species,
+  Subspecies = sample_data(diet_fr)$Subspecies,
+  stringsAsFactors = FALSE
+) %>% distinct(Species_Label, .keep_all = TRUE)
+
+summary_table <- summary_table %>%
+  left_join(bird_metadata, by = "Species_Label") %>%
+  dplyr::select(
+    Archipelago_Mainland, Island_Mainland, Genus, Species, Subspecies,
+    Total_samples, N_microbiome, N_diet, N_WGS,
+    Diet_and_Microb, All_three
+  ) %>%
+  arrange(
+    factor(Archipelago_Mainland,
+      levels = c("Mainland", "Azores", "Madeira", "Canary Islands")
+    ),
+    Island_Mainland
+  )
+
+write.csv(summary_table,
+  file = paste0(outputDir, "/sample_summary_per_population.csv"),
+  row.names = FALSE
+)
+```
+
+## EXPORT CORRECTED PHYLOSEQ OBJECTS
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+saveRDS(microb_fr, paste0(dataDir, "/microb_fr_corrected.rds"))
+saveRDS(diet_fr, paste0(dataDir, "/diet_fr_corrected.rds"))
+saveRDS(microb_overlap_diet, paste0(dataDir, "/microb_overlap_diet_corrected.rds"))
+saveRDS(diet_overlap_microb, paste0(dataDir, "/diet_overlap_microb_corrected.rds"))
+saveRDS(wgs_fr, paste0(dataDir, "/wgs_fr_corrected.rds"))
+saveRDS(wgs_microb, paste0(dataDir, "/wgs_microb_corrected.rds"))
+```
+
+
+## CREATE SUPPLEMENTARY METADATA TABLE
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+## CREATE SUPPLEMENTARY METADATA TABLE
+
+# --- Pull sample_data tables, coerce Lab_Code to character for safe joins ---
+sd_microb <- as(sample_data(microb_fr), "data.frame") %>%
+  mutate(Lab_Code = as.character(Lab_Code))
+sd_diet   <- as(sample_data(diet_fr),   "data.frame") %>%
+  mutate(Lab_Code = as.character(Lab_Code))
+sd_wgs    <- as(sample_data(wgs_fr),    "data.frame") %>%
+  mutate(Lab_Code = as.character(Lab_Code))
+
+microb_codes <- unique(sd_microb$Lab_Code)
+diet_codes   <- unique(sd_diet$Lab_Code)
+wgs_codes    <- unique(sd_wgs$Lab_Code)
+
+# --- Harmonize diet Sex coding to character (1=male, 2=female) ---
+# Verified against sd_microb: Lab_Code 105/101/100 = male = 1; Lab_Code 106 = female = 2.
+sd_diet <- sd_diet %>%
+  mutate(
+    Sex = case_when(
+      as.character(Sex) == "1" ~ "male",
+      as.character(Sex) == "2" ~ "female",
+      TRUE ~ NA_character_
+    )
+  )
+
+AccessionNumber_df <- read.csv("~/Dropbox/FringillaMicrobiome/13_ENA/02_runs/Prepare_run_submission_ENA.csv", header = TRUE, sep = ";")
+
+head(AccessionNumber_df)
+
+
+ROH_data <- read.csv(paste0(dataDir, "/fringilla_microbiome_roh_rg_filtered.csv"))
+
+head(ROH_data)
+
+# --- Build the merged base table ---
+# Slim each frame to the columns we need, then harmonize Year.
+# any_of() silently drops columns that don't exist in a given frame
+# (e.g. diet_fr has no Date / Island_Province / Age_cat),
+# so those become NA for diet-only birds after bind_rows.
+
+keep_cols <- c("Lab_Code", "Ring",
+               "Genus", "Species", "Subspecies",
+               "Date", "Month", "Year",
+               "Ydec", "Xdec",
+               "Island_Province", "Archipelago_Mainland", "Island_Mainland",
+               "Sex", "Age_cat")
+
+shrink <- function(df) {
+  df %>%
+    dplyr::select(any_of(keep_cols)) %>%
+    mutate(
+      Year = suppressWarnings(as.integer(Year)),
+      Ydec = suppressWarnings(as.numeric(Ydec)),
+      Xdec = suppressWarnings(as.numeric(Xdec))
+    )
+}
+sd_microb_min <- shrink(sd_microb)
+sd_diet_min   <- shrink(sd_diet)
+sd_wgs_min    <- shrink(sd_wgs)
+
+diet_only_rows <- sd_diet_min %>% filter(!Lab_Code %in% microb_codes)
+wgs_only_rows  <- sd_wgs_min  %>% filter(!Lab_Code %in% microb_codes,
+                                         !Lab_Code %in% diet_only_rows$Lab_Code)
+
+supp_meta <- bind_rows(sd_microb_min, diet_only_rows, wgs_only_rows) %>%
+  distinct(Lab_Code, .keep_all = TRUE)
+
+ 
+
+# --- Re-derive dataset-inclusion indicators from actual phyloseq membership ---
+# (overwrites the WGS_data / diet_data columns inherited from microb_fr so they
+# reflect post-correction, post-QC inclusion)
+supp_meta <- supp_meta %>%
+  mutate(
+    microb_data = as.integer(Lab_Code %in% microb_codes),
+    diet_data   = as.integer(Lab_Code %in% diet_codes),
+    WGS_data    = as.integer(Lab_Code %in% wgs_codes)
+  )
+
+# --- Join ENA accession from AccessionNumber_df (key: Ring) ---
+acc_lookup <- AccessionNumber_df %>%
+  dplyr::select(Ring, accession) %>%
+  distinct(Ring, .keep_all = TRUE)
+
+supp_meta <- supp_meta %>%
+  left_join(acc_lookup, by = "Ring")
+
+roh_lookup <- ROH_data %>%
+  mutate(Lab_Code = sub("_.*", "", file_id)) %>%
+  dplyr::select(Lab_Code, ROH_coef = froh) %>%
+  distinct(Lab_Code, .keep_all = TRUE)
+
+supp_meta <- supp_meta %>%
+  left_join(roh_lookup, by = "Lab_Code")
+
+
+# --- Order columns to match the supplementary template ---
+supp_meta <- supp_meta %>%
+  dplyr::select(
+    accession,
+    Lab_Code,
+    Ring,
+    Genus, Species, Subspecies,
+    Date, Month, Year,
+    Ydec, Xdec,
+    Island_Province,
+    Archipelago_Mainland,
+    Island_Mainland,
+    Sex,
+    Age_cat,
+    microb_data,
+    diet_data,
+    WGS_data,
+    ROH_coef
+    # ROH_coef -- add here once we know its source
+  ) %>%
+  arrange(factor(Archipelago_Mainland,
+                 levels = c("Mainland", "Azores", "Madeira", "Canary Islands")),
+          Island_Mainland, Genus, Species, Subspecies)
+
+# --- Sanity checks: totals ---
+nrow(supp_meta)                                                       # 302
+sum(supp_meta$microb_data)                                            # 234
+sum(supp_meta$diet_data)                                              # 276
+sum(supp_meta$WGS_data)                                               # 106
+sum(supp_meta$microb_data & supp_meta$diet_data)                      # 208
+sum(supp_meta$microb_data & supp_meta$diet_data & supp_meta$WGS_data) # 103
+
+# --- Audit: diet-only birds will have NA for columns missing in diet_fr ---
+diet_only_check <- supp_meta %>% filter(microb_data == 0 & diet_data == 1)
+nrow(diet_only_check)                          # expect 68
+sum(is.na(diet_only_check$Date))               # expect 68
+sum(is.na(diet_only_check$Island_Province))    # expect 68
+sum(is.na(diet_only_check$Age_cat))            # expect 68
+
+supp_meta %>% filter(is.na(accession)) %>%
+  dplyr::select(Lab_Code, Ring, Genus, Species, microb_data, diet_data, WGS_data)
+
+
+# Re-check
+sum(is.na(supp_meta$accession))   # should be 0
+
+
+supp_meta <- supp_meta %>%
+  mutate(accession = if_else(Lab_Code == "280" & is.na(accession),
+                             "ERS16447430",
+                             accession))
+
+# Re-check
+sum(is.na(supp_meta$accession))   # should be 0
+
+
+supp_meta %>% filter(Lab_Code == "280") %>%
+  dplyr::select(accession, Lab_Code, Ring, Genus, Species, Date, Island_Mainland)
+
+
+write.csv(supp_meta,
+          file = paste0(outputDir, "/sample_metadata_supplementary.csv"),
+          row.names = FALSE)
+```
+
+## MEAN ROH PER POPULATION
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# Subset to birds with a ROH value (WGS subset, post rg-filtering)
+roh_pop <- supp_meta %>%
+  filter(!is.na(ROH_coef)) %>%
+  mutate(Subspecies = ifelse(is.na(Subspecies), "", Subspecies)) %>%
+  group_by(Archipelago_Mainland, Island_Mainland, Genus, Species, Subspecies) %>%
+  summarise(
+    n          = n(),
+    mean_ROH   = mean(ROH_coef),
+    sd_ROH     = sd(ROH_coef),
+    se_ROH     = sd_ROH / sqrt(n),
+    CI95_lower = mean_ROH - qt(0.975, df = n - 1) * se_ROH,
+    CI95_upper = mean_ROH + qt(0.975, df = n - 1) * se_ROH,
+    .groups    = "drop"
+  ) %>%
+  arrange(factor(Archipelago_Mainland,
+                 levels = c("Mainland", "Azores", "Madeira", "Canary Islands")),
+          Island_Mainland, Genus, Species, Subspecies)
+
+# Sanity check: total n should match supp_meta WGS count with non-NA ROH
+sum(roh_pop$n)                                                  # n WGS birds with ROH
+sum(!is.na(supp_meta$ROH_coef))                                 # should match
+sum(!is.na(supp_meta$ROH_coef) & supp_meta$WGS_data == 1)       # should also match
+
+# Round for export
+roh_pop_out <- roh_pop %>%
+  mutate(across(c(mean_ROH, sd_ROH, se_ROH, CI95_lower, CI95_upper),
+                ~ round(., 4)))
+
+write.csv(roh_pop_out,
+          file = paste0(outputDir, "/ROH_per_population.csv"),
+          row.names = FALSE)
+
+roh_pop_out
+```

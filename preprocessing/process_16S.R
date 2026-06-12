@@ -29,7 +29,7 @@ library(microbiome)
 library(seqateurs)
 
 ## ------ WORKING DIRECTORIES ------
-source("~/FringillaProject/01_Scripts/workingDirectories.R")
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/workingDirectories.R")
 
 ## -----------------------------------------------------------------------------
 ## ------ I. LOAD & CHECK DATA ------

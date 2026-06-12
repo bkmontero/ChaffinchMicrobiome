@@ -6,9 +6,7 @@ output:
   rmdformats::downcute:
     code_folding: hide
     toc_depth: 2
-
 ---
-
 
 ## LOAD LIBRARIES
 
@@ -18,49 +16,15 @@ rm(list = ls())
 
 # basics
 library(dplyr)
-library(tidyr)
 library(tidyverse)
 library(stringr)
-library(vegan)
-library(magrittr)
 library(ggplot2)
-library(ggpubr)
-library(MicEco)
-library(rlist)
-library(grid)
-library(tsiR)
-library(ggforce)
-library(ggrepel)
 
-# phyloseq section
+# phyloseq + diversity
 library(phyloseq)
-library(Biostrings)
-library(microbiome)
 library(biomeUtils)
-library(microViz)
-
-# diversity 
-library(betapart)
-library(adespatial)
-library(ecodist)
-library(geosphere)
-
-
-#rmd
-library(details)
-library(knitr)
-library(kableExtra)
-
-#models
-library(mgcv)
-library(glmmTMB)
-library(lme4)
-library(MuMIn)
-library(MASS)
-library(nlme)
-library(car)
-library(multcomp)
-library(ggeffects)
+library(microbiome)
+library(vegan)
 
 ```
 
@@ -74,1181 +38,135 @@ source("~/Dropbox/FringillaMicrobiome/05_Scripts/CleanScripts/graphics_param.R")
 ```
 
 ## LOAD 16S DATA
-```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
-microb_fr <- readRDS(paste0(dataDir, "/microb_overlap_OTU99_fr_taxFix.rds" ))
 
-ps_fringilla <- speedyseq::tax_glom(microb_fr , "Species")
-ps_fringilla <- biomeUtils::removeZeros(ps_fringilla)
+```{r loaddata, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
 
-```
-
-groups
-
-```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
-
-sample_data(ps_fringilla)$fIsland_Mainland <- factor(sample_data(ps_fringilla)$Island_Mainland,levels=c("Mainland","Flores","Sao Miguel","Madeira","La Palma","El Hierro","Gran Canaria","Tenerife","La Gomera"))
-table(sample_data(ps_fringilla)$fIsland_Mainland)
-
-#sample_data(ps_fringilla)$fFringilla_Other <- ifelse(sample_data(ps_fringilla)$Genus == "Fringilla", "Fringilla", "Other" )
-#table(sample_data(ps_fringilla)$fFringilla_Other)
-
-table(sample_data(ps_fringilla)$Species_Label)
+microb_fr <- readRDS(paste0(dataDir, "/microb_fr_corrected.rds")) %>%
+  biomeUtils::removeZeros()
 
 ```
-#NMDS
 
-```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+## NMDS AT SPECIES LEVEL (Bray-Curtis)
 
-#Bray
+```{r nmds, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+ps_fringilla <- speedyseq::tax_glom(microb_fr, "Species") %>%
+  biomeUtils::removeZeros()
+
 set.seed(1)
 ord <- metaMDS(otu_table(ps_fringilla), distance = "bray", k = 8, binary = FALSE)
 
-#Call:
-#metaMDS(comm = otu_table(ps_fringilla), distance = "bray", k = 8,      binary = FALSE) 
-
-#global Multidimensional Scaling using monoMDS
-
-#Data:     wisconsin(sqrt(otu_table(ps_fringilla))) 
-#Distance: bray 
-
-#Dimensions: 8 
-#Stress:     0.09619446 
-#Stress type 1, weak ties
-#Best solution was not repeated after 20 tries
-#The best solution was from try 1 (random start)
-#Scaling: centring, PC rotation, halfchange scaling 
-#Species: expanded scores based on ‘wisconsin(sqrt(otu_table(ps_fringilla)))’ 
-
-scrs <- scores(ord, display = 'sites')
-
-scrs <- cbind(as.data.frame(scrs), Species_Label = sample_data(ps_fringilla)$Species_Label)
+scrs <- scores(ord, display = 'sites') %>%
+  as.data.frame() %>%
+  mutate(Species_Label = sample_data(ps_fringilla)$Species_Label)
 
 cent <- aggregate(cbind(NMDS1, NMDS2) ~ Species_Label, data = scrs, FUN = mean)
 
-segs <- merge(scrs, setNames(cent, c('Species_Label','oNMDS1','oNMDS2')),
-              by = 'Species_Label', sort = FALSE)
-
-
-cent$fSpecies_Label <- factor(cent$Species_Label, levels = c("El_Hierro_F_c_ombriosa", "Flores_F_moreletti", "Gran_Canaria_F_c_bakeri", "Gran_Canaria_F_polatzeki", "La_Gomera_F_c_canariensis", "La_Palma_F_c_palmae", "Madeira_F_maderensis" , "Mainland_F_coelebs", "Sao_Miguel_F_moreletti", "Tenerife_F_c_canariensis", "Tenerife_F_teydea"), labels = c("El~Hierro:~italic('F.c. ombriosa')","Flores:~italic('F. moreletti')","Gran~Canaria:~italic('F.c. bakeri')","Gran~Canaria:~italic('F. polatzeki')","La~Gomera:~italic('F.c. canariensis')","La~Palma:~italic('F.c. palmae')","Madeira:~italic('F. maderensis')","Mainland:~italic('F. coelebs')","Sao~Miguel:~italic('F. moreletti')","Tenerife:~italic('F.c. canariensis')","Tenerife:~italic('F. teydea')"))
-
-
-png(paste0(outputDir, "/Figures/bray_NMDS_species_speciesFix.png"), width = 320, height = 240, units = "mm", res = 1000)
-
-(bray_NMDS <- ggplot(scrs, aes(x = NMDS1, y = NMDS2, fill = Species_Label,  shape= Species_Label)) +
-  #geom_segment(data = segs, mapping = aes(xend = oNMDS1, yend = oNMDS2), alpha = 0.2) + # spiders
-    geom_point(alpha=1,size=10, stroke =1.5,  color = "white") + 
-    geom_point(data=cent, aes(y=NMDS2,x=NMDS1,fill=Species_Label),size=17, stroke =1.5, color = "black") +
-  pca_theme + SpeciesLabel.fill + 
-  scale_y_continuous(labels = scales::number_format(accuracy = 0.01))+
- scale_shape_manual(values = c(21,22,23,21, 23, 25, 21,21, 21, 22, 25), guide = "none")+
-  #geom_label_repel(data = cent, aes(label = fSpecies_Label,color = Species_Label), size=rel(5), nudge_y = 0.0005, nudge_x = 0.0005, fill = "white", parse = TRUE) +
-  guides(color = "none"))
-
+png(paste0(outputDir, "/Figures/bray_NMDS_species_speciesFix.png"),
+    width = 320, height = 240, units = "mm", res = 1000)
+(bray_NMDS <- ggplot(scrs, aes(x = NMDS1, y = NMDS2, fill = Species_Label, shape = Species_Label)) +
+    geom_point(alpha = 1, size = 10, stroke = 1.5, color = "white") +
+    geom_point(data = cent, aes(y = NMDS2, x = NMDS1, fill = Species_Label),
+               size = 17, stroke = 1.5, color = "black") +
+    pca_theme + SpeciesLabel.fill +
+    scale_y_continuous(labels = scales::number_format(accuracy = 0.01)) +
+    scale_shape_manual(values = c(21, 22, 23, 21, 23, 25, 21, 21, 21, 22, 25), guide = "none") +
+    guides(color = "none"))
 dev.off()
 
 ```
 
-## Test effect of population, species, sex and age
+## PERMANOVA ACROSS TAXONOMIC LEVELS
 
-```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+```{r permanova-helper, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
 
-ps_fringilla <- ps_fringilla  %>% subset_samples(Genus == "Fringilla") %>% subset_samples(!is.na(Sex)) %>% subset_samples(Age > 0) %>% removeZeros()
-
-df <- meta(ps_fringilla)
-head(df,3)
-table(df$Species)
-
-# Jaccard
-jaccard_dist <- vegdist(otu_table(ps_fringilla), method = "jaccard", binary = TRUE)
-
-set.seed(42)
-(ad <- adonis2(jaccard_dist~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-#Permutation test for adonis under reduced model
-#Marginal effects of terms
-#Permutation: free
-#Number of permutations: 9999
-
-#adonis2(formula = jaccard_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10    9.144 0.11010 2.3878 0.0001 ***
-#Age_cat         1    0.322 0.00388 0.8404 0.9368    
-#Sex             1    0.353 0.00425 0.9209 0.7217    
-#Residual      189   72.377 0.87149                  
-#Total         201   83.050 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-
-
-(ad <- adonis2(jaccard_dist~ Species + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-#Permutation test for adonis under reduced model
-#Marginal effects of terms
-#Permutation: free
-#Number of permutations: 9999
-
-#adonis2(formula = jaccard_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5    5.033 0.06060 2.5529 0.0001 ***
-#Age_cat    1    0.482 0.00581 1.2232 0.0537 .  
-#Sex        1    0.348 0.00419 0.8829 0.8456    
-#Residual 194   76.488 0.92100                  
-#Total    201   83.050 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-
-bray_dist <- vegdist(otu_table(ps_fringilla), method = "bray", binary = FALSE)
-
-set.seed(42)
-(ad <- adonis2(bray_dist~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-#Permutation test for adonis under reduced model
-#Marginal effects of terms
-#Permutation: free
-#Number of permutations: 9999
-
-#adonis2(formula = bray_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10   15.032 0.17510 4.1743 0.0001 ***
-#Age_cat         1    0.248 0.00289 0.6891 0.9145    
-#Sex             1    0.507 0.00590 1.4077 0.0900 .  
-#Residual      189   68.063 0.79279                  
-#Total         201   85.852 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-
-(ad <- adonis2(bray_dist~ Species + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-
-
-#Permutation test for adonis under reduced model
-#Marginal effects of terms
-#Permutation: free
-#Number of permutations: 9999
-
-#adonis2(formula = bray_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5   10.588 0.12332 5.6655 0.0001 ***
-#Age_cat    1    0.611 0.00711 1.6336 0.0398 *  
-#Sex        1    0.496 0.00578 1.3280 0.1161    
-#Residual 194   72.508 0.84457                  
-#Total    201   85.852 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-
-#microb_dist <- vegdist(otu_table(microb_clr), method = "euclidean", binary = FALSE)
-
-#set.seed(42)
-#ad <- adonis2(microb_dist~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999)
-
-#ad
-```
-
-Phylum level
-
-```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
-
-ps_fringilla <- speedyseq::tax_glom(microb_fr , "Phylum")
-ps_fringilla <- biomeUtils::removeZeros(ps_fringilla)
-
-ps_fringilla <- ps_fringilla  %>% subset_samples(Genus == "Fringilla") %>% subset_samples(!is.na(Sex)) %>% subset_samples(Age > 0) %>% removeZeros()
-
-df <- meta(ps_fringilla)
-head(df,3)
-table(df$Species)
-
-# Jaccard
-jaccard_dist <- vegdist(otu_table(ps_fringilla), method = "jaccard", binary = TRUE)
-
-set.seed(42)
-(ad <- adonis2(jaccard_dist~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-#Permutation test for adonis under reduced model
-#Marginal effects of terms
-#Permutation: free
-#Number of permutations: 9999
-
-#adonis2(formula = jaccard_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10    4.868 0.14442 3.3039 0.0001 ***
-#Age_cat         1    0.232 0.00689 1.5751 0.1355    
-#Sex             1    0.248 0.00736 1.6841 0.1075    
-#Residual      189   27.849 0.82615                  
-#Total         201   33.709 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-(ad <- adonis2(jaccard_dist~ Species + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-#Permutation test for adonis under reduced model
-#Marginal effects of terms
-#Permutation: free
-#Number of permutations: 9999
-
-#adonis2(formula = jaccard_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5    2.812 0.08342 3.6486 0.0001 ***
-#Age_cat    1    0.159 0.00473 1.0333 0.3971    
-#Sex        1    0.257 0.00763 1.6685 0.1150    
-#Residual 194   29.905 0.88715                  
-#Total    201   33.709 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-
-bray_dist <- vegdist(otu_table(ps_fringilla), method = "bray", binary = FALSE)
-
-set.seed(42)
-(ad <- adonis2(bray_dist~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-#Permutation test for adonis under reduced model
-#Marginal effects of terms
-#Permutation: free
-#Number of permutations: 9999
-
-#adonis2(formula = bray_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10    9.169 0.21128 5.2632 0.0001 ***
-#Age_cat         1    0.061 0.00141 0.3515 0.8827    
-#Sex             1    0.110 0.00253 0.6304 0.6537    
-#Residual      189   32.924 0.75868                  
-#Total         201   43.396 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-
-(ad <- adonis2(bray_dist~ Species + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-
-#Permutation test for adonis under reduced model
-#Marginal effects of terms
-#Permutation: free
-#Number of permutations: 9999
-
-#adonis2(formula = bray_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5    6.733 0.15515 7.3883 0.0001 ***
-#Age_cat    1    0.153 0.00353 0.8403 0.4808    
-#Sex        1    0.092 0.00212 0.5056 0.7603    
-#Residual 194   35.359 0.81480                  
-#Total    201   43.396 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# Runs four distance metrics (Jaccard, Bray-Curtis, unweighted UniFrac, weighted UniFrac)
+# for a given taxonomic level. Returns a named list of adonis2 results.
+permanova_at_level <- function(ps_base, level, seed = 42) {
+  ps <- if (level == "OTU99") ps_base else speedyseq::tax_glom(ps_base, level)
+  ps <- ps %>%
+    biomeUtils::removeZeros() %>%
+    subset_samples(Genus == "Fringilla" & !is.na(Sex) & Age > 0) %>%
+    biomeUtils::removeZeros()
+  
+  jac_dist <- vegdist(otu_table(ps), method = "jaccard", binary = TRUE)
+  bray_dist <- vegdist(otu_table(ps), method = "bray", binary = FALSE)
+  uw_dist <- UniFrac(ps, weighted = FALSE)
+  w_dist <- UniFrac(ps, weighted = TRUE)
+  
+  formula <- ~ Species_Label + Age_cat + Sex
+  
+  set.seed(seed); jac  <- adonis2(update(formula, jac_dist  ~ .), data = meta(ps), by = "margin", permutations = 9999)
+  set.seed(seed); bray <- adonis2(update(formula, bray_dist ~ .), data = meta(ps), by = "margin", permutations = 9999)
+  set.seed(seed); uw   <- adonis2(update(formula, uw_dist   ~ .), data = meta(ps), by = "margin", permutations = 9999)
+  set.seed(seed); w    <- adonis2(update(formula, w_dist    ~ .), data = meta(ps), by = "margin", permutations = 9999)
+  
+  list(Jaccard = jac, `Bray-Curtis` = bray,
+       `Unweighted UniFrac` = uw, `Weighted UniFrac` = w)
+}
 
 ```
 
-Class level
+```{r permanova-run, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
 
-```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+tax_levels <- c("Phylum", "Class", "Order", "Family", "Genus", "Species", "OTU99")
 
-ps_fringilla <- speedyseq::tax_glom(microb_fr , "Class")
-ps_fringilla <- biomeUtils::removeZeros(ps_fringilla)
+results_by_level <- lapply(tax_levels, function(lvl) {
+  message("Running PERMANOVA at level: ", lvl)
+  permanova_at_level(microb_fr, lvl)
+})
+names(results_by_level) <- tax_levels
 
-ps_fringilla <- ps_fringilla  %>% subset_samples(Genus == "Fringilla") %>% subset_samples(!is.na(Sex)) %>% subset_samples(Age > 0) %>% removeZeros()
-
-df <- meta(ps_fringilla)
-head(df,3)
-table(df$Species)
-
-# Jaccard
-jaccard_dist <- vegdist(otu_table(ps_fringilla), method = "jaccard", binary = TRUE)
-
-set.seed(42)
-(ad <- adonis2(jaccard_dist~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-
-#Permutation test for adonis under reduced model
-#Marginal effects of terms
-#Permutation: free
-#Number of permutations: 9999#
-
-#adonis2(formula = jaccard_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10    5.548 0.13644 3.0851 0.0001 ***
-#Age_cat         1    0.241 0.00593 1.3417 0.1742    
-#Sex             1    0.280 0.00689 1.5577 0.0883 .  
-#Residual      189   33.989 0.83587                  
-#Total         201   40.663 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-(ad <- adonis2(jaccard_dist~ Species + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-#Permutation test for adonis under reduced model
-#Marginal effects of terms
-#Permutation: free
-#Number of permutations: 9999
-
-#adonis2(formula = jaccard_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5    2.949 0.07253 3.1276 0.0001 ***
-#Age_cat    1    0.263 0.00646 1.3923 0.1440    
-#Sex        1    0.286 0.00703 1.5148 0.0993 .  
-#Residual 194   36.588 0.89979                  
-#Total    201   40.663 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-
-bray_dist <- vegdist(otu_table(ps_fringilla), method = "bray", binary = FALSE)
-
-set.seed(42)
-(ad <- adonis2(bray_dist~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-#Permutation test for adonis under reduced model
-#Marginal effects of terms
-#Permutation: free
-#Number of permutations: 9999
-
-#adonis2(formula = bray_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#              Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10   10.445 0.20825 5.2250 0.0001 ***
-#Age_cat         1    0.059 0.00118 0.2953 0.9366    
-#Sex             1    0.175 0.00349 0.8762 0.4770    
-#Residual      189   37.782 0.75329                  
-#Total         201   50.156 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-
-(ad <- adonis2(bray_dist~ Species + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-#Permutation test for adonis under reduced model
-#Marginal effects of terms
-#Permutation: free
-#Number of permutations: 9999
-#
-#adonis2(formula = bray_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations# = 9999, by = "margin")
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5    7.126 0.14207 6.7267 0.0001 ***
-#Age_cat    1    0.556 0.01109 2.6264 0.0271 *  
-#Sex        1    0.155 0.00309 0.7317 0.5858    
-#Residual 194   41.101 0.81947                  
-#Total    201   50.156 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+# Print everything for inspection
+results_by_level
 
 ```
-Order level
 
-```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
-
-ps_fringilla <- speedyseq::tax_glom(microb_fr , "Order")
-ps_fringilla <- biomeUtils::removeZeros(ps_fringilla)
-
-ps_fringilla <- ps_fringilla  %>% subset_samples(Genus == "Fringilla") %>% subset_samples(!is.na(Sex)) %>% subset_samples(Age > 0) %>% removeZeros()
-
-df <- meta(ps_fringilla)
-head(df,3)
-table(df$Species)
-
-# Jaccard
-jaccard_dist <- vegdist(otu_table(ps_fringilla), method = "jaccard", binary = TRUE)
-
-set.seed(42)
-(ad <- adonis2(jaccard_dist~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-#Permutation test for adonis under reduced model
-#Marginal effects of terms
-#Permutation: free
-#Number of permutations: 9999
-
-#adonis2(formula = jaccard_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10    7.381 0.13362 3.0003 0.0001 ***
-#Age_cat         1    0.232 0.00420 0.9426 0.5233    
-#Sex             1    0.299 0.00541 1.2147 0.1871    
-#Residual      189   46.494 0.84169                  
-#Total         201   55.239 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-
-
-(ad <- adonis2(jaccard_dist~ Species + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-#Permutation test for adonis under reduced model
-#Marginal effects of terms
-#Permutation: free
-#Number of permutations: 9999
-
-#adonis2(formula = jaccard_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5    4.146 0.07505 3.2347 0.0001 ***
-#Age_cat    1    0.369 0.00667 1.4377 0.0699 .  
-#Sex        1    0.299 0.00542 1.1675 0.2309    
-#Residual 194   49.729 0.90025                  
-#Total    201   55.239 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-
-bray_dist <- vegdist(otu_table(ps_fringilla), method = "bray", binary = FALSE)
-
-set.seed(42)
-(ad <- adonis2(bray_dist~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-#Permutation test for adonis under reduced model
-#Marginal effects of terms
-#Permutation: free
-#Number of permutations: 9999
-
-#adonis2(formula = bray_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10   11.205 0.17573 4.2250 0.0001 ***
-#Age_cat         1    0.165 0.00259 0.6221 0.8035    
-#Sex             1    0.259 0.00407 0.9778 0.4203    
-#Residual      189   50.123 0.78610                  
-#Total         201   63.761 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-
-(ad <- adonis2(bray_dist~ Species + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-#Permutation test for adonis under reduced model
-#Marginal effects of terms
-#Permutation: free
-#Number of permutations: 9999
-
-#adonis2(formula = bray_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5    7.717 0.12103 5.5852 0.0001 ***
-#Age_cat    1    0.590 0.00925 2.1344 0.0335 *  
-#Sex        1    0.262 0.00411 0.9481 0.4482    
-#Residual 194   53.610 0.84080                  
-#Total    201   63.761 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-```
-Family level
-
-```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
-
-ps_fringilla <- speedyseq::tax_glom(microb_fr , "Family")
-ps_fringilla <- biomeUtils::removeZeros(ps_fringilla)
-
-ps_fringilla <- ps_fringilla  %>% subset_samples(Genus == "Fringilla") %>% subset_samples(!is.na(Sex)) %>% subset_samples(Age > 0) %>% removeZeros()
-
-df <- meta(ps_fringilla)
-head(df,3)
-table(df$Species)
-
-# Jaccard
-jaccard_dist <- vegdist(otu_table(ps_fringilla), method = "jaccard", binary = TRUE)
-
-set.seed(42)
-(ad <- adonis2(jaccard_dist~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-
-#Permutation test for adonis under reduced model
-#Marginal effects of terms
-#Permutation: free
-#Number of permutations: 9999
-
-#adonis2(formula = jaccard_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10    7.921 0.12696 2.8127 0.0001 ***
-#Age_cat         1    0.243 0.00390 0.8640 0.7178    
-#Sex             1    0.243 0.00390 0.8634 0.7236    
-#Residual      189   53.223 0.85314                  
-#Total         201   62.385 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-
-
-(ad <- adonis2(jaccard_dist~ Species + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-#Permutation test for adonis under reduced model
-#Marginal effects of terms
-#Permutation: free
-#Number of permutations: 9999
-
-#adonis2(formula = jaccard_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5    4.528 0.07258 3.1032 0.0001 ***
-#Age_cat    1    0.338 0.00542 1.1590 0.1987    
-#Sex        1    0.238 0.00382 0.8171 0.8126    
-#Residual 194   56.616 0.90752                  
-#Total    201   62.385 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-
-bray_dist <- vegdist(otu_table(ps_fringilla), method = "bray", binary = FALSE)
-
-set.seed(42)
-(ad <- adonis2(bray_dist~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-#Permutation test for adonis under reduced model
-#Marginal effects of terms
-#Permutation: free
-#Number of permutations: 9999
-
-#adonis2(formula = bray_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10   14.230 0.19182 4.6891 0.0001 ***
-#Age_cat         1    0.197 0.00266 0.6494 0.8391    
-#Sex             1    0.329 0.00443 1.0831 0.3305    
-#Residual      189   57.356 0.77316                  
-#Total         201   74.183 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-
-(ad <- adonis2(bray_dist~ Species + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-#Permutation test for adonis under reduced model
-#Marginal effects of terms
-#Permutation: free
-#Number of permutations: 9999
-
-#adonis2(formula = bray_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5   10.513 0.14171 6.6787 0.0001 ***
-#Age_cat    1    0.720 0.00971 2.2877 0.0144 *  
-#Sex        1    0.328 0.00442 1.0414 0.3652    
-#Residual 194   61.073 0.82327                  
-#Total    201   74.183 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-```
-
-Genus level
-
-```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
-
-ps_fringilla <- speedyseq::tax_glom(microb_fr , "Genus")
-ps_fringilla <- biomeUtils::removeZeros(ps_fringilla)
-
-
-ps_fringilla <- ps_fringilla  %>% subset_samples(Genus == "Fringilla") %>% subset_samples(!is.na(Sex)) %>% subset_samples(Age > 0) %>% removeZeros()
-
-df <- meta(ps_fringilla)
-head(df,3)
-table(df$Species)
-
-# Jaccard
-jaccard_dist <- vegdist(otu_table(ps_fringilla), method = "jaccard", binary = TRUE)
-
-set.seed(42)
-(ad <- adonis2(jaccard_dist~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-#adonis2(formula = jaccard_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10    9.130 0.11545 2.5223 0.0001 ***
-#Age_cat         1    0.318 0.00403 0.8799 0.8036    
-#Sex             1    0.350 0.00443 0.9674 0.5435    
-#Residual      189   68.416 0.86508                  
-#Total         201   79.086 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-
-(ad <- adonis2(jaccard_dist~ Species + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-#adonis2(formula = jaccard_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5    5.085 0.06430 2.7230 0.0001 ***
-#Age_cat    1    0.462 0.00584 1.2364 0.0653 .  
-#Sex        1    0.344 0.00435 0.9215 0.6801    
-#Residual 194   72.461 0.91623                  
-#Total    201   79.086 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-
-bray_dist <- vegdist(otu_table(ps_fringilla), method = "bray", binary = FALSE)
-
-set.seed(42)
-(ad <- adonis2(bray_dist~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-#adonis2(formula = bray_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10   14.715 0.17475 4.1767 0.0001 ***
-#Age_cat         1    0.241 0.00286 0.6835 0.9044    
-#Sex             1    0.538 0.00639 1.5281 0.0665 .  
-#Residual      189   66.587 0.79075                  
-#Total         201   84.207 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-
-(ad <- adonis2(bray_dist~ Species + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-#adonis2(formula = bray_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5   10.293 0.12223 5.6241 0.0001 ***
-#Age_cat    1    0.625 0.00742 1.7070 0.0367 *  
-#Sex        1    0.528 0.00627 1.4418 0.0821 .  
-#Residual 194   71.009 0.84326                  
-#Total    201   84.207 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-```
-
-OTU level
-
-```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
-
-ps_fringilla <- microb_fr
-ps_fringilla <- biomeUtils::removeZeros(ps_fringilla)
-
-ps_fringilla <- ps_fringilla  %>% subset_samples(Genus == "Fringilla") %>% subset_samples(!is.na(Sex)) %>% subset_samples(Age > 0) %>% removeZeros()
-
-df <- meta(ps_fringilla)
-head(df,3)
-table(df$Species)
-
-# Jaccard
-jaccard_dist <- vegdist(otu_table(ps_fringilla), method = "jaccard", binary = TRUE)
-
-set.seed(42)
-(ad <- adonis2(jaccard_dist~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-#Permutation test for adonis under reduced model
-#Marginal effects of terms
-#Permutation: free
-#Number of permutations: 9999
-
-#adonis2(formula = jaccard_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10    8.449 0.08736 1.8387 0.0001 ***
-#Age_cat         1    0.453 0.00468 0.9856 0.5688    
-#Sex             1    0.460 0.00476 1.0010 0.4478    
-#Residual      189   86.848 0.89799                  
-#Total         201   96.713 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-
-
-(ad <- adonis2(jaccard_dist~ Species + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-#Permutation test for adonis under reduced model
-#Marginal effects of terms
-#Permutation: free
-#Number of permutations: 9999
-
-#adonis2(formula = jaccard_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5    4.253 0.04397 1.8124 0.0001 ***
-#Age_cat    1    0.595 0.00616 1.2686 0.0006 ***
-#Sex        1    0.461 0.00477 0.9833 0.5845    
-#Residual 194   91.044 0.94138                  
-#Total    201   96.713 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-
-bray_dist <- vegdist(otu_table(ps_fringilla), method = "bray", binary = FALSE)
-
-set.seed(42)
-(ad <- adonis2(bray_dist~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-#Permutation test for adonis under reduced model
-#Marginal effects of terms
-#Permutation: free
-#Number of permutations: 9999
-
-#adonis2(formula = bray_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10   13.854 0.15005 3.4445 0.0001 ***
-#Age_cat         1    0.433 0.00469 1.0757 0.2770    
-#Sex             1    0.440 0.00477 1.0947 0.2525    
-#Residual      189   76.018 0.82333                  
-#Total         201   92.330 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-(ad <- adonis2(bray_dist~ Species + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-#permutations = 9999))
-#Permutation test for adonis under reduced model
-#Marginal effects of terms
-#Permutation: free
-#Number of permutations: 9999
-
-#adonis2(formula = bray_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5    9.804 0.10618 4.7508 0.0001 ***
-#Age_cat    1    0.648 0.00701 1.5689 0.0349 *  
-#Sex        1    0.436 0.00472 1.0558 0.2897    
-#Residual 194   80.068 0.86719                  
-#Total    201   92.330 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-```
-
-## Repeat analysis using weighted and unweighted UniFrac
-
-```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
-
-# SPECIES LEVEL 
-
-ps_fringilla <- speedyseq::tax_glom(microb_fr, "Species")
-ps_fringilla <- biomeUtils::removeZeros(ps_fringilla)
-ps_fringilla <- ps_fringilla %>% subset_samples(Genus == "Fringilla") %>% subset_samples(!is.na(Sex)) %>% subset_samples(Age > 0) %>% removeZeros()
-
-# Unweighted UniFrac
-unifrac_uw_dist <- UniFrac(ps_fringilla, weighted = FALSE)
-
-set.seed(42)
-(ad <- adonis2(unifrac_uw_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
-
-#adonis2(formula = unifrac_uw_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10    7.886 0.12386 2.7402 0.0001 ***
-#Age_cat         1    0.259 0.00407 0.8996 0.6599    
-#Sex             1    0.282 0.00444 0.9815 0.4641    
-#Residual      189   54.392 0.85429                  
-#Total         201   63.669 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-set.seed(42)
-(ad <- adonis2(unifrac_uw_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
-
-#adonis2(formula = unifrac_uw_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5    4.516 0.07093 3.0335 0.0001 ***
-#Age_cat    1    0.386 0.00606 1.2951 0.0780 .  
-#Sex        1    0.282 0.00443 0.9477 0.5451    
-#Residual 194   57.762 0.90722                  
-#Total    201   63.669 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-# Weighted UniFrac
-unifrac_w_dist <- UniFrac(ps_fringilla, weighted = TRUE)
-
-set.seed(42)
-(ad <- adonis2(unifrac_w_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
-
-#adonis2(formula = unifrac_w_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10    9.515 0.19927 4.8938 0.0001 ***
-#Age_cat         1    0.131 0.00275 0.6761 0.7493    
-#Sex             1    0.240 0.00503 1.2363 0.2380    
-#Residual      189   36.748 0.76957                  
-#Total         201   47.751 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-set.seed(42)
-(ad <- adonis2(unifrac_w_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
-
-#adonis2(formula = unifrac_w_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5    6.262 0.13115 6.0744 0.0001 ***
-#Age_cat    1    0.461 0.00966 2.2365 0.0258 *  
-#Sex        1    0.230 0.00481 1.1142 0.3087    
-#Residual 194   40.001 0.83769                  
-#Total    201   47.751 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-# PHYLUM LEVEL
-
-ps_fringilla <- speedyseq::tax_glom(microb_fr, "Phylum")
-ps_fringilla <- biomeUtils::removeZeros(ps_fringilla)
-ps_fringilla <- ps_fringilla %>% subset_samples(Genus == "Fringilla") %>% subset_samples(!is.na(Sex)) %>% subset_samples(Age > 0) %>% removeZeros()
-
-# Unweighted UniFrac
-unifrac_uw_dist <- UniFrac(ps_fringilla, weighted = FALSE)
-
-set.seed(42)
-(ad <- adonis2(unifrac_uw_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
-
-
-#adonis2(formula = unifrac_uw_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10    4.889 0.13889 3.1538 0.0001 ***
-#Age_cat         1    0.235 0.00668 1.5171 0.1586    
-#Sex             1    0.257 0.00731 1.6605 0.1180    
-#Residual      189   29.299 0.83236                  
-#Total         201   35.200 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-
-set.seed(42)
-(ad <- adonis2(unifrac_uw_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
-
-#adonis2(formula = unifrac_uw_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5    2.919 0.08292 3.6217 0.0001 ***
-#Age_cat    1    0.160 0.00456 0.9955 0.4156    
-#Sex        1    0.265 0.00753 1.6453 0.1219    
-#Residual 194   31.269 0.88833                  
-#Total    201   35.200 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-
-# Weighted UniFrac
-unifrac_w_dist <- UniFrac(ps_fringilla, weighted = TRUE)
-
-set.seed(42)
-(ad <- adonis2(unifrac_w_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
-
-#adonis2(formula = unifrac_w_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10    7.551 0.23492 5.9873 0.0001 ***
-#Age_cat         1    0.058 0.00181 0.4621 0.7592    
-#Sex             1    0.085 0.00265 0.6744 0.5817    
-#Residual      189   23.836 0.74158                  
-#Total         201   32.143 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-set.seed(42)
-(ad <- adonis2(unifrac_w_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
-
-#adonis2(formula = unifrac_w_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5    5.191 0.16151 7.6890 0.0001 ***
-#Age_cat    1    0.122 0.00378 0.9001 0.4315    
-#Sex        1    0.066 0.00204 0.4863 0.7371    
-#Residual 194   26.196 0.81499                  
-#Total    201   32.143 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-# CLASS LEVEL
-
-ps_fringilla <- speedyseq::tax_glom(microb_fr, "Class")
-ps_fringilla <- biomeUtils::removeZeros(ps_fringilla)
-ps_fringilla <- ps_fringilla %>% subset_samples(Genus == "Fringilla") %>% subset_samples(!is.na(Sex)) %>% subset_samples(Age > 0) %>% removeZeros()
-
-# Unweighted UniFrac
-unifrac_uw_dist <- UniFrac(ps_fringilla, weighted = FALSE)
-
-set.seed(42)
-(ad <- adonis2(unifrac_uw_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
-
-#adonis2(formula = unifrac_uw_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10    5.142 0.13339 3.0063 0.0001 ***
-#Age_cat         1    0.242 0.00627 1.4130 0.1555    
-#Sex             1    0.276 0.00717 1.6157 0.0904 .  
-#Residual      189   32.326 0.83860                  
-#Total         201   38.548 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-
-set.seed(42)
-(ad <- adonis2(unifrac_uw_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
-
-#adonis2(formula = unifrac_uw_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5    2.874 0.07457 3.2239 0.0001 ***
-#Age_cat    1    0.230 0.00597 1.2897 0.2107    
-#Sex        1    0.283 0.00734 1.5864 0.0974 .  
-#Residual 194   34.593 0.89742                  
-#Total    201   38.548 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-
-
-# Weighted UniFrac
-unifrac_w_dist <- UniFrac(ps_fringilla, weighted = TRUE)
-
-set.seed(42)
-(ad <- adonis2(unifrac_w_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
-
-#adonis2(formula = unifrac_w_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10    8.285 0.22791 5.8130 0.0001 ***
-#Age_cat         1    0.059 0.00162 0.4127 0.8264    
-#Sex             1    0.118 0.00325 0.8286 0.4907    
-#Residual      189   26.938 0.74102                  
-#Total         201   36.353 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-set.seed(42)
-(ad <- adonis2(unifrac_w_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
-
-#adonis2(formula = unifrac_w_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5    5.432 0.14942 7.0742 0.0001 ***
-#Age_cat    1    0.378 0.01039 2.4586 0.0464 *  
-#Sex        1    0.095 0.00261 0.6171 0.6499    
-#Residual 194   29.792 0.81951                  
-#Total    201   36.353 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-
-# ORDER LEVEL
-
-ps_fringilla <- speedyseq::tax_glom(microb_fr, "Order")
-ps_fringilla <- biomeUtils::removeZeros(ps_fringilla)
-ps_fringilla <- ps_fringilla %>% subset_samples(Genus == "Fringilla") %>% subset_samples(!is.na(Sex)) %>% subset_samples(Age > 0) %>% removeZeros()
-
-# Unweighted UniFrac
-unifrac_uw_dist <- UniFrac(ps_fringilla, weighted = FALSE)
-
-set.seed(42)
-(ad <- adonis2(unifrac_uw_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
-
-#adonis2(formula = unifrac_uw_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10    6.744 0.13641 3.0787 0.0001 ***
-#Age_cat         1    0.229 0.00463 1.0454 0.3744    
-#Sex             1    0.281 0.00568 1.2827 0.1632    
-#Residual      189   41.402 0.83743                  
-#Total         201   49.440 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-set.seed(42)
-(ad <- adonis2(unifrac_uw_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
-
-#adonis2(formula = unifrac_uw_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5    3.862 0.07812 3.3839 0.0001 ***
-#Age_cat    1    0.337 0.00681 1.4756 0.0783 .  
-#Sex        1    0.282 0.00570 1.2339 0.1917    
-#Residual 194   44.284 0.89572                  
-#Total    201   49.440 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-# Weighted UniFrac
-
-
-unifrac_w_dist <- UniFrac(ps_fringilla, weighted = TRUE)
-
-set.seed(42)
-(ad <- adonis2(unifrac_w_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
-
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10    8.655 0.19985 4.9142 0.0001 ***
-#Age_cat         1    0.125 0.00288 0.7084 0.6564    
-#Sex             1    0.194 0.00449 1.1030 0.3272    
-#Residual      189   33.289 0.76862                  
-#Total         201   43.310 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-set.seed(42)
-(ad <- adonis2(unifrac_w_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
-
-#adonis2(formula = unifrac_w_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5    5.191 0.16151 7.6890 0.0001 ***
-#Age_cat    1    0.122 0.00378 0.9001 0.4207    
-#Sex        1    0.066 0.00204 0.4863 0.7365    
-#Residual 194   26.196 0.81499                  
-#Total    201   32.143 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-
-# FAMILY LEVEL
-
-ps_fringilla <- speedyseq::tax_glom(microb_fr, "Family")
-ps_fringilla <- biomeUtils::removeZeros(ps_fringilla)
-ps_fringilla <- ps_fringilla %>% subset_samples(Genus == "Fringilla") %>% subset_samples(!is.na(Sex)) %>% subset_samples(Age > 0) %>% removeZeros()
-
-# Unweighted UniFrac
-unifrac_uw_dist <- UniFrac(ps_fringilla, weighted = FALSE)
-
-set.seed(42)
-(ad <- adonis2(unifrac_uw_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
-
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10    7.266 0.13355 2.9918 0.0001 ***
-#Age_cat         1    0.237 0.00435 0.9751 0.4680    
-#Sex             1    0.254 0.00467 1.0461 0.3549    
-#Residual      189   45.900 0.84366                  
-#Total         201   54.406 1.00000  
-
-set.seed(42)
-(ad <- adonis2(unifrac_uw_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
-
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5    4.248 0.07807 3.3691 0.0001 ***
-#Age_cat    1    0.333 0.00613 1.3221 0.1083    
-#Sex        1    0.252 0.00464 1.0002 0.4240    
-#Residual 194   48.918 0.89913                  
-#Total    201   54.406 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-
-# Weighted UniFrac
-unifrac_w_dist <- UniFrac(ps_fringilla, weighted = TRUE)
-
-set.seed(42)
-(ad <- adonis2(unifrac_w_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
-
-#adonis2(formula = unifrac_w_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10    8.655 0.19985 4.9142 0.0001 ***
-#Age_cat         1    0.125 0.00288 0.7084 0.6564    
-#Sex             1    0.194 0.00449 1.1030 0.3272    
-#Residual      189   33.289 0.76862                  
-#Total         201   43.310 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-set.seed(42)
-(ad <- adonis2(unifrac_w_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
-
-
-#adonis2(formula = unifrac_w_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5    5.687 0.13131 6.0861 0.0001 ***
-#Age_cat    1    0.440 0.01017 2.3564 0.0269 *  
-#Sex        1    0.186 0.00428 0.9929 0.3966    
-#Residual 194   36.257 0.83715                  
-#Total    201   43.310 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-
-# GENUS LEVEL
-
-ps_fringilla <- speedyseq::tax_glom(microb_fr, "Genus")
-ps_fringilla <- biomeUtils::removeZeros(ps_fringilla)
-ps_fringilla <- ps_fringilla %>% subset_samples(Genus == "Fringilla") %>% subset_samples(!is.na(Sex)) %>% subset_samples(Age > 0) %>% removeZeros()
-
-# Unweighted UniFrac
-unifrac_uw_dist <- UniFrac(ps_fringilla, weighted = FALSE)
-
-set.seed(42)
-(ad <- adonis2(unifrac_uw_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
-
-#adonis2(formula = unifrac_uw_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10    7.874 0.12663 2.8114 0.0001 ***
-#Age_cat         1    0.256 0.00412 0.9145 0.6110    
-#Sex             1    0.276 0.00444 0.9854 0.4543    
-#Residual      189   52.933 0.85129                  
-#Total         201   62.179 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-set.seed(42)
-(ad <- adonis2(unifrac_uw_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
-
-#adonis2(formula = unifrac_uw_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5    4.566 0.07344 3.1502 0.0001 ***
-#Age_cat    1    0.372 0.00598 1.2834 0.0911 .  
-#Sex        1    0.275 0.00443 0.9495 0.5357    
-#Residual 194   56.240 0.90449                  
-#Total    201   62.179 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-# Weighted UniFrac
-unifrac_w_dist <- UniFrac(ps_fringilla, weighted = TRUE)
-
-set.seed(42)
-(ad <- adonis2(unifrac_w_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
-
-#adonis2(formula = unifrac_w_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10    9.508 0.19953 4.9018 0.0001 ***
-#Age_cat         1    0.131 0.00274 0.6741 0.7505    
-#Sex             1    0.241 0.00507 1.2449 0.2337    
-#Residual      189   36.659 0.76935                  
-#Total         201   47.649 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-set.seed(42)
-(ad <- adonis2(unifrac_w_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
-
-#adonis2(formula = unifrac_w_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5    6.264 0.13147 6.0912 0.0001 ***
-#Age_cat    1    0.460 0.00965 2.2348 0.0220 *  
-#Sex        1    0.231 0.00484 1.1219 0.3032    
-#Residual 194   39.902 0.83741                  
-#Total    201   47.649 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-# OTU LEVEL
-
-ps_fringilla <- microb_fr
-ps_fringilla <- biomeUtils::removeZeros(ps_fringilla)
-ps_fringilla <- ps_fringilla %>% subset_samples(Genus == "Fringilla") %>% subset_samples(!is.na(Sex)) %>% subset_samples(Age > 0) %>% removeZeros()
-
-# Unweighted UniFrac
-unifrac_uw_dist <- UniFrac(ps_fringilla, weighted = FALSE)
-
-set.seed(42)
-(ad <- adonis2(unifrac_uw_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
-
-#adonis2(formula = unifrac_uw_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10    8.172 0.11740 2.5744 0.0001 ***
-#Age_cat         1    0.292 0.00420 0.9213 0.6559    
-#Sex             1    0.328 0.00471 1.0336 0.3452    
-#Residual      189   59.992 0.86187                  
-#Total         201   69.607 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-set.seed(42)
-(ad <- adonis2(unifrac_uw_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
-
-#adonis2(formula = unifrac_uw_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5    4.632 0.06655 2.8290 0.0001 ***
-#Age_cat    1    0.422 0.00606 1.2886 0.0545 .  
-#Sex        1    0.330 0.00474 1.0067 0.4132    
-#Residual 194   63.531 0.91271                  
-#Total    201   69.607 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1 
-
-
-# Weighted UniFrac
-unifrac_w_dist <- UniFrac(ps_fringilla, weighted = TRUE)
-
-set.seed(42)
-(ad <- adonis2(unifrac_w_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
-
-#adonis2(formula = unifrac_w_dist ~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10    9.466 0.19672 4.8161 0.0001 ***
-#Age_cat         1    0.141 0.00293 0.7161 0.7062    
-#Sex             1    0.242 0.00503 1.2316 0.2382    
-#Residual      189   37.149 0.77201                  
-#Total         201   48.120 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
-
-set.seed(42)
-(ad <- adonis2(unifrac_w_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), by = "margin", permutations = 9999))
-
-
-#adonis2(formula = unifrac_w_dist ~ Species + Age_cat + Sex, data = meta(ps_fringilla), permutations = 9999, by = "margin")
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5    6.222 0.12931 5.9768 0.0001 ***
-#Age_cat    1    0.476 0.00989 2.2859 0.0188 *  
-#Sex        1    0.232 0.00482 1.1148 0.3061    
-#Residual 194   40.393 0.83943                  
-#Total    201   48.120 1.00000                  
-#---
-#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+## BUILD COMBINED RESULTS TABLE
+
+```{r table, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# Helper to extract a tidy data frame from one adonis2 result
+extract_adonis <- function(adonis_result, distance_metric, taxonomic_level) {
+  df <- as.data.frame(adonis_result)
+  df$Predictor <- rownames(df)
+  df <- df[!df$Predictor %in% c("Residual", "Total"), ]
+  
+  data.frame(
+    `Distance metric` = distance_metric,
+    `Taxonomic Level` = taxonomic_level,
+    Predictor = df$Predictor,
+    R2 = round(df$R2, 3),
+    F = round(df$F, 3),
+    pvalue = df$`Pr(>F)`,
+    check.names = FALSE,
+    stringsAsFactors = FALSE
+  )
+}
+
+# Flatten all results into one table, ordered: Jaccard, Bray, UW UniFrac, W UniFrac
+# within each taxonomic level
+permanova_table <- bind_rows(lapply(tax_levels, function(lvl) {
+  bind_rows(
+    extract_adonis(results_by_level[[lvl]]$Jaccard,            "Jaccard",            lvl),
+    extract_adonis(results_by_level[[lvl]]$`Bray-Curtis`,      "Bray-Curtis",        lvl),
+    extract_adonis(results_by_level[[lvl]]$`Unweighted UniFrac`, "Unweighted UniFrac", lvl),
+    extract_adonis(results_by_level[[lvl]]$`Weighted UniFrac`,   "Weighted UniFrac",   lvl)
+  )
+}))
+
+# Format p-values
+permanova_table$pvalue <- ifelse(
+  permanova_table$pvalue < 0.001,
+  "<0.001",
+  formatC(permanova_table$pvalue, format = "f", digits = 3)
+)
+
+write.csv(permanova_table,
+          file = paste0(outputDir, "/permanova_results_full.csv"),
+          row.names = FALSE)
+
+# To access individual results from R:
+# results_by_level[["Family"]][["Bray-Curtis"]]
 
 ```

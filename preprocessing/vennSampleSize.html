@@ -7,9 +7,9 @@
 
         <meta name="author" content="B. K. Montero and M. Gillingham" />
     
-        <meta name="date" content="2026-05-11" />
+        <meta name="date" content="2026-05-18" />
     
-    <title>Ordination 16S data</title>
+    <title>Sample sizes and corrected phyloseq objects</title>
 
         <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -1577,10 +1577,13 @@ Prism.languages.r={comment:/#.*/,string:{pattern:/(['"])(?:\\.|(?!\1)[^\\\r\n])*
             <ul>
             <li><a href="#load-libraries">LOAD LIBRARIES</a></li>
             <li><a href="#working-directories">WORKING DIRECTORIES</a></li>
-            <li><a href="#load-16s-data">LOAD 16S DATA</a></li>
-            <li><a href="#nmds-at-species-level-bray-curtis">NMDS AT SPECIES LEVEL (Bray-Curtis)</a></li>
-            <li><a href="#permanova-across-taxonomic-levels">PERMANOVA ACROSS TAXONOMIC LEVELS</a></li>
-            <li><a href="#build-combined-results-table">BUILD COMBINED RESULTS TABLE</a></li>
+            <li><a href="#load-and-correct-phyloseq-objects">LOAD AND CORRECT PHYLOSEQ OBJECTS</a></li>
+            <li><a href="#verify-sample-sizes">VERIFY SAMPLE SIZES</a></li>
+            <li><a href="#venn-diagram">VENN DIAGRAM</a></li>
+            <li><a href="#per-population-summary-table">PER-POPULATION SUMMARY TABLE</a></li>
+            <li><a href="#export-corrected-phyloseq-objects">EXPORT CORRECTED PHYLOSEQ OBJECTS</a></li>
+            <li><a href="#create-supplementary-metadata-table">CREATE SUPPLEMENTARY METADATA TABLE</a></li>
+            <li><a href="#mean-roh-per-population">MEAN ROH PER POPULATION</a></li>
             </ul>
           </div>
           <div data-position="sidebar:post-end" class="InjectedComponents"><div class="dark-theme-toggler"><div class="toggle "><div class="toggle-track"><div class="toggle-track-check"><img src="data:image/png;base64,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" role="presentation" style="pointer-events: none;" width="16" height="16"></div> <div class="toggle-track-x"><img src="data:image/png;base64,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" role="presentation" style="pointer-events: none;" width="16" height="16"></div></div> <div class="toggle-thumb"></div></div> <input type="checkbox" aria-label="Switch between Dark and Default theme" class="toggler-screen-reader-only"></div></div>
@@ -1597,12 +1600,12 @@ Prism.languages.r={comment:/#.*/,string:{pattern:/(['"])(?:\\.|(?!\1)[^\\\r\n])*
    </div>
    
         
-      <h1 class="title">Ordination 16S data</h1>
+      <h1 class="title">Sample sizes and corrected phyloseq objects</h1>
       
       <p class="authors">
            <span class="glyphicon glyphicon-user"></span> B. K. Montero and M. Gillingham
       </p>
-         <p class="date"><span class="glyphicon glyphicon-calendar"></span> 2026-05-11</p>
+         <p class="date"><span class="glyphicon glyphicon-calendar"></span> 2026-05-18</p>
            
 
    
@@ -1616,644 +1619,463 @@ Prism.languages.r={comment:/#.*/,string:{pattern:/(['"])(?:\\.|(?!\1)[^\\\r\n])*
 
 # basics
 library(dplyr)
-library(tidyverse)
+library(tidyr)
 library(stringr)
-library(ggplot2)
 
-# phyloseq + diversity
+# phyloseq
 library(phyloseq)
 library(biomeUtils)
-library(microbiome)
-library(vegan)</code></pre>
+
+# venn diagram
+library(grid)
+library(VennDiagram)</code></pre>
 </div>
 <div id="working-directories" class="section level2">
 <h2>WORKING DIRECTORIES</h2>
-<pre class="r"><code>source(&quot;~/Dropbox/FringillaMicrobiome/05_Scripts/workingDirectories.R&quot;)
-source(&quot;~/Dropbox/FringillaMicrobiome/05_Scripts/CleanScripts/graphics_param.R&quot;)</code></pre>
+<pre class="r"><code>source(&quot;~/Dropbox/FringillaMicrobiome/05_Scripts/workingDirectories.R&quot;)</code></pre>
 </div>
-<div id="load-16s-data" class="section level2">
-<h2>LOAD 16S DATA</h2>
-<pre class="r"><code>microb_fr &lt;- readRDS(paste0(dataDir, &quot;/microb_fr_corrected.rds&quot;)) %&gt;%
-    biomeUtils::removeZeros()</code></pre>
+<div id="load-and-correct-phyloseq-objects" class="section level2">
+<h2>LOAD AND CORRECT PHYLOSEQ OBJECTS</h2>
+<pre class="r"><code># Sample 89 is a duplicate of 88 (lower
+# sequencing depth, excluded) Sample 398R is
+# a re-extraction of 398; rename to merge
+
+apply_corrections &lt;- function(ps) {
+    ps &lt;- ps %&gt;%
+        subset_samples(Lab_Code != &quot;89&quot;) %&gt;%
+        removeZeros()
+    sample_data(ps)$Lab_Code[sample_data(ps)$Lab_Code ==
+        &quot;398R&quot;] &lt;- &quot;398&quot;
+    ps
+}
+
+# Microbiome (all Fringilla)
+microb_fr &lt;- readRDS(paste0(dataDir, &quot;/ps_OTU99_wAlpha_fr_taxFix.rds&quot;)) %&gt;%
+    subset_samples(Genus == &quot;Fringilla&quot;) %&gt;%
+    apply_corrections()
+
+# Microbiome (Fringilla with diet overlap)
+microb_overlap_diet &lt;- readRDS(paste0(dataDir,
+    &quot;/microb_overlap_OTU99_fr_taxFix.rds&quot;)) %&gt;%
+    subset_samples(Genus == &quot;Fringilla&quot;) %&gt;%
+    apply_corrections()
+
+# Diet (all Fringilla)
+diet_fr &lt;- readRDS(paste0(dataDir, &quot;/ps_diet_rarefied.rds&quot;)) %&gt;%
+    subset_samples(Genus == &quot;Fringilla&quot;) %&gt;%
+    apply_corrections()
+
+# Diet (Fringilla with microbiome overlap)
+diet_overlap_microb &lt;- readRDS(paste0(dataDir,
+    &quot;/diet_overlap_OTU99_fr.rds&quot;)) %&gt;%
+    apply_corrections()
+
+# WGS (Fringilla, microbiome-overlap,
+# excluding low-quality WGS samples)
+wgs_qc_exclude &lt;- c(&quot;132&quot;, &quot;252&quot;)
+wgs_fr &lt;- microb_fr %&gt;%
+    subset_samples(WGS_data == 1 &amp; !Lab_Code %in%
+        wgs_qc_exclude)
+
+wgs_microb &lt;- microb_overlap_diet %&gt;%
+    subset_samples(WGS_data == 1 &amp; !Lab_Code %in%
+        wgs_qc_exclude)
+
+# Sanity check
+nrow(sample_data(microb_fr))  # 234</code></pre>
+<pre><code>## [1] 234</code></pre>
+<pre class="r"><code>nrow(sample_data(diet_fr))  # 276</code></pre>
+<pre><code>## [1] 276</code></pre>
+<pre class="r"><code>nrow(sample_data(microb_overlap_diet))  # 208</code></pre>
+<pre><code>## [1] 208</code></pre>
+<pre class="r"><code>nrow(sample_data(diet_overlap_microb))  # 208</code></pre>
+<pre><code>## [1] 208</code></pre>
+<pre class="r"><code>nrow(sample_data(wgs_fr))  # 106</code></pre>
+<pre><code>## [1] 106</code></pre>
+<pre class="r"><code>nrow(sample_data(wgs_microb))  # 103</code></pre>
+<pre><code>## [1] 103</code></pre>
 </div>
-<div id="nmds-at-species-level-bray-curtis" class="section level2">
-<h2>NMDS AT SPECIES LEVEL (Bray-Curtis)</h2>
-<pre class="r"><code>ps_fringilla &lt;- speedyseq::tax_glom(microb_fr,
-    &quot;Species&quot;) %&gt;%
-    biomeUtils::removeZeros()
+<div id="verify-sample-sizes" class="section level2">
+<h2>VERIFY SAMPLE SIZES</h2>
+<pre class="r"><code>diet_codes &lt;- sample_data(diet_fr)$Lab_Code
+microb_codes &lt;- sample_data(microb_fr)$Lab_Code
+wgs_codes &lt;- sample_data(wgs_fr)$Lab_Code
 
-set.seed(1)
-ord &lt;- metaMDS(otu_table(ps_fringilla), distance = &quot;bray&quot;,
-    k = 8, binary = FALSE)</code></pre>
-<pre><code>## Square root transformation
-## Wisconsin double standardization
-## Run 0 stress 0.09836932 
-## Run 1 stress 0.09792143 
-## ... New best solution
-## ... Procrustes: rmse 0.02130248  max resid 0.09371834 
-## Run 2 stress 0.09858832 
-## Run 3 stress 0.0991731 
-## Run 4 stress 0.09837134 
-## ... Procrustes: rmse 0.01844119  max resid 0.06381256 
-## Run 5 stress 0.0996052 
-## Run 6 stress 0.09802244 
-## ... Procrustes: rmse 0.01424684  max resid 0.0628416 
-## Run 7 stress 0.09846974 
-## Run 8 stress 0.09823318 
-## ... Procrustes: rmse 0.02005818  max resid 0.09686977 
-## Run 9 stress 0.09818498 
-## ... Procrustes: rmse 0.01934323  max resid 0.1065405 
-## Run 10 stress 0.09844321 
-## Run 11 stress 0.09911149 
-## Run 12 stress 0.0979396 
-## ... Procrustes: rmse 0.01610915  max resid 0.09385687 
-## Run 13 stress 0.09807407 
-## ... Procrustes: rmse 0.02214428  max resid 0.1002099 
-## Run 14 stress 0.0985767 
-## Run 15 stress 0.09863733 
-## Run 16 stress 0.09860824 
-## Run 17 stress 0.09895406 
-## Run 18 stress 0.09849147 
-## Run 19 stress 0.09868567 
-## Run 20 stress 0.09847055 
-## *** Best solution was not repeated -- monoMDS stopping criteria:
-##     20: no. of iterations &gt;= maxit</code></pre>
-<pre class="r"><code>scrs &lt;- scores(ord, display = &quot;sites&quot;) %&gt;%
-    as.data.frame() %&gt;%
-    mutate(Species_Label = sample_data(ps_fringilla)$Species_Label)
+# Total unique birds: should be 302
+length(unique(c(diet_codes, microb_codes, wgs_codes)))</code></pre>
+<pre><code>## [1] 302</code></pre>
+<pre class="r"><code># Set differences
+length(setdiff(diet_codes, microb_codes))  # 68 diet-only</code></pre>
+<pre><code>## [1] 68</code></pre>
+<pre class="r"><code>length(setdiff(microb_codes, diet_codes))  # 26 microb-only</code></pre>
+<pre><code>## [1] 26</code></pre>
+<pre class="r"><code>length(setdiff(wgs_codes, microb_codes))  # 0  (all WGS birds in microbiome)</code></pre>
+<pre><code>## [1] 0</code></pre>
+<pre class="r"><code>length(setdiff(wgs_codes, diet_codes))  # 3  (3 WGS birds without diet)</code></pre>
+<pre><code>## [1] 3</code></pre>
+</div>
+<div id="venn-diagram" class="section level2">
+<h2>VENN DIAGRAM</h2>
+<pre class="r"><code># area1 = diet, area2 = microbiome, area3 = WGS
+# n12 = diet ∩ microbiome
+# n13 = diet ∩ WGS
+# n23 = microbiome ∩ WGS
+# n123 = all three
 
-cent &lt;- aggregate(cbind(NMDS1, NMDS2) ~ Species_Label,
-    data = scrs, FUN = mean)
+png(paste0(outputDir, &quot;/Figures/VennSampleSize.png&quot;),
+  width = 320, height = 240, units = &quot;mm&quot;, res = 1000
+)
 
-png(paste0(outputDir, &quot;/Figures/bray_NMDS_species_speciesFix.png&quot;),
-    width = 320, height = 240, units = &quot;mm&quot;, res = 1000)
-(bray_NMDS &lt;- ggplot(scrs, aes(x = NMDS1, y = NMDS2,
-    fill = Species_Label, shape = Species_Label)) +
-    geom_point(alpha = 1, size = 10, stroke = 1.5,
-        color = &quot;white&quot;) + geom_point(data = cent,
-    aes(y = NMDS2, x = NMDS1, fill = Species_Label),
-    size = 17, stroke = 1.5, color = &quot;black&quot;) +
-    pca_theme + SpeciesLabel.fill + scale_y_continuous(labels = scales::number_format(accuracy = 0.01)) +
-    scale_shape_manual(values = c(21, 22, 23,
-        21, 23, 25, 21, 21, 21, 22, 25), guide = &quot;none&quot;) +
-    guides(color = &quot;none&quot;))
+grid.newpage()
+draw.triple.venn(
+  area1 = 234, # microbiome
+  area2 = 276, # diet
+  area3 = 106, # WGS
+  n12 = 208, # diet ∩ microbiome
+  n13 = 106, # microbiome ∩ WGS
+  n23 = 103, # diet ∩ WGS
+  n123 = 103, # all three
+  category = c(&quot;&quot;, &quot;&quot;, &quot;&quot;),
+  rotation = 1,
+  lwd = c(3, 3, 3),
+  fontfamily = rep(&quot;arial&quot;, 7),
+  col = &quot;Black&quot;,
+  fill = c(&quot;grey&quot;, &quot;black&quot;, &quot;white&quot;),
+  cex = 4, cat.cex = 2,
+  euler.d = TRUE, scaled = TRUE
+)
+
 dev.off()</code></pre>
 <pre><code>## png 
 ##   2</code></pre>
 </div>
-<div id="permanova-across-taxonomic-levels" class="section level2">
-<h2>PERMANOVA ACROSS TAXONOMIC LEVELS</h2>
-<pre class="r"><code># Runs four distance metrics (Jaccard,
-# Bray-Curtis, unweighted UniFrac, weighted
-# UniFrac) for a given taxonomic level.
-# Returns a named list of adonis2 results.
-permanova_at_level &lt;- function(ps_base, level,
-    seed = 42) {
-    ps &lt;- if (level == &quot;OTU99&quot;)
-        ps_base else speedyseq::tax_glom(ps_base, level)
-    ps &lt;- ps %&gt;%
-        biomeUtils::removeZeros() %&gt;%
-        subset_samples(Genus == &quot;Fringilla&quot; &amp;
-            !is.na(Sex) &amp; Age &gt; 0) %&gt;%
-        biomeUtils::removeZeros()
+<div id="per-population-summary-table" class="section level2">
+<h2>PER-POPULATION SUMMARY TABLE</h2>
+<pre class="r"><code># Build per-bird presence indicators
+diet_df &lt;- data.frame(Lab_Code = sample_data(diet_fr)$Lab_Code,
+    Species_Label = gsub(&quot; &quot;, &quot;_&quot;, sample_data(diet_fr)$Species_Label),
+    in_diet = TRUE)
 
-    jac_dist &lt;- vegdist(otu_table(ps), method = &quot;jaccard&quot;,
-        binary = TRUE)
-    bray_dist &lt;- vegdist(otu_table(ps), method = &quot;bray&quot;,
-        binary = FALSE)
-    uw_dist &lt;- UniFrac(ps, weighted = FALSE)
-    w_dist &lt;- UniFrac(ps, weighted = TRUE)
+microb_df &lt;- data.frame(Lab_Code = sample_data(microb_fr)$Lab_Code,
+    Species_Label = gsub(&quot; &quot;, &quot;_&quot;, sample_data(microb_fr)$Species_Label),
+    in_microb = TRUE)
 
-    formula &lt;- ~Species_Label + Age_cat + Sex
+wgs_df &lt;- data.frame(Lab_Code = sample_data(wgs_fr)$Lab_Code,
+    Species_Label = gsub(&quot; &quot;, &quot;_&quot;, sample_data(wgs_fr)$Species_Label),
+    in_wgs = TRUE)
 
-    set.seed(seed)
-    jac &lt;- adonis2(update(formula, jac_dist ~
-        .), data = meta(ps), by = &quot;margin&quot;, permutations = 9999)
-    set.seed(seed)
-    bray &lt;- adonis2(update(formula, bray_dist ~
-        .), data = meta(ps), by = &quot;margin&quot;, permutations = 9999)
-    set.seed(seed)
-    uw &lt;- adonis2(update(formula, uw_dist ~ .),
-        data = meta(ps), by = &quot;margin&quot;, permutations = 9999)
-    set.seed(seed)
-    w &lt;- adonis2(update(formula, w_dist ~ .),
-        data = meta(ps), by = &quot;margin&quot;, permutations = 9999)
+all_birds &lt;- bind_rows(diet_df, microb_df, wgs_df) %&gt;%
+    group_by(Lab_Code, Species_Label) %&gt;%
+    summarise(in_diet = any(in_diet, na.rm = TRUE),
+        in_microb = any(in_microb, na.rm = TRUE),
+        in_wgs = any(in_wgs, na.rm = TRUE), .groups = &quot;drop&quot;) %&gt;%
+    mutate(across(starts_with(&quot;in_&quot;), ~replace_na(.,
+        FALSE)))
 
-    list(Jaccard = jac, `Bray-Curtis` = bray,
-        `Unweighted UniFrac` = uw, `Weighted UniFrac` = w)
-}</code></pre>
-<pre class="r"><code>tax_levels &lt;- c(&quot;Phylum&quot;, &quot;Class&quot;, &quot;Order&quot;, &quot;Family&quot;,
-    &quot;Genus&quot;, &quot;Species&quot;, &quot;OTU99&quot;)
+# Per-population counts
+summary_table &lt;- all_birds %&gt;%
+    group_by(Species_Label) %&gt;%
+    summarise(Total_samples = n(), N_microbiome = sum(in_microb),
+        N_diet = sum(in_diet), N_WGS = sum(in_wgs),
+        Diet_and_Microb = sum(in_diet &amp; in_microb),
+        All_three = sum(in_diet &amp; in_microb &amp;
+            in_wgs), .groups = &quot;drop&quot;)
 
-results_by_level &lt;- lapply(tax_levels, function(lvl) {
-    message(&quot;Running PERMANOVA at level: &quot;, lvl)
-    permanova_at_level(microb_fr, lvl)
-})
-names(results_by_level) &lt;- tax_levels
+# Verify totals (should be 302, 234, 276,
+# 106, 208, 103)
+summary_table %&gt;%
+    summarise(total = sum(Total_samples), micro = sum(N_microbiome),
+        diet = sum(N_diet), wgs = sum(N_WGS),
+        diet_microb = sum(Diet_and_Microb), all_three = sum(All_three))</code></pre>
+<pre><code>## # A tibble: 1 × 6
+##   total micro  diet   wgs diet_microb all_three
+##   &lt;int&gt; &lt;int&gt; &lt;int&gt; &lt;int&gt;       &lt;int&gt;     &lt;int&gt;
+## 1   302   234   276   106         208       103</code></pre>
+<pre class="r"><code># Add metadata
+bird_metadata &lt;- data.frame(Species_Label = gsub(&quot; &quot;,
+    &quot;_&quot;, sample_data(diet_fr)$Species_Label),
+    Archipelago_Mainland = sample_data(diet_fr)$Archipelago_Mainland,
+    Island_Mainland = sample_data(diet_fr)$Island_Mainland,
+    Genus = sample_data(diet_fr)$Genus, Species = sample_data(diet_fr)$Species,
+    Subspecies = sample_data(diet_fr)$Subspecies,
+    stringsAsFactors = FALSE) %&gt;%
+    distinct(Species_Label, .keep_all = TRUE)
 
-# Print everything for inspection
-results_by_level</code></pre>
-<pre><code>## $Phylum
-## $Phylum$Jaccard
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, jac_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    5.002 0.13207 3.3617 0.0001 ***
-## Age_cat         1    0.308 0.00812 2.0676 0.0487 *  
-## Sex             1    0.241 0.00635 1.6164 0.1223    
-## Residual      214   31.845 0.84076                  
-## Total         226   37.876 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Phylum$`Bray-Curtis`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, bray_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    9.722 0.19918 5.4709 0.0001 ***
-## Age_cat         1    0.088 0.00180 0.4945 0.7738    
-## Sex             1    0.098 0.00201 0.5527 0.7242    
-## Residual      214   38.028 0.77910                  
-## Total         226   48.810 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Phylum$`Unweighted UniFrac`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, uw_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    5.012 0.12778 3.2307 0.0001 ***
-## Age_cat         1    0.303 0.00773 1.9551 0.0649 .  
-## Sex             1    0.239 0.00610 1.5433 0.1500    
-## Residual      214   33.198 0.84643                  
-## Total         226   39.221 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Phylum$`Weighted UniFrac`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, w_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    7.967 0.22448 6.3361 0.0001 ***
-## Age_cat         1    0.069 0.00193 0.5460 0.6906    
-## Sex             1    0.049 0.00137 0.3873 0.8216    
-## Residual      214   26.909 0.75818                  
-## Total         226   35.491 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## 
-## $Class
-## $Class$Jaccard
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, jac_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    5.832 0.12864 3.2525 0.0001 ***
-## Age_cat         1    0.328 0.00724 1.8301 0.0427 *  
-## Sex             1    0.262 0.00578 1.4621 0.1217    
-## Residual      214   38.369 0.84636                  
-## Total         226   45.334 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Class$`Bray-Curtis`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, bray_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10   10.944 0.19508 5.3747 0.0001 ***
-## Age_cat         1    0.074 0.00133 0.3656 0.8993    
-## Sex             1    0.132 0.00235 0.6465 0.6750    
-## Residual      214   43.576 0.77672                  
-## Total         226   56.103 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Class$`Unweighted UniFrac`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, uw_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    5.361 0.12473 3.1399 0.0001 ***
-## Age_cat         1    0.316 0.00736 1.8519 0.0510 .  
-## Sex             1    0.259 0.00604 1.5196 0.1210    
-## Residual      214   36.541 0.85011                  
-## Total         226   42.984 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Class$`Weighted UniFrac`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, w_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    8.682 0.21737 6.1247 0.0001 ***
-## Age_cat         1    0.068 0.00171 0.4819 0.7697    
-## Sex             1    0.063 0.00157 0.4418 0.8036    
-## Residual      214   30.334 0.75951                  
-## Total         226   39.939 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## 
-## $Order
-## $Order$Jaccard
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, jac_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    7.842 0.12613 3.1652 0.0001 ***
-## Age_cat         1    0.281 0.00452 1.1350 0.2597    
-## Sex             1    0.279 0.00449 1.1268 0.2694    
-## Residual      214   53.020 0.85279                  
-## Total         226   62.173 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Order$`Bray-Curtis`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, bray_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10   11.456 0.15886 4.1982 0.0001 ***
-## Age_cat         1    0.232 0.00322 0.8509 0.5480    
-## Sex             1    0.239 0.00331 0.8743 0.5250    
-## Residual      214   58.397 0.80978                  
-## Total         226   72.115 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Order$`Unweighted UniFrac`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, uw_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    7.168 0.12859 3.2415 0.0001 ***
-## Age_cat         1    0.284 0.00509 1.2823 0.1609    
-## Sex             1    0.259 0.00464 1.1704 0.2423    
-## Residual      214   47.320 0.84896                  
-## Total         226   55.739 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Order$`Weighted UniFrac`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, w_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    9.038 0.18709 5.0852 0.0001 ***
-## Age_cat         1    0.155 0.00320 0.8704 0.5064    
-## Sex             1    0.171 0.00355 0.9648 0.4266    
-## Residual      214   38.037 0.78733                  
-## Total         226   48.311 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## 
-## $Family
-## $Family$Jaccard
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, jac_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    8.562 0.12179 3.0295 0.0001 ***
-## Age_cat         1    0.301 0.00428 1.0656 0.3182    
-## Sex             1    0.272 0.00387 0.9616 0.5135    
-## Residual      214   60.482 0.86033                  
-## Total         226   70.301 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Family$`Bray-Curtis`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, bray_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10   14.359 0.17093 4.5761 0.0001 ***
-## Age_cat         1    0.232 0.00276 0.7391 0.7353    
-## Sex             1    0.324 0.00385 1.0312 0.3765    
-## Residual      214   67.147 0.79934                  
-## Total         226   84.003 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Family$`Unweighted UniFrac`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, uw_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    7.746 0.12655 3.1735 0.0001 ***
-## Age_cat         1    0.297 0.00486 1.2183 0.1688    
-## Sex             1    0.252 0.00411 1.0307 0.3828    
-## Residual      214   52.237 0.85339                  
-## Total         226   61.211 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Family$`Weighted UniFrac`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, w_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    9.778 0.19048 5.1925 0.0001 ***
-## Age_cat         1    0.150 0.00292 0.7948 0.5929    
-## Sex             1    0.173 0.00338 0.9203 0.4732    
-## Residual      214   40.299 0.78503                  
-## Total         226   51.334 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## 
-## $Genus
-## $Genus$Jaccard
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, jac_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    9.775 0.10958 2.6846 0.0001 ***
-## Age_cat         1    0.363 0.00407 0.9980 0.4460    
-## Sex             1    0.361 0.00404 0.9907 0.4577    
-## Residual      214   77.925 0.87348                  
-## Total         226   89.212 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Genus$`Bray-Curtis`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, bray_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10   14.912 0.15689 4.1282 0.0001 ***
-## Age_cat         1    0.344 0.00362 0.9520 0.4683    
-## Sex             1    0.474 0.00498 1.3109 0.1226    
-## Residual      214   77.300 0.81330                  
-## Total         226   95.046 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Genus$`Unweighted UniFrac`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, uw_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    8.401 0.12015 2.9886 0.0001 ***
-## Age_cat         1    0.304 0.00435 1.0824 0.2817    
-## Sex             1    0.279 0.00399 0.9923 0.4369    
-## Residual      214   60.155 0.86033                  
-## Total         226   69.921 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Genus$`Weighted UniFrac`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, w_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    9.899 0.18658 5.0685 0.0001 ***
-## Age_cat         1    0.159 0.00300 0.8157 0.5903    
-## Sex             1    0.198 0.00373 1.0132 0.3839    
-## Residual      214   41.797 0.78777                  
-## Total         226   53.057 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## 
-## $Species
-## $Species$Jaccard
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, jac_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    9.777 0.10449 2.5433 0.0001 ***
-## Age_cat         1    0.375 0.00401 0.9763 0.5266    
-## Sex             1    0.377 0.00403 0.9819 0.4952    
-## Residual      214   82.264 0.87920                  
-## Total         226   93.567 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Species$`Bray-Curtis`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, bray_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10   15.177 0.15677 4.1150 0.0001 ***
-## Age_cat         1    0.343 0.00354 0.9299 0.5118    
-## Sex             1    0.446 0.00461 1.2097 0.1684    
-## Residual      214   78.925 0.81529                  
-## Total         226   96.806 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Species$`Unweighted UniFrac`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, uw_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    8.395 0.11737 2.9094 0.0001 ***
-## Age_cat         1    0.312 0.00436 1.0801 0.2772    
-## Sex             1    0.287 0.00402 0.9960 0.4341    
-## Residual      214   61.746 0.86331                  
-## Total         226   71.523 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Species$`Weighted UniFrac`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, w_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    9.899 0.18635 5.0611 0.0001 ***
-## Age_cat         1    0.161 0.00303 0.8240 0.5825    
-## Sex             1    0.198 0.00373 1.0128 0.3841    
-## Residual      214   41.857 0.78796                  
-## Total         226   53.121 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## 
-## $OTU99
-## $OTU99$Jaccard
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, jac_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    8.800 0.08086 1.9100 0.0001 ***
-## Age_cat         1    0.483 0.00443 1.0473 0.1723    
-## Sex             1    0.475 0.00436 1.0306 0.2566    
-## Residual      214   98.601 0.90600                  
-## Total         226  108.831 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $OTU99$`Bray-Curtis`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, bray_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10   13.885 0.13356 3.3926 0.0001 ***
-## Age_cat         1    0.506 0.00487 1.2358 0.1213    
-## Sex             1    0.428 0.00412 1.0468 0.2997    
-## Residual      214   87.581 0.84250                  
-## Total         226  103.955 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $OTU99$`Unweighted UniFrac`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, uw_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    8.608 0.11011 2.7042 0.0001 ***
-## Age_cat         1    0.338 0.00432 1.0615 0.2848    
-## Sex             1    0.338 0.00432 1.0618 0.2847    
-## Residual      214   68.119 0.87140                  
-## Total         226   78.172 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $OTU99$`Weighted UniFrac`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, w_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    9.861 0.18416 4.9884 0.0001 ***
-## Age_cat         1    0.171 0.00320 0.8656 0.5362    
-## Sex             1    0.201 0.00376 1.0186 0.3760    
-## Residual      214   42.304 0.79001                  
-## Total         226   53.549 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
+summary_table &lt;- summary_table %&gt;%
+    left_join(bird_metadata, by = &quot;Species_Label&quot;) %&gt;%
+    dplyr::select(Archipelago_Mainland, Island_Mainland,
+        Genus, Species, Subspecies, Total_samples,
+        N_microbiome, N_diet, N_WGS, Diet_and_Microb,
+        All_three) %&gt;%
+    arrange(factor(Archipelago_Mainland, levels = c(&quot;Mainland&quot;,
+        &quot;Azores&quot;, &quot;Madeira&quot;, &quot;Canary Islands&quot;)),
+        Island_Mainland)
+
+write.csv(summary_table, file = paste0(outputDir,
+    &quot;/sample_summary_per_population.csv&quot;), row.names = FALSE)</code></pre>
 </div>
-<div id="build-combined-results-table" class="section level2">
-<h2>BUILD COMBINED RESULTS TABLE</h2>
-<pre class="r"><code># Helper to extract a tidy data frame from
-# one adonis2 result
-extract_adonis &lt;- function(adonis_result, distance_metric,
-    taxonomic_level) {
-    df &lt;- as.data.frame(adonis_result)
-    df$Predictor &lt;- rownames(df)
-    df &lt;- df[!df$Predictor %in% c(&quot;Residual&quot;,
-        &quot;Total&quot;), ]
+<div id="export-corrected-phyloseq-objects" class="section level2">
+<h2>EXPORT CORRECTED PHYLOSEQ OBJECTS</h2>
+<pre class="r"><code>saveRDS(microb_fr, paste0(dataDir, &quot;/microb_fr_corrected.rds&quot;))
+saveRDS(diet_fr, paste0(dataDir, &quot;/diet_fr_corrected.rds&quot;))
+saveRDS(microb_overlap_diet, paste0(dataDir, &quot;/microb_overlap_diet_corrected.rds&quot;))
+saveRDS(diet_overlap_microb, paste0(dataDir, &quot;/diet_overlap_microb_corrected.rds&quot;))
+saveRDS(wgs_fr, paste0(dataDir, &quot;/wgs_fr_corrected.rds&quot;))
+saveRDS(wgs_microb, paste0(dataDir, &quot;/wgs_microb_corrected.rds&quot;))</code></pre>
+</div>
+<div id="create-supplementary-metadata-table" class="section level2">
+<h2>CREATE SUPPLEMENTARY METADATA TABLE</h2>
+<pre class="r"><code>## CREATE SUPPLEMENTARY METADATA TABLE
 
-    data.frame(`Distance metric` = distance_metric,
-        `Taxonomic Level` = taxonomic_level, Predictor = df$Predictor,
-        R2 = round(df$R2, 3), F = round(df$F,
-            3), pvalue = df$`Pr(&gt;F)`, check.names = FALSE,
-        stringsAsFactors = FALSE)
+# --- Pull sample_data tables, coerce Lab_Code to character for safe joins ---
+sd_microb &lt;- as(sample_data(microb_fr), &quot;data.frame&quot;) %&gt;%
+  mutate(Lab_Code = as.character(Lab_Code))
+sd_diet   &lt;- as(sample_data(diet_fr),   &quot;data.frame&quot;) %&gt;%
+  mutate(Lab_Code = as.character(Lab_Code))
+sd_wgs    &lt;- as(sample_data(wgs_fr),    &quot;data.frame&quot;) %&gt;%
+  mutate(Lab_Code = as.character(Lab_Code))
+
+microb_codes &lt;- unique(sd_microb$Lab_Code)
+diet_codes   &lt;- unique(sd_diet$Lab_Code)
+wgs_codes    &lt;- unique(sd_wgs$Lab_Code)
+
+# --- Harmonize diet Sex coding to character (1=male, 2=female) ---
+# Verified against sd_microb: Lab_Code 105/101/100 = male = 1; Lab_Code 106 = female = 2.
+sd_diet &lt;- sd_diet %&gt;%
+  mutate(
+    Sex = case_when(
+      as.character(Sex) == &quot;1&quot; ~ &quot;male&quot;,
+      as.character(Sex) == &quot;2&quot; ~ &quot;female&quot;,
+      TRUE ~ NA_character_
+    )
+  )
+
+AccessionNumber_df &lt;- read.csv(&quot;~/Dropbox/FringillaMicrobiome/13_ENA/02_runs/Prepare_run_submission_ENA.csv&quot;, header = TRUE, sep = &quot;;&quot;)
+
+head(AccessionNumber_df)</code></pre>
+<pre><code>##      Ring Submit_ENA   Lab_Code sampleid_16S Seq_depth  COI Raw_data_COI rbcL
+## 1 MKP2322        yes P25554_113         &lt;NA&gt;        NA &lt;NA&gt;         &lt;NA&gt; &lt;NA&gt;
+## 2 4L88808        yes P25554_111         &lt;NA&gt;        NA &lt;NA&gt;         &lt;NA&gt; &lt;NA&gt;
+## 3 4L23104        yes P25554_109         &lt;NA&gt;        NA &lt;NA&gt;         &lt;NA&gt; &lt;NA&gt;
+## 4 A407506        yes P25554_108         &lt;NA&gt;        NA &lt;NA&gt;         &lt;NA&gt; &lt;NA&gt;
+## 5 AJB4304        yes P25554_107         &lt;NA&gt;        NA &lt;NA&gt;         &lt;NA&gt; &lt;NA&gt;
+## 6  MKP596        yes P25554_106         &lt;NA&gt;        NA &lt;NA&gt;         &lt;NA&gt; &lt;NA&gt;
+##   Raw_data_rbcL        WGS num_extractions Notes Library_name_COI
+## 1          &lt;NA&gt; P25554_113               1                       
+## 2          &lt;NA&gt; P25554_111               1                       
+## 3          &lt;NA&gt; P25554_109               1                       
+## 4          &lt;NA&gt; P25554_108               1                       
+## 5          &lt;NA&gt; P25554_107               1                       
+## 6          &lt;NA&gt; P25554_106               1                       
+##   Illumina.NovaSeq.6000 InsertSize_COI InsertSize_rbcL library.selection.all
+## 1                                   NA              NA                   PCR
+## 2                                   NA              NA                   PCR
+## 3                                   NA              NA                   PCR
+## 4                                   NA              NA                   PCR
+## 5                                   NA              NA                   PCR
+## 6                                   NA              NA                   PCR
+##   library.source library.strategy library_layout   accession Project_accession
+## 1        genomic         amplicon                ERS16447124        PRJEB65290
+## 2        genomic         amplicon                ERS16447050        PRJEB65290
+## 3        genomic         amplicon                ERS16447049        PRJEB65290
+## 4        genomic         amplicon                ERS16447058        PRJEB65290
+## 5        genomic         amplicon                ERS16447096        PRJEB65290
+## 6        genomic         amplicon                ERS16447126        PRJEB65290</code></pre>
+<pre class="r"><code>ROH_data &lt;- read.csv(paste0(dataDir, &quot;/fringilla_microbiome_roh_rg_filtered.csv&quot;))
+
+head(ROH_data)</code></pre>
+<pre><code>##                         file_id total_length_bp      froh
+## 1    101_Sao_Miguel_F_moreletti       222243431 0.2209321
+## 2    105_Sao_Miguel_F_moreletti       228737075 0.2273874
+## 3    106_Sao_Miguel_F_moreletti       229670935 0.2283158
+## 4 117_La_Gomera_F_c_canariensis       715371315 0.7111503
+## 5 118_La_Gomera_F_c_canariensis       700388207 0.6962556
+## 6 120_La_Gomera_F_c_canariensis       718244435 0.7140065</code></pre>
+<pre class="r"><code># --- Build the merged base table ---
+# Slim each frame to the columns we need, then harmonize Year.
+# any_of() silently drops columns that don&#39;t exist in a given frame
+# (e.g. diet_fr has no Date / Island_Province / Age_cat),
+# so those become NA for diet-only birds after bind_rows.
+
+keep_cols &lt;- c(&quot;Lab_Code&quot;, &quot;Ring&quot;,
+               &quot;Genus&quot;, &quot;Species&quot;, &quot;Subspecies&quot;,
+               &quot;Date&quot;, &quot;Month&quot;, &quot;Year&quot;,
+               &quot;Ydec&quot;, &quot;Xdec&quot;,
+               &quot;Island_Province&quot;, &quot;Archipelago_Mainland&quot;, &quot;Island_Mainland&quot;,
+               &quot;Sex&quot;, &quot;Age_cat&quot;)
+
+shrink &lt;- function(df) {
+  df %&gt;%
+    dplyr::select(any_of(keep_cols)) %&gt;%
+    mutate(
+      Year = suppressWarnings(as.integer(Year)),
+      Ydec = suppressWarnings(as.numeric(Ydec)),
+      Xdec = suppressWarnings(as.numeric(Xdec))
+    )
 }
+sd_microb_min &lt;- shrink(sd_microb)
+sd_diet_min   &lt;- shrink(sd_diet)
+sd_wgs_min    &lt;- shrink(sd_wgs)
 
-# Flatten all results into one table,
-# ordered: Jaccard, Bray, UW UniFrac, W
-# UniFrac within each taxonomic level
-permanova_table &lt;- bind_rows(lapply(tax_levels,
-    function(lvl) {
-        bind_rows(extract_adonis(results_by_level[[lvl]]$Jaccard,
-            &quot;Jaccard&quot;, lvl), extract_adonis(results_by_level[[lvl]]$`Bray-Curtis`,
-            &quot;Bray-Curtis&quot;, lvl), extract_adonis(results_by_level[[lvl]]$`Unweighted UniFrac`,
-            &quot;Unweighted UniFrac&quot;, lvl), extract_adonis(results_by_level[[lvl]]$`Weighted UniFrac`,
-            &quot;Weighted UniFrac&quot;, lvl))
-    }))
+diet_only_rows &lt;- sd_diet_min %&gt;% filter(!Lab_Code %in% microb_codes)
+wgs_only_rows  &lt;- sd_wgs_min  %&gt;% filter(!Lab_Code %in% microb_codes,
+                                         !Lab_Code %in% diet_only_rows$Lab_Code)
 
-# Format p-values
-permanova_table$pvalue &lt;- ifelse(permanova_table$pvalue &lt;
-    0.001, &quot;&lt;0.001&quot;, formatC(permanova_table$pvalue,
-    format = &quot;f&quot;, digits = 3))
+supp_meta &lt;- bind_rows(sd_microb_min, diet_only_rows, wgs_only_rows) %&gt;%
+  distinct(Lab_Code, .keep_all = TRUE)
 
-write.csv(permanova_table, file = paste0(outputDir,
-    &quot;/permanova_results_full.csv&quot;), row.names = FALSE)
+ 
 
-# To access individual results from R:
-# results_by_level[[&#39;Family&#39;]][[&#39;Bray-Curtis&#39;]]</code></pre>
+# --- Re-derive dataset-inclusion indicators from actual phyloseq membership ---
+# (overwrites the WGS_data / diet_data columns inherited from microb_fr so they
+# reflect post-correction, post-QC inclusion)
+supp_meta &lt;- supp_meta %&gt;%
+  mutate(
+    microb_data = as.integer(Lab_Code %in% microb_codes),
+    diet_data   = as.integer(Lab_Code %in% diet_codes),
+    WGS_data    = as.integer(Lab_Code %in% wgs_codes)
+  )
+
+# --- Join ENA accession from AccessionNumber_df (key: Ring) ---
+acc_lookup &lt;- AccessionNumber_df %&gt;%
+  dplyr::select(Ring, accession) %&gt;%
+  distinct(Ring, .keep_all = TRUE)
+
+supp_meta &lt;- supp_meta %&gt;%
+  left_join(acc_lookup, by = &quot;Ring&quot;)
+
+roh_lookup &lt;- ROH_data %&gt;%
+  mutate(Lab_Code = sub(&quot;_.*&quot;, &quot;&quot;, file_id)) %&gt;%
+  dplyr::select(Lab_Code, ROH_coef = froh) %&gt;%
+  distinct(Lab_Code, .keep_all = TRUE)
+
+supp_meta &lt;- supp_meta %&gt;%
+  left_join(roh_lookup, by = &quot;Lab_Code&quot;)
+
+
+# --- Order columns to match the supplementary template ---
+supp_meta &lt;- supp_meta %&gt;%
+  dplyr::select(
+    accession,
+    Lab_Code,
+    Ring,
+    Genus, Species, Subspecies,
+    Date, Month, Year,
+    Ydec, Xdec,
+    Island_Province,
+    Archipelago_Mainland,
+    Island_Mainland,
+    Sex,
+    Age_cat,
+    microb_data,
+    diet_data,
+    WGS_data,
+    ROH_coef
+    # ROH_coef -- add here once we know its source
+  ) %&gt;%
+  arrange(factor(Archipelago_Mainland,
+                 levels = c(&quot;Mainland&quot;, &quot;Azores&quot;, &quot;Madeira&quot;, &quot;Canary Islands&quot;)),
+          Island_Mainland, Genus, Species, Subspecies)
+
+# --- Sanity checks: totals ---
+nrow(supp_meta)                                                       # 302</code></pre>
+<pre><code>## [1] 302</code></pre>
+<pre class="r"><code>sum(supp_meta$microb_data)                                            # 234</code></pre>
+<pre><code>## [1] 234</code></pre>
+<pre class="r"><code>sum(supp_meta$diet_data)                                              # 276</code></pre>
+<pre><code>## [1] 276</code></pre>
+<pre class="r"><code>sum(supp_meta$WGS_data)                                               # 106</code></pre>
+<pre><code>## [1] 106</code></pre>
+<pre class="r"><code>sum(supp_meta$microb_data &amp; supp_meta$diet_data)                      # 208</code></pre>
+<pre><code>## [1] 208</code></pre>
+<pre class="r"><code>sum(supp_meta$microb_data &amp; supp_meta$diet_data &amp; supp_meta$WGS_data) # 103</code></pre>
+<pre><code>## [1] 103</code></pre>
+<pre class="r"><code># --- Audit: diet-only birds will have NA for columns missing in diet_fr ---
+diet_only_check &lt;- supp_meta %&gt;% filter(microb_data == 0 &amp; diet_data == 1)
+nrow(diet_only_check)                          # expect 68</code></pre>
+<pre><code>## [1] 68</code></pre>
+<pre class="r"><code>sum(is.na(diet_only_check$Date))               # expect 68</code></pre>
+<pre><code>## [1] 68</code></pre>
+<pre class="r"><code>sum(is.na(diet_only_check$Island_Province))    # expect 68</code></pre>
+<pre><code>## [1] 68</code></pre>
+<pre class="r"><code>sum(is.na(diet_only_check$Age_cat))            # expect 68</code></pre>
+<pre><code>## [1] 68</code></pre>
+<pre class="r"><code>supp_meta %&gt;% filter(is.na(accession)) %&gt;%
+  dplyr::select(Lab_Code, Ring, Genus, Species, microb_data, diet_data, WGS_data)</code></pre>
+<pre><code>##   Lab_Code       Ring     Genus Species microb_data diet_data WGS_data
+## 1      280 Sin anilla Fringilla coelebs           1         0        0</code></pre>
+<pre class="r"><code># Re-check
+sum(is.na(supp_meta$accession))   # should be 0</code></pre>
+<pre><code>## [1] 1</code></pre>
+<pre class="r"><code>supp_meta &lt;- supp_meta %&gt;%
+  mutate(accession = if_else(Lab_Code == &quot;280&quot; &amp; is.na(accession),
+                             &quot;ERS16447430&quot;,
+                             accession))
+
+# Re-check
+sum(is.na(supp_meta$accession))   # should be 0</code></pre>
+<pre><code>## [1] 0</code></pre>
+<pre class="r"><code>supp_meta %&gt;% filter(Lab_Code == &quot;280&quot;) %&gt;%
+  dplyr::select(accession, Lab_Code, Ring, Genus, Species, Date, Island_Mainland)</code></pre>
+<pre><code>##     accession Lab_Code       Ring     Genus Species       Date Island_Mainland
+## 1 ERS16447430      280 Sin anilla Fringilla coelebs 20/05/2021        Mainland</code></pre>
+<pre class="r"><code>write.csv(supp_meta,
+          file = paste0(outputDir, &quot;/sample_metadata_supplementary.csv&quot;),
+          row.names = FALSE)</code></pre>
+</div>
+<div id="mean-roh-per-population" class="section level2">
+<h2>MEAN ROH PER POPULATION</h2>
+<pre class="r"><code># Subset to birds with a ROH value (WGS
+# subset, post rg-filtering)
+roh_pop &lt;- supp_meta %&gt;%
+    filter(!is.na(ROH_coef)) %&gt;%
+    mutate(Subspecies = ifelse(is.na(Subspecies),
+        &quot;&quot;, Subspecies)) %&gt;%
+    group_by(Archipelago_Mainland, Island_Mainland,
+        Genus, Species, Subspecies) %&gt;%
+    summarise(n = n(), mean_ROH = mean(ROH_coef),
+        sd_ROH = sd(ROH_coef), se_ROH = sd_ROH/sqrt(n),
+        CI95_lower = mean_ROH - qt(0.975, df = n -
+            1) * se_ROH, CI95_upper = mean_ROH +
+            qt(0.975, df = n - 1) * se_ROH, .groups = &quot;drop&quot;) %&gt;%
+    arrange(factor(Archipelago_Mainland, levels = c(&quot;Mainland&quot;,
+        &quot;Azores&quot;, &quot;Madeira&quot;, &quot;Canary Islands&quot;)),
+        Island_Mainland, Genus, Species, Subspecies)
+
+# Sanity check: total n should match
+# supp_meta WGS count with non-NA ROH
+sum(roh_pop$n)  # n WGS birds with ROH</code></pre>
+<pre><code>## [1] 107</code></pre>
+<pre class="r"><code>sum(!is.na(supp_meta$ROH_coef))  # should match</code></pre>
+<pre><code>## [1] 107</code></pre>
+<pre class="r"><code>sum(!is.na(supp_meta$ROH_coef) &amp; supp_meta$WGS_data ==
+    1)  # should also match</code></pre>
+<pre><code>## [1] 106</code></pre>
+<pre class="r"><code># Round for export
+roh_pop_out &lt;- roh_pop %&gt;%
+    mutate(across(c(mean_ROH, sd_ROH, se_ROH,
+        CI95_lower, CI95_upper), ~round(., 4)))
+
+write.csv(roh_pop_out, file = paste0(outputDir,
+    &quot;/ROH_per_population.csv&quot;), row.names = FALSE)
+
+roh_pop_out</code></pre>
+<pre><code>## # A tibble: 11 × 11
+##    Archipelago_Mainland Island_Mainland Genus  Species Subspecies     n mean_ROH
+##    &lt;chr&gt;                &lt;chr&gt;           &lt;chr&gt;  &lt;chr&gt;   &lt;chr&gt;      &lt;int&gt;    &lt;dbl&gt;
+##  1 Mainland             Mainland        Fring… coelebs &quot;&quot;             2   0.0297
+##  2 Azores               Flores          Fring… morele… &quot;&quot;            10   0.255 
+##  3 Azores               Sao Miguel      Fring… morele… &quot;&quot;            10   0.227 
+##  4 Madeira              Madeira         Fring… madere… &quot;&quot;            11   0.614 
+##  5 Canary Islands       El Hierro       Fring… canari… &quot;ombriosa&quot;    12   0.716 
+##  6 Canary Islands       Gran Canaria    Fring… canari… &quot;bakeri&quot;      10   0.760 
+##  7 Canary Islands       Gran Canaria    Fring… polatz… &quot;&quot;            11   0.921 
+##  8 Canary Islands       La Gomera       Fring… canari… &quot;canarien…    11   0.704 
+##  9 Canary Islands       La Palma        Fring… canari… &quot;palmae&quot;      11   0.776 
+## 10 Canary Islands       Tenerife        Fring… canari… &quot;canarien…    10   0.787 
+## 11 Canary Islands       Tenerife        Fring… teydea  &quot;&quot;             9   0.924 
+## # ℹ 4 more variables: sd_ROH &lt;dbl&gt;, se_ROH &lt;dbl&gt;, CI95_lower &lt;dbl&gt;,
+## #   CI95_upper &lt;dbl&gt;</code></pre>
 </div>
 </div>
 

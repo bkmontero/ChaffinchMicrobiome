@@ -1,0 +1,1182 @@
+---
+title: 'Effect of colonisation history and biogeography'
+author: "B. K. Montero and M. Gillingham"
+date: "`r Sys.Date()`"
+output: 
+  rmdformats::downcute:
+    code_folding: hide
+    toc_depth: 2
+---
+
+
+## LOAD LIBRARIES
+
+```{r libraries, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+rm(list = ls())
+
+# basics
+library(tibble)
+library(dplyr)
+library(tidyverse)
+library(data.table)
+library(ggtern)
+library(patchwork)
+
+# phyloseq section
+library(phyloseq)
+library(Biostrings)
+library(microbiome)
+library(biomeUtils)
+library(microViz)
+
+# diversity 
+library(adespatial)
+
+
+#rmd
+library(details)
+library(knitr)
+library(kableExtra)
+
+#models
+library(MASS)
+library(MuMIn)
+library(car)
+library(multcomp)
+library(glmmTMB)
+library(ggeffects)
+```
+
+## WORKING DIRECTORIES
+
+```{r source, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/workingDirectories.R")
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/CleanScripts/graphics_param.R")
+
+```
+
+## SHARED LABELLING SCHEME
+
+```{r labelling, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+order_levels <- c(
+  "Mainland : F.coelebs",
+  "Sao Miguel : F.moreletti",
+  "Flores : F.moreletti",
+  "Madeira : F.maderensis",
+  "El Hierro : F.c.ombriosa",
+  "La Palma : F.c.palmae",
+  "Gran Canaria : F.c.bakeri",
+  "Tenerife : F.c.canariensis",
+  "La Gomera : F.c.canariensis",
+  "Tenerife : F.teydea",
+  "Gran Canaria : F.polatzeki"
+)
+
+short_labels <- c(
+  "Mainland : F.coelebs"           = "Mainland",
+  "Sao Miguel : F.moreletti"       = "Sao Miguel",
+  "Flores : F.moreletti"           = "Flores",
+  "Madeira : F.maderensis"         = "Madeira",
+  "El Hierro : F.c.ombriosa"       = "El Hierro",
+  "La Palma : F.c.palmae"          = "La Palma",
+  "Gran Canaria : F.c.bakeri"      = "Gran Canaria",
+  "Tenerife : F.c.canariensis"     = "Tenerife",
+  "La Gomera : F.c.canariensis"    = "La Gomera",
+  "Tenerife : F.teydea"            = "Tenerife",
+  "Gran Canaria : F.polatzeki"     = "Gran Canaria"
+)
+
+species_complex_lookup <- c(
+  "Mainland : F.coelebs"           = "Common chaffinch species complex",
+  "Sao Miguel : F.moreletti"       = "Common chaffinch species complex",
+  "Flores : F.moreletti"           = "Common chaffinch species complex",
+  "Madeira : F.maderensis"         = "Common chaffinch species complex",
+  "El Hierro : F.c.ombriosa"       = "Common chaffinch species complex",
+  "La Palma : F.c.palmae"          = "Common chaffinch species complex",
+  "Gran Canaria : F.c.bakeri"      = "Common chaffinch species complex",
+  "Tenerife : F.c.canariensis"     = "Common chaffinch species complex",
+  "La Gomera : F.c.canariensis"    = "Common chaffinch species complex",
+  "Tenerife : F.teydea"            = "Blue finches",
+  "Gran Canaria : F.polatzeki"     = "Blue finches"
+)
+
+order_to_species_label <- c(
+  "Mainland : F.coelebs"           = "Mainland_F_coelebs",
+  "Sao Miguel : F.moreletti"       = "Sao Miguel_F_moreletti",
+  "Flores : F.moreletti"           = "Flores_F_moreletti",
+  "Madeira : F.maderensis"         = "Madeira_F_maderensis",
+  "El Hierro : F.c.ombriosa"       = "El Hierro_F_c_ombriosa",
+  "La Palma : F.c.palmae"          = "La Palma_F_c_palmae",
+  "Gran Canaria : F.c.bakeri"      = "Gran Canaria_F_c_bakeri",
+  "Tenerife : F.c.canariensis"     = "Tenerife_F_c_canariensis",
+  "La Gomera : F.c.canariensis"    = "La Gomera_F_c_canariensis",
+  "Tenerife : F.teydea"            = "Tenerife_F_teydea",
+  "Gran Canaria : F.polatzeki"     = "Gran Canaria_F_polatzeki"
+)
+
+
+SpeciesLabel.order_local <- c(
+  "Mainland_F_coelebs",
+  "Sao Miguel_F_moreletti",
+  "Flores_F_moreletti",
+  "Madeira_F_maderensis",
+  "El Hierro_F_c_ombriosa",
+  "La Palma_F_c_palmae",
+  "Gran Canaria_F_c_bakeri",
+  "Tenerife_F_c_canariensis",
+  "La Gomera_F_c_canariensis",
+  "Tenerife_F_teydea",
+  "Gran Canaria_F_polatzeki"
+)
+
+SpeciesLabel.colors_local <- c(
+  "Mainland_F_coelebs"           = "black",
+  "Sao Miguel_F_moreletti"       = "darkred",
+  "Flores_F_moreletti"           = "darkred",
+  "Madeira_F_maderensis"         = "#E6AB02",
+  "El Hierro_F_c_ombriosa"       = "#006D2C",
+  "La Palma_F_c_palmae"          = "#BAE4B3",
+  "Gran Canaria_F_c_bakeri"      = "#31A354",
+  "Tenerife_F_c_canariensis"     = "#708238",
+  "La Gomera_F_c_canariensis"    = "#708238",
+  "Tenerife_F_teydea"            = "#A6CEE3",
+  "Gran Canaria_F_polatzeki"     = "#1F78B4"
+)
+
+SpeciesLabel.fill_local <- scale_fill_manual(
+  name = "Island / Mainland",
+  values = SpeciesLabel.colors_local,
+  limits = SpeciesLabel.order_local,
+  guide = "none"
+)
+
+```
+
+## LOAD 16S DATA
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+ps_fringilla_rare <- readRDS(paste0(dataDir, "/microb_fr_corrected.rds"))
+ps_fringilla_rare <- biomeUtils::removeZeros(ps_fringilla_rare)
+ps_fringilla_rare <- speedyseq::tax_glom(ps_fringilla_rare, "Species")
+ps_fringilla_rare <- biomeUtils::removeZeros(ps_fringilla_rare)
+
+```
+
+
+```{r helpers, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# Convert a p-value to significance stars
+p_to_stars <- function(p) {
+  ifelse(is.na(p), "",
+    ifelse(p < 0.001, "***",
+      ifelse(p < 0.01, "**",
+        ifelse(p < 0.05, "*", ""))))
+}
+
+# Build the significance stars vector from a glm.nb fit,
+# matched to the order_levels vector
+build_signif_stars <- function(model) {
+  ci <- as_tibble(confint(model), rownames = 'predictor')
+  coefs <- as_tibble(summary(model)$coefficients)
+  
+  tab <- cbind(ci, coefs)
+  
+  # Back-transform on log scale
+  tab$CImin <- c(tab$`2.5 %`[1], tab$Estimate[1] + tab$`2.5 %`[-1])
+  tab$CImax <- c(tab$`97.5 %`[1], tab$Estimate[1] + tab$`97.5 %`[-1])
+  tab$Estimate.transformed <- c(tab$Estimate[1], tab$Estimate[1] + tab$Estimate[-1])
+  tab$Estimate <- exp(tab$Estimate.transformed)
+  tab$CImin <- exp(tab$CImin)
+  tab$CImax <- exp(tab$CImax)
+  
+  tab %>%
+    mutate(island = predictor %>%
+             str_replace("\\(Intercept\\)", "Mainland : F.coelebs") %>%
+             str_replace("Species_Label", "") %>%
+             str_replace("_F_", " : F.") %>%
+             str_replace("c_", "c.") %>%
+             str_replace("_", " ")) %>%
+    mutate(Order = factor(island, levels = order_levels),
+           p.signif = p_to_stars(`Pr(>|z|)`)) %>%
+    # Intercept (Mainland) is always blank
+    mutate(p.signif = ifelse(predictor == "(Intercept)", "", p.signif)) %>%
+    arrange(Order) %>%
+    dplyr::select(Order, Estimate, CImin, CImax, `Pr(>|z|)`, p.signif)
+}
+
+# Build a parsed annotation string for biogeography plots
+# Format: "atop(paste(~beta~' = 0.157 [0.002, 0.311];'),~italic('p-value')~'= 0.047')"
+build_biogeo_annot <- function(model, term) {
+  ci <- confint(model)
+  est <- summary(model)$coefficients$cond[term, "Estimate"]
+  p <- summary(model)$coefficients$cond[term, "Pr(>|z|)"]
+  cimin <- ci[term, 1]
+  cimax <- ci[term, 2]
+  
+  p_str <- if (p < 0.001) "'< 0.001'" else paste0("'= ", formatC(p, format = "f", digits = 3), "'")
+  
+  paste0("atop(paste(~beta~' = ", formatC(est, format = "f", digits = 3),
+         " [", formatC(cimin, format = "f", digits = 3), ", ",
+         formatC(cimax, format = "f", digits = 3), "];'),~italic('p-value')~", p_str, ")")
+}
+
+```
+
+## TESTING THE EFFECT OF COLONISATION HISTORY
+
+### ALPHA DIVERSITY
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, fig.width=14, fig.height=7}
+
+rich <- estimate_richness(ps_fringilla_rare, measures = c("Observed", "Shannon"))
+pd <- calculatePD(ps_fringilla_rare, justDF = TRUE)
+
+sample_data(ps_fringilla_rare)$Observed_sps_rare <- rich$Observed
+sample_data(ps_fringilla_rare)$PD_sps_rare <- pd$PD
+sample_data(ps_fringilla_rare)$PD_integer <- round(pd$PD, 0)
+
+alpha_df <- data.frame(sample_data(ps_fringilla_rare))
+
+mainland_fringilla <- alpha_df %>% dplyr::filter(!is.na(Age_cat) & !is.na(Sex))
+mainland_fringilla$Species_Label <- as.factor(mainland_fringilla$Species_Label)
+mainland_fringilla$Species_Label <- relevel(mainland_fringilla$Species_Label, "Mainland_F_coelebs")
+
+GLM1 <- glm.nb(Observed_sps_rare ~ Age_cat + Sex + Species_Label, data = mainland_fringilla, na.action = na.fail)
+summary(GLM1)
+dredge(GLM1)
+Anova(GLM1, type = "III", test = "F")
+
+alpha_df$Species_Label <- as.factor(alpha_df$Species_Label)
+alpha_df$Species_Label <- relevel(alpha_df$Species_Label, "Mainland_F_coelebs")
+
+GLM2 <- glm.nb(Observed_sps_rare ~ Species_Label, data = alpha_df, na.action = na.fail)
+summary(GLM2)
+dredge(GLM2)
+Anova(GLM2, type = "III")
+mcp <- glht(GLM2, linfct = mcp(Species_Label = "Tukey"))
+summary(mcp)
+
+CI <- as_tibble(confint(GLM2), rownames = 'predictor') 
+CI <- cbind(CI, as_tibble(summary(GLM2)$coefficients))
+CI$CImin <- c(CI$`2.5 %`[1], CI$Estimate[1] + CI$`2.5 %`[c(-1)])
+CI$CImax <- c(CI$`97.5 %`[1], CI$Estimate[1] + CI$`97.5 %`[c(-1)])
+CI$Estimate.transformed <- c(CI$`Estimate`[1], CI$`Estimate`[1] + CI$`Estimate`[c(-1)])
+CI$Estimate <- exp(CI$Estimate.transformed)
+CI$CImin <- exp(CI$CImin)
+CI$CImax <- exp(CI$CImax)
+CI <- CI[c(1, 4, 5, 6, 7, 8, 9)]
+
+write_tsv(CI, paste0(outputDir, "/07_Stats/02_analyses/glm_rare_sobs_speciesFix.tsv"))
+
+```
+
+### Build alpha_df with shared Order factor + sample-size labels
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, fig.width=14, fig.height=7}
+
+alpha_df <- alpha_df %>% 
+  filter(Genus == "Fringilla") %>%
+  mutate(Labels = Species_Label %>%
+           str_replace("Mainland_F_coelebs", "Mainland : F.coelebs") %>%
+           str_replace("_F_", " : F.") %>%
+           str_replace("c_", "c.") %>%
+           str_replace("_", " "))
+
+alpha_df$Order <- factor(alpha_df$Labels, levels = order_levels)
+alpha_df$SpeciesComplex <- factor(species_complex_lookup[as.character(alpha_df$Order)],
+                                  levels = c("Common chaffinch species complex", "Blue finches"))
+
+sample_sizes <- alpha_df %>%
+  group_by(Order) %>%
+  summarise(n = n(), .groups = "drop")
+
+labels_with_n <- sapply(order_levels, function(lvl) {
+  n <- sample_sizes$n[match(lvl, sample_sizes$Order)]
+  paste0(short_labels[lvl], "\nn = ", n)
+})
+
+estimate_obj <- read_tsv(paste0(outputDir, "/07_Stats/02_analyses/glm_rare_sobs_speciesFix.tsv"))
+
+model_estimates <- estimate_obj %>%
+  mutate(value = Estimate + estimate_obj[[1, 2]]) %>%
+  mutate(value = ifelse(predictor == '(Intercept)', Estimate, value)) %>%
+  mutate(island = predictor %>%
+           str_replace("as.factor", "") %>%
+           str_replace("\\(Species_Label\\)", "") %>%
+           str_replace("\\(Intercept\\)", "Mainland : F.coelebs") %>%
+           str_replace("Sexmale", "Male") %>%
+           str_replace("Age_catfledging", "Fledging") %>%
+           str_replace("_F_", " : F.") %>%
+           str_replace("c_", "c.") %>%
+           str_replace("_", " "))
+
+species_estimates <- model_estimates
+species_estimates$Order <- factor(species_estimates$island, levels = order_levels)
+
+# Build CI table with p-values for richness GLM
+rich_ci_table <- as_tibble(confint(GLM2), rownames = 'predictor') %>%
+  cbind(as_tibble(summary(GLM2)$coefficients))
+
+signif2 <- build_signif_stars(GLM2)
+signif2 <- left_join(
+  distinct(alpha_df, SpeciesComplex, Order),
+  signif2,
+  by = "Order"
+) %>% arrange(SpeciesComplex, Order)
+
+```
+
+### p1: Richness boxplot
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, fig.width=14, fig.height=7}
+
+(p1 <- ggplot(alpha_df, aes(Order, Observed_sps_rare)) +
+    facet_grid(~ SpeciesComplex, scales = "free_x", space = "free_x") +
+    geom_boxplot(aes(fill = Species_Label), show.legend = FALSE,
+                 lwd = 0.25, fatten = 1, alpha = 0.5,
+                 outlier.colour = 'transparent', width = 0.5) +
+    geom_point(aes(fill = Species_Label), shape = 21,
+               position = position_jitter(seed = 100, width = 0.1),
+               size = 3, alpha = 0.7, stroke = 0.25) +
+    SpeciesLabel.fill +
+    ylab("Richness") + xlab("") +
+    sl_theme + boxplot_theme +
+    scale_x_discrete(breaks = names(labels_with_n), labels = labels_with_n) +
+    geom_hline(aes(yintercept = signif2$Estimate[1]), linetype = 'dashed') +
+    stat_summary(aes(x = Order, y = Observed_sps_rare),
+                 fun.data = "mean_cl_boot", geom = "pointrange",
+                 shape = 23, col = "#acacac", fill = '#acacac',
+                 size = 0.5, fun.args = list(conf.int = .95)) +
+    geom_text(data = signif2, aes(x = Order, y = 250, label = p.signif),
+              vjust = 0.75, size = 8) +
+    scale_y_continuous(breaks = seq(0, 250, by = 50)))
+
+```
+
+### Faith's PD analogue
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, fig.width=14, fig.height=7}
+
+GLM1 <- glm.nb(PD_integer ~ Age_cat + Sex + Species_Label, data = mainland_fringilla, na.action = na.fail)
+summary(GLM1)
+Anova(GLM1, type = "III", test = "F")
+
+GLM2 <- glm.nb(PD_integer ~ Species_Label, data = alpha_df, na.action = na.fail)
+summary(GLM2)
+Anova(GLM2, type = "III", test = "F")
+
+CI <- as_tibble(confint(GLM2), rownames = 'predictor')
+CI <- cbind(CI, as_tibble(summary(GLM2)$coefficients))
+CI$CImin <- c(CI$`2.5 %`[1], CI$Estimate[1] + CI$`2.5 %`[c(-1)])
+CI$CImax <- c(CI$`97.5 %`[1], CI$Estimate[1] + CI$`97.5 %`[c(-1)])
+CI$Estimate.transformed <- c(CI$`Estimate`[1], CI$`Estimate`[1] + CI$`Estimate`[c(-1)])
+CI$Estimate <- exp(CI$Estimate.transformed)
+CI$CImin <- exp(CI$CImin)
+CI$CImax <- exp(CI$CImax)
+CI <- CI[c(1, 4, 5, 6, 7, 8, 9)]
+
+write_tsv(CI, paste0(outputDir, "/07_Stats/02_analyses/glm_rare_pd_speciesFix.tsv"))
+
+estimate_obj_pd <- read_tsv(paste0(outputDir, "/07_Stats/02_analyses/glm_rare_pd_speciesFix.tsv"))
+
+species_estimates_pd <- estimate_obj_pd %>%
+  mutate(value = Estimate + estimate_obj_pd[[1, 2]]) %>%
+  mutate(value = ifelse(predictor == '(Intercept)', Estimate, value)) %>%
+  mutate(island = predictor %>%
+           str_replace("as.factor", "") %>%
+           str_replace("\\(Species_Label\\)", "") %>%
+           str_replace("\\(Intercept\\)", "Mainland : F.coelebs") %>%
+           str_replace("Sexmale", "Male") %>%
+           str_replace("Age_catfledging", "Fledging") %>%
+           str_replace("_F_", " : F.") %>%
+           str_replace("c_", "c.") %>%
+           str_replace("_", " "))
+
+species_estimates_pd$Order <- factor(species_estimates_pd$island, levels = order_levels)
+
+pd_ci_table <- as_tibble(confint(GLM2), rownames = 'predictor') %>%
+  cbind(as_tibble(summary(GLM2)$coefficients))
+
+signif2_pd <- build_signif_stars(GLM2)
+signif2_pd <- left_join(
+  distinct(alpha_df, SpeciesComplex, Order),
+  signif2_pd,
+  by = "Order"
+) %>% arrange(SpeciesComplex, Order)
+
+(p_PD <- ggplot(alpha_df, aes(Order, PD_sps_rare)) +
+    facet_grid(~ SpeciesComplex, scales = "free_x", space = "free_x") +
+    geom_boxplot(aes(fill = Species_Label), show.legend = FALSE,
+                 lwd = 0.25, fatten = 1, alpha = 0.5,
+                 outlier.colour = 'transparent', width = 0.5) +
+    geom_point(aes(fill = Species_Label), shape = 21,
+               position = position_jitter(seed = 100, width = 0.1),
+               size = 3, alpha = 0.7, stroke = 0.25) +
+    SpeciesLabel.fill +
+    ylab("Faith's phylogenetic diversity") + xlab("") +
+    sl_theme + boxplot_theme +
+    scale_x_discrete(breaks = names(labels_with_n), labels = labels_with_n) +
+    geom_hline(aes(yintercept = signif2_pd$Estimate[1]), linetype = 'dashed') +
+    stat_summary(aes(x = Order, y = PD_sps_rare),
+                 fun.data = "mean_cl_boot", geom = "pointrange",
+                 shape = 23, col = "#acacac", fill = '#acacac',
+                 size = 0.5, fun.args = list(conf.int = .95)) +
+    geom_text(data = signif2_pd, aes(x = Order, y = 40, label = p.signif),
+              vjust = 0.75, size = 8) +
+    scale_y_continuous(breaks = seq(0, 40, by = 5)))
+
+```
+
+## GLMs across taxonomic levels (Phylum → OTU99)
+
+Loads the phyloseq object fresh (without species-glomming) and runs negative binomial GLMs at each level for both richness and Faith's PD, building one combined table.
+
+```{r glm-across-levels, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+ps_base <- readRDS(paste0(dataDir, "/microb_fr_corrected.rds")) %>%
+  biomeUtils::removeZeros()
+
+# Helper: at one taxonomic level, compute Observed richness + Faith's PD,
+# fit GLM nb against Species_Label, return a tidy CI table
+glm_at_level <- function(ps_base, level) {
+  ps <- if (level == "OTU99") ps_base else speedyseq::tax_glom(ps_base, level)
+  ps <- biomeUtils::removeZeros(ps)
+  
+  rich <- estimate_richness(ps, measures = c("Observed"))
+  pd <- calculatePD(ps, justDF = TRUE)
+  
+  sample_data(ps)$Observed_rare <- rich$Observed
+  sample_data(ps)$PD_rare <- pd$PD
+  sample_data(ps)$PD_integer <- round(pd$PD, 0)
+  
+  df <- data.frame(sample_data(ps)) %>%
+    filter(Genus == "Fringilla")
+  df$Species_Label <- relevel(as.factor(df$Species_Label), "Mainland_F_coelebs")
+  
+  # Helper to fit and extract a tidy CI table from a glm.nb
+  fit_and_extract <- function(formula, df, metric_name, level_name) {
+    m <- glm.nb(formula, data = df, na.action = na.fail)
+    
+    CI <- as_tibble(confint(m), rownames = 'predictor')
+    CI <- cbind(CI, as_tibble(summary(m)$coefficients))
+    CI$CImin <- c(CI$`2.5 %`[1], CI$Estimate[1] + CI$`2.5 %`[-1])
+    CI$CImax <- c(CI$`97.5 %`[1], CI$Estimate[1] + CI$`97.5 %`[-1])
+    CI$Estimate.transformed <- c(CI$`Estimate`[1], CI$`Estimate`[1] + CI$`Estimate`[-1])
+    CI$Estimate <- exp(CI$Estimate.transformed)
+    CI$CImin <- exp(CI$CImin)
+    CI$CImax <- exp(CI$CImax)
+    
+    CI %>%
+      mutate(`Alpha diversity metric` = metric_name,
+             `Taxonomic level` = level_name,
+             Predictor = gsub("Species_Label", "", predictor)) %>%
+      dplyr::select(`Alpha diversity metric`, `Taxonomic level`, Predictor,
+                    Estimate, `Std. Error`, `z value`, `Pr(>|z|)`, CImin, CImax)
+  }
+  
+  rich_tab <- fit_and_extract(Observed_rare ~ Species_Label, df, "Richness", level)
+  pd_tab <- fit_and_extract(PD_integer ~ Species_Label, df, "Faith's phylogenetic diversity", level)
+  
+  bind_rows(rich_tab, pd_tab)
+}
+
+# Run across all levels
+tax_levels <- c("Phylum", "Class", "Order", "Family", "Genus", "Species", "OTU99")
+
+glm_table <- bind_rows(lapply(tax_levels, function(lvl) {
+  message("Running GLMs at level: ", lvl)
+  glm_at_level(ps_base, lvl)
+}))
+
+# Round and format
+glm_table <- glm_table %>%
+  mutate(
+    Estimate = round(Estimate, 3),
+    `Std. Error` = round(`Std. Error`, 3),
+    `z value` = round(`z value`, 3),
+    `Pr(>|z|)` = ifelse(`Pr(>|z|)` < 0.0001,
+                       "<0.0001",
+                       formatC(`Pr(>|z|)`, format = "f", digits = 4)),
+    CImin = round(CImin, 3),
+    CImax = round(CImax, 3)
+  )
+
+# Save
+write.csv(glm_table,
+          paste0(outputDir, "/glm_alpha_diversity_across_taxlevels.csv"),
+          row.names = FALSE)
+
+```
+
+### PARTITION BETA DIVERSITY (Bray-Curtis)
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+Matrix_abund <- data.frame(otu_table(ps_fringilla_rare))
+
+j.matrix <- beta.div.comp(Matrix_abund, coef = "BJ", quant = FALSE, save.abc = FALSE)
+s.quant <- beta.div.comp(Matrix_abund, coef = "BS", quant = TRUE, save.abc = FALSE)
+
+```
+
+### Helper functions
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+build_pairwise_df <- function(s_obj, meta) {
+  if ("repl" %in% names(s_obj)) {
+    xy <- t(combn(colnames(as.matrix(s_obj$D)), 2))
+    df <- data.frame(
+      X1 = xy[, 1],
+      X2 = xy[, 2],
+      repl = as.matrix(s_obj$repl)[xy],
+      rich = as.matrix(s_obj$rich)[xy],
+      D = as.matrix(s_obj$D)[xy]
+    )
+  } else {
+    dm <- as.matrix(s_obj)
+    xy <- which(upper.tri(dm), arr.ind = TRUE)
+    df <- data.frame(
+      X1 = rownames(dm)[xy[, 1]],
+      X2 = rownames(dm)[xy[, 2]],
+      D = dm[xy]
+    )
+  }
+  df$X1_X2 <- paste0(df$X1, "_", df$X2)
+  
+  meta_X1 <- data.frame(
+    X1 = paste0(meta$Lab_Code, "_", meta$Species_Label),
+    Species_Label_X1 = meta$Species_Label,
+    Archipelago_Mainland_X1 = meta$Archipelago_Mainland)
+  meta_X2 <- data.frame(
+    X2 = paste0(meta$Lab_Code, "_", meta$Species_Label),
+    Species_Label_X2 = meta$Species_Label,
+    Archipelago_Mainland_X2 = meta$Archipelago_Mainland)
+  
+  df <- df %>% left_join(meta_X1, by = "X1") %>% left_join(meta_X2, by = "X2")
+  df$X1_X2_Species_Label <- paste0(df$Species_Label_X1, ":", df$Species_Label_X2)
+  df$X1_X2_Same_site <- df$Species_Label_X1 == df$Species_Label_X2
+  df$X1_X2_Archipelago_Mainland <- paste0(df$Archipelago_Mainland_X1, ":", df$Archipelago_Mainland_X2)
+  
+  if ("repl" %in% names(s_obj)) df$S <- 1 - df$D
+  df
+}
+
+prepare_dist_for_plot <- function(df_diff_mainland) {
+  df_diff_mainland$site_interest <- gsub('Mainland_F_coelebs', '', df_diff_mainland$X1_X2_Species_Label)
+  df_diff_mainland$site_interest <- gsub(':', '', df_diff_mainland$site_interest)
+  
+  df_diff_mainland <- df_diff_mainland %>%
+    mutate(Labels = site_interest %>%
+             str_replace("Mainland_F_coelebs", "Mainland : F.coelebs") %>%
+             str_replace("_F_", " : F.") %>%
+             str_replace("c_", "c.") %>%
+             str_replace("_", " "))
+  
+  df_diff_mainland$Order <- factor(df_diff_mainland$Labels, levels = order_levels)
+  df_diff_mainland$SpeciesComplex <- factor(species_complex_lookup[as.character(df_diff_mainland$Order)],
+                                            levels = c("Common chaffinch species complex", "Blue finches"))
+  df_diff_mainland$SpeciesLabelMatch <- factor(
+    order_to_species_label[as.character(df_diff_mainland$Order)],
+    levels = SpeciesLabel.order_local)
+  df_diff_mainland
+}
+
+# Add a placeholder Mainland row so Mainland appears on the x-axis
+add_mainland_placeholder <- function(df, columns_to_fill = list()) {
+  mainland_row <- data.frame(
+    X1 = "Mainland_F_coelebs", X2 = "Mainland_F_coelebs",
+    Species_Label_X1 = "Mainland_F_coelebs", Species_Label_X2 = "Mainland_F_coelebs",
+    X1_X2_Species_Label = "Mainland_F_coelebs:Mainland_F_coelebs",
+    site_interest = "Mainland", Labels = "Mainland : F.coelebs",
+    Order = factor("Mainland : F.coelebs", levels = order_levels),
+    SpeciesComplex = factor("Common chaffinch species complex",
+                            levels = c("Common chaffinch species complex", "Blue finches")),
+    SpeciesLabelMatch = factor("Mainland_F_coelebs", levels = SpeciesLabel.order_local)
+  )
+  for (col in names(columns_to_fill)) {
+    mainland_row[[col]] <- columns_to_fill[[col]]
+  }
+  bind_rows(df, mainland_row)
+}
+
+```
+
+### Bray-Curtis dissimilarity vs mainland
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, fig.width=14, fig.height=7}
+
+Meta <- data.frame(sample_data(ps_fringilla_rare))
+
+dist_df <- build_pairwise_df(s.quant, Meta)
+dist_df_diff_site <- dist_df %>% filter(!X1_X2_Same_site)
+dist_df_diff_mainland <- dist_df_diff_site %>%
+  filter(grepl("Mainland_F_coelebs", X1_X2_Species_Label))
+
+dist_df_diff_mainland <- prepare_dist_for_plot(dist_df_diff_mainland)
+dist_df_diff_mainland <- add_mainland_placeholder(
+  dist_df_diff_mainland,
+  list(D = NA, repl = NA, rich = NA, S = NA, X1_X2 = "mainland_mainland",
+       X1_X2_Same_site = TRUE, X1_X2_Archipelago_Mainland = "Mainland:Mainland",
+       Archipelago_Mainland_X1 = "Mainland", Archipelago_Mainland_X2 = "Mainland")
+)
+
+# Common chaffinch only subset (used for ternary plots)
+dist_df_common <- dist_df %>%
+  filter(!Species_Label_X1 %in% c("Tenerife_F_teydea", "Gran_Canaria_F_polatzeki"),
+         !Species_Label_X2 %in% c("Tenerife_F_teydea", "Gran_Canaria_F_polatzeki"))
+dist_df_diff_common <- dist_df_common %>% filter(!X1_X2_Same_site)
+
+dat_text <- data.frame(
+  label = c("Reference", ""),
+  SpeciesComplex = factor(c("Common chaffinch species complex", "Blue finches"),
+                          levels = c("Common chaffinch species complex", "Blue finches")),
+  x = 0.5, y = 0.35)
+
+(D_overall_bray <- ggplot(data = dist_df_diff_mainland, aes(Order, D)) +
+    geom_boxplot(aes(fill = SpeciesLabelMatch), show.legend = FALSE,
+                 lwd = 0.25, fatten = 1, alpha = 0.7,
+                 outlier.colour = 'transparent', width = 0.5) +
+    geom_point(aes(fill = SpeciesLabelMatch), shape = 21,
+               position = position_jitter(seed = 100, width = 0.1),
+               size = 3, alpha = 0.5, stroke = 0.25) +
+    xlab("") + ylab("Dissimilarity") +
+    facet_grid(. ~ SpeciesComplex, scales = "free_x", space = "free_x") +
+    scale_x_discrete(breaks = names(labels_with_n), labels = labels_with_n) +
+    SpeciesLabel.fill_local + sl_theme + boxplot_theme +
+    stat_summary(aes(x = Order, y = D), fun.data = "mean_cl_boot",
+                 geom = "pointrange", shape = 23,
+                 col = '#acacac', fill = '#acacac', size = 0.5))
+
+(D_overall_bray_patch <- D_overall_bray +
+    geom_rect(data = dist_df_diff_mainland %>% filter(SpeciesComplex == "Common chaffinch species complex"),
+              aes(xmin = 0.5, xmax = 1.5, ymin = -Inf, ymax = Inf),
+              alpha = 0.5, fill = 'lightgrey') +
+    geom_text(data = dat_text, mapping = aes(x = x, y = y, label = label),
+              hjust = -0.25, vjust = 2.5, angle = 90, size = 7) +
+    theme(strip.background = element_blank(), strip.text.x = element_blank()))
+
+```
+
+### Ternary plots
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, fig.width=14, fig.height=7}
+
+(triangle.overall.diff.bray <- ggtern(data = dist_df_diff_common, aes(rich, repl, S)) +
+    geom_point(size = 4, alpha = 0.05, stroke = 0.25) +
+    geom_crosshair_tern(aes(mean(dist_df_diff_common$rich),
+                            mean(dist_df_diff_common$repl),
+                            mean(dist_df_diff_common$S)),
+                        col = "darkred", lty = "dashed",
+                        lineend = "round", size = 2.2) +
+    geom_point(aes(mean(dist_df_diff_common$rich),
+                   mean(dist_df_diff_common$repl),
+                   mean(dist_df_diff_common$S)),
+               col = 'darkred', size = 10) +
+    geom_point(aes(x = mean(dist_df_diff_common$rich),
+                   y = 1 - mean(dist_df_diff_common$rich), z = 0),
+               col = "darkred", size = 10) +
+    annotate(geom = 'text', x = mean(dist_df_diff_common$rich),
+             y = 1 - mean(dist_df_diff_common$rich), z = 0,
+             label = paste(round(mean(dist_df_diff_common$rich) * 100, 2)),
+             hjust = 1, vjust = -1, size = 12, col = "darkred") +
+    geom_point(aes(x = 0, y = mean(dist_df_diff_common$repl),
+                   z = 1 - mean(dist_df_diff_common$repl)),
+               col = "darkred", size = 10) +
+    annotate(geom = 'text', x = 0, y = mean(dist_df_diff_common$repl),
+             z = 1 - mean(dist_df_diff_common$repl),
+             label = paste(round(mean(dist_df_diff_common$repl) * 100, 2)),
+             hjust = -0.3, vjust = 1, size = 12, col = "darkred") +
+    geom_point(aes(x = 1 - mean(dist_df_diff_common$S), y = 0,
+                   z = mean(dist_df_diff_common$S)),
+               col = "darkred", size = 8) +
+    annotate(geom = 'text', x = 1 - mean(dist_df_diff_common$S), y = 0,
+             z = mean(dist_df_diff_common$S),
+             label = paste(round(mean(dist_df_diff_common$S) * 100, 2)),
+             hjust = 0.5, vjust = 2, size = 12, col = "darkred") +
+    theme_classic() + theme_hidetitles() + theme_nomask() +
+    theme(axis.text = element_text(size = 28),
+          tern.axis.arrow = element_line(size = 3)))
+
+```
+
+### Jaccard partitioning
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, fig.width=14, fig.height=7}
+
+j_dist_df <- build_pairwise_df(j.matrix, Meta)
+j_dist_df_common <- j_dist_df %>%
+  filter(!Species_Label_X1 %in% c("Tenerife_F_teydea", "Gran_Canaria_F_polatzeki"),
+         !Species_Label_X2 %in% c("Tenerife_F_teydea", "Gran_Canaria_F_polatzeki"))
+j_dist_df_diff_common <- j_dist_df_common %>% filter(!X1_X2_Same_site)
+
+(triangle.overall.diff.jaccard <- ggtern(data = j_dist_df_diff_common, aes(rich, repl, S)) +
+    geom_point(size = 4, alpha = 0.05, stroke = 0.25) +
+    geom_crosshair_tern(aes(mean(j_dist_df_diff_common$rich),
+                            mean(j_dist_df_diff_common$repl),
+                            mean(j_dist_df_diff_common$S)),
+                        col = "darkred", lty = "dashed",
+                        lineend = "round", size = 2.2) +
+    geom_point(aes(mean(j_dist_df_diff_common$rich),
+                   mean(j_dist_df_diff_common$repl),
+                   mean(j_dist_df_diff_common$S)),
+               col = 'darkred', size = 10) +
+    geom_point(aes(x = mean(j_dist_df_diff_common$rich),
+                   y = 1 - mean(j_dist_df_diff_common$rich), z = 0),
+               col = "darkred", size = 10) +
+    annotate(geom = 'text', x = mean(j_dist_df_diff_common$rich),
+             y = 1 - mean(j_dist_df_diff_common$rich), z = 0,
+             label = paste(round(mean(j_dist_df_diff_common$rich) * 100, 2)),
+             hjust = 1, vjust = -1, size = 12, col = "darkred") +
+    geom_point(aes(x = 0, y = mean(j_dist_df_diff_common$repl),
+                   z = 1 - mean(j_dist_df_diff_common$repl)),
+               col = "darkred", size = 10) +
+    annotate(geom = 'text', x = 0, y = mean(j_dist_df_diff_common$repl),
+             z = 1 - mean(j_dist_df_diff_common$repl),
+             label = paste(round(mean(j_dist_df_diff_common$repl) * 100, 2)),
+             hjust = -0.3, vjust = 1, size = 12, col = "darkred") +
+    geom_point(aes(x = 1 - mean(j_dist_df_diff_common$S), y = 0,
+                   z = mean(j_dist_df_diff_common$S)),
+               col = "darkred", size = 8) +
+    annotate(geom = 'text', x = 1 - mean(j_dist_df_diff_common$S), y = 0,
+             z = mean(j_dist_df_diff_common$S),
+             label = paste(round(mean(j_dist_df_diff_common$S) * 100, 2)),
+             hjust = 0.5, vjust = 2, size = 12, col = "darkred") +
+    theme_classic() + theme_hidetitles() + theme_nomask() +
+    theme(axis.text = element_text(size = 28),
+          tern.axis.arrow = element_line(size = 3)))
+
+```
+
+### UniFrac dissimilarities (unweighted and weighted)
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, fig.width=14, fig.height=7}
+
+build_unifrac_df <- function(unifrac_obj, meta) {
+  dm <- as.matrix(unifrac_obj)
+  pairs <- which(upper.tri(dm), arr.ind = TRUE)
+  df <- data.frame(
+    X1 = rownames(dm)[pairs[, 1]],
+    X2 = rownames(dm)[pairs[, 2]],
+    D = dm[pairs])
+  df$Species_Label_X1 <- meta[df$X1, "Species_Label"]
+  df$Species_Label_X2 <- meta[df$X2, "Species_Label"]
+  df$X1_X2_Species_Label <- paste0(df$Species_Label_X1, ":", df$Species_Label_X2)
+  
+  df <- df %>% filter(
+    (Species_Label_X1 == "Mainland_F_coelebs" & Species_Label_X2 != "Mainland_F_coelebs") |
+    (Species_Label_X2 == "Mainland_F_coelebs" & Species_Label_X1 != "Mainland_F_coelebs"))
+  
+  df$site_interest <- ifelse(df$Species_Label_X1 == "Mainland_F_coelebs",
+                             as.character(df$Species_Label_X2),
+                             as.character(df$Species_Label_X1))
+  
+  df <- df %>%
+    mutate(Labels = site_interest %>%
+             str_replace("_F_", " : F.") %>%
+             str_replace("c_", "c.") %>%
+             str_replace("_", " "))
+  
+  df$Order <- factor(df$Labels, levels = order_levels)
+  df$SpeciesComplex <- factor(species_complex_lookup[as.character(df$Order)],
+                              levels = c("Common chaffinch species complex", "Blue finches"))
+  df$SpeciesLabelMatch <- factor(
+    order_to_species_label[as.character(df$Order)],
+    levels = SpeciesLabel.order_local)
+  
+  # Add Mainland placeholder
+  mainland_row <- data.frame(
+    X1 = "Mainland_F_coelebs", X2 = "Mainland_F_coelebs", D = NA,
+    Species_Label_X1 = "Mainland_F_coelebs", Species_Label_X2 = "Mainland_F_coelebs",
+    X1_X2_Species_Label = "Mainland_F_coelebs:Mainland_F_coelebs",
+    site_interest = "Mainland", Labels = "Mainland : F.coelebs",
+    Order = factor("Mainland : F.coelebs", levels = order_levels),
+    SpeciesComplex = factor("Common chaffinch species complex",
+                            levels = c("Common chaffinch species complex", "Blue finches")),
+    SpeciesLabelMatch = factor("Mainland_F_coelebs", levels = SpeciesLabel.order_local))
+  bind_rows(df, mainland_row)
+}
+
+make_unifrac_panel <- function(df, ylab_text) {
+  y_range <- range(df$D, na.rm = TRUE)
+  y_low <- y_range[1] + (y_range[2] - y_range[1]) * 0.35   # 35% from bottom
+  
+  dat_text <- data.frame(
+  label = c("Reference", ""),
+  SpeciesComplex = factor(c("Common chaffinch species complex", "Blue finches"),
+                          levels = c("Common chaffinch species complex", "Blue finches")),
+  x = 0.5, y = y_low)
+  
+  p <- ggplot(data = df, aes(Order, D)) +
+    geom_boxplot(aes(fill = SpeciesLabelMatch), show.legend = FALSE,
+                 lwd = 0.25, fatten = 1, alpha = 0.7,
+                 outlier.colour = 'transparent', width = 0.5) +
+    geom_point(aes(fill = SpeciesLabelMatch), shape = 21,
+               position = position_jitter(seed = 100, width = 0.1),
+               size = 3, alpha = 0.5, stroke = 0.25) +
+    xlab("") + ylab(ylab_text) +
+    facet_grid(. ~ SpeciesComplex, scales = "free_x", space = "free_x") +
+    scale_x_discrete(breaks = names(labels_with_n), labels = labels_with_n) +
+    SpeciesLabel.fill_local + sl_theme + boxplot_theme +
+    stat_summary(aes(x = Order, y = D), fun.data = "mean_cl_boot",
+                 geom = "pointrange", shape = 23,
+                 col = '#acacac', fill = '#acacac', size = 0.5)
+  
+  p +
+    geom_rect(data = df %>% filter(SpeciesComplex == "Common chaffinch species complex"),
+              aes(xmin = 0.5, xmax = 1.5, ymin = -Inf, ymax = Inf),
+              alpha = 0.5, fill = 'lightgrey') +
+    geom_text(data = dat_text, mapping = aes(x = x, y = y, label = label),
+              hjust = -0.25, vjust = 2.5, angle = 90, size = 7) +
+    theme(strip.background = element_blank(), strip.text.x = element_blank())
+}
+
+unifrac_uw <- UniFrac(ps_fringilla_rare, weighted = FALSE)
+df_uw <- build_unifrac_df(unifrac_uw, Meta)
+D_unifrac_uw_patch <- make_unifrac_panel(df_uw, "Unweighted UniFrac")
+D_unifrac_uw_patch
+
+unifrac_w <- UniFrac(ps_fringilla_rare, weighted = TRUE)
+df_w <- build_unifrac_df(unifrac_w, Meta)
+D_unifrac_w_patch <- make_unifrac_panel(df_w, "Weighted UniFrac")
+D_unifrac_w_patch
+
+```
+
+# BIOGEOGRAPHY
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, fig.width=14, fig.height=7}
+
+nomainland_fringilla <- alpha_df %>% dplyr::filter(!is.na(Area_km2) & Genus == "Fringilla")
+nrow(nomainland_fringilla)
+# Area
+GLMM1 <- glmmTMB(Observed_sps_rare ~ scale(Area_km2) + (1 | Species_Label),
+                 data = nomainland_fringilla, na.action = na.fail, family = nbinom2)
+summary(GLMM1); confint(GLMM1)
+
+(pArea <- ggpredict(GLMM1, terms = "Area_km2 [all]") %>%
+    plot(line_size = 1.5, color = "darkred") +
+    geom_point(data = nomainland_fringilla, aes(y = Observed_sps_rare, x = Area_km2),
+               shape = 21, fill = "grey",
+               position = position_jitter(seed = 100, width = 50),
+               size = 3, alpha = 0.9, stroke = 0.25) +
+    ylab("Richness") + xlab(bquote(Area ~ (km^2))) +
+    scatter_theme + ggtitle("") + sl_theme +
+    annotate(geom = "text",
+             label = build_biogeo_annot(GLMM1, "scale(Area_km2)"),
+             parse = TRUE, x = 1000, y = 240, size = 6) +
+    scale_y_continuous(breaks = seq(0, 250, by = 50)))
+
+GLMM1_PD <- glmmTMB(PD_integer ~ scale(Area_km2) + (1 | Species_Label),
+                    data = nomainland_fringilla, na.action = na.fail, family = nbinom2)
+summary(GLMM1_PD); confint(GLMM1_PD)
+
+(pArea_PD <- ggpredict(GLMM1_PD, terms = "Area_km2 [all]") %>%
+    plot(line_size = 1.5, color = "darkred") +
+    geom_point(data = nomainland_fringilla, aes(y = PD_integer, x = Area_km2),
+               shape = 21, fill = "grey",
+               position = position_jitter(seed = 100, width = 50),
+               size = 3, alpha = 0.9, stroke = 0.25) +
+    ylab("Faith's phylogenetic diversity") + xlab(bquote(Area ~ (km^2))) +
+    scatter_theme + ggtitle("") + sl_theme +
+    annotate(geom = "text",
+             label = build_biogeo_annot(GLMM1_PD, "scale(Area_km2)"),
+             parse = TRUE, x = 1000, y = 35, size = 6) +
+    scale_y_continuous(breaks = seq(0, 40, by = 5)))
+
+# Distance
+GLMM2 <- glmmTMB(Observed_sps_rare ~ scale(Distance_mainland) + (1 | Species_Label),
+                 data = nomainland_fringilla, na.action = na.fail, family = nbinom2)
+summary(GLMM2); confint(GLMM2)
+
+(pDistance <- ggpredict(GLMM2, terms = "Distance_mainland [all]") %>%
+    plot(line_size = 1.5, color = "darkred") +
+    geom_point(data = nomainland_fringilla, aes(y = Observed_sps_rare, x = Distance_mainland),
+               shape = 21, fill = "grey",
+               position = position_jitter(seed = 100, width = 50),
+               size = 3, alpha = 0.9, stroke = 0.25) +
+    ylab("") + xlab("Distance from mainland (km)") +
+    scatter_theme + ggtitle("") + sl_theme +
+    annotate(geom = "text",
+             label = build_biogeo_annot(GLMM2, "scale(Distance_mainland)"),
+             parse = TRUE, x = 1000, y = 240, size = 6) +
+    scale_y_continuous(breaks = seq(0, 250, by = 50)))
+
+GLMM2_PD <- glmmTMB(PD_integer ~ scale(Distance_mainland) + (1 | Species_Label),
+                    data = nomainland_fringilla, na.action = na.fail, family = nbinom2)
+summary(GLMM2_PD); confint(GLMM2_PD)
+
+(pDistance_PD <- ggpredict(GLMM2_PD, terms = "Distance_mainland [all]") %>%
+    plot(line_size = 1.5, color = "darkred") +
+    geom_point(data = nomainland_fringilla, aes(y = PD_integer, x = Distance_mainland),
+               shape = 21, fill = "grey",
+               position = position_jitter(seed = 100, width = 50),
+               size = 3, alpha = 0.9, stroke = 0.25) +
+    ylab("") + xlab("Distance from mainland (km)") +
+    scatter_theme + ggtitle("") + sl_theme +
+    annotate(geom = "text",
+             label = build_biogeo_annot(GLMM2_PD, "scale(Distance_mainland)"),
+             parse = TRUE, x = 1000, y = 35, size = 6) +
+    scale_y_continuous(breaks = seq(0, 40, by = 5)))
+
+# Age
+GLMM3 <- glmmTMB(Observed_sps_rare ~ scale(Age_ma) + (1 | Species_Label),
+                 data = nomainland_fringilla, na.action = na.fail, family = nbinom2)
+summary(GLMM3); confint(GLMM3)
+
+(pAge_ma <- ggpredict(GLMM3, terms = "Age_ma [all]") %>%
+    plot(line_size = 1.5, color = "darkred") +
+    geom_point(data = nomainland_fringilla, aes(y = Observed_sps_rare, x = Age_ma),
+               shape = 21, fill = "grey",
+               position = position_jitter(seed = 100, width = 0.3),
+               size = 3, alpha = 0.9, stroke = 0.25) +
+    ylab("") + xlab("Island age (mya)") +
+    scatter_theme + ggtitle("") + sl_theme +
+    annotate(geom = "text",
+             label = build_biogeo_annot(GLMM3, "scale(Age_ma)"),
+             parse = TRUE, x = 7.5, y = 240, size = 6) +
+    scale_y_continuous(breaks = seq(0, 250, by = 50)))
+
+GLMM3_PD <- glmmTMB(PD_integer ~ scale(Age_ma) + (1 | Species_Label),
+                    data = nomainland_fringilla, na.action = na.fail, family = nbinom2)
+summary(GLMM3_PD); confint(GLMM3_PD)
+
+(pAge_ma_PD <- ggpredict(GLMM3_PD, terms = "Age_ma [all]") %>%
+    plot(line_size = 1.5, color = "darkred") +
+    geom_point(data = nomainland_fringilla, aes(y = PD_integer, x = Age_ma),
+               shape = 21, fill = "grey",
+               position = position_jitter(seed = 100, width = 0.3),
+               size = 3, alpha = 0.9, stroke = 0.25) +
+    ylab("") + xlab("Island age (mya)") +
+    scatter_theme + ggtitle("") + sl_theme +
+    annotate(geom = "text",
+             label = build_biogeo_annot(GLMM3_PD, "scale(Age_ma)"),
+             parse = TRUE, x = 7.5, y = 35, size = 6) +
+    scale_y_continuous(breaks = seq(0, 40, by = 5)))
+
+```
+## Biogeography effects across taxonomic levels
+
+```{r biogeo-across-levels, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+# Helper: fit biogeography GLMMs at one taxonomic level
+biogeo_at_level <- function(ps_base, level, nomainland_meta) {
+  
+  # Aggregate to taxonomic level
+
+ps <- if (level == "OTU99") ps_base else speedyseq::tax_glom(ps_base, level)
+  ps <- biomeUtils::removeZeros(ps)
+  
+  # Calculate richness
+  rich <- estimate_richness(ps, measures = "Observed")
+  sample_data(ps)$Observed_rare <- rich$Observed
+  
+  # Build dataframe and merge with island metadata
+  df <- data.frame(sample_data(ps)) %>%
+    filter(Genus == "Fringilla", !is.na(Area_km2))
+  
+  # Fit the three biogeography models
+  fit_and_extract <- function(predictor_name, formula_str) {
+    m <- glmmTMB(as.formula(formula_str), 
+                 data = df, na.action = na.fail, family = nbinom2)
+    
+    coefs <- summary(m)$coefficients$cond
+    
+    # Extract predictor row (not intercept)
+    pred_row <- coefs[2, ]
+    int_row <- coefs[1, ]
+    
+    data.frame(
+      `Taxonomic Level` = level,
+      Predictor = c("Intercept", predictor_name),
+      Estimate = round(c(int_row["Estimate"], pred_row["Estimate"]), 5),
+      `Std. Error` = round(c(int_row["Std. Error"], pred_row["Std. Error"]), 5),
+      `z value` = round(c(int_row["z value"], pred_row["z value"]), 2),
+      `Pr(>|z|)` = c(int_row["Pr(>|z|)"], pred_row["Pr(>|z|)"]),
+      check.names = FALSE
+    )
+  }
+  
+  area_tab <- fit_and_extract("Island area", 
+    "Observed_rare ~ scale(Area_km2) + (1 | Species_Label)")
+  dist_tab <- fit_and_extract("Distance to mainland", 
+    "Observed_rare ~ scale(Distance_mainland) + (1 | Species_Label)")
+  age_tab <- fit_and_extract("Island age", 
+    "Observed_rare ~ scale(Age_ma) + (1 | Species_Label)")
+  
+  bind_rows(area_tab, dist_tab, age_tab)
+}
+
+# Run across all taxonomic levels
+tax_levels <- c("Phylum", "Class", "Order", "Family", "Genus", "Species", "OTU99")
+
+biogeo_table <- bind_rows(lapply(tax_levels, function(lvl) {
+  message("Running biogeography GLMMs at level: ", lvl)
+  biogeo_at_level(ps_base, lvl, nomainland_fringilla)
+}))
+
+# Format p-values
+biogeo_table <- biogeo_table %>%
+  mutate(`Pr(>|z|)` = ifelse(`Pr(>|z|)` < 0.0001,
+                             "<0.0001",
+                             formatC(`Pr(>|z|)`, format = "f", digits = 4)))
+
+# Display
+kable(biogeo_table,
+      col.names = c("Taxonomic Level", "Predictor", "Estimate",
+                    "Std. Error", "z value", "p-value"),
+      caption = "Effect of biogeography on microbiome richness across taxonomic levels") %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"))
+
+# Save
+write.csv(biogeo_table,
+          paste0(outputDir, "/glm_biogeography_richness_across_taxlevels.csv"),
+          row.names = FALSE)
+```
+
+
+## Patchwork
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, fig.width=14, fig.height=7}
+
+png(paste0(outputDir, "/Figures/Colonisation_history_speciesFix.png"),
+    width = 300, height = 240, units = "mm", res = 350)
+((p1 + theme(axis.title.x = element_blank(), axis.text.x = element_blank(),
+             axis.line.x = element_blank(), axis.ticks.x = element_blank(),
+             strip.text.x = element_text(size = 18))) /
+   D_overall_bray_patch) + plot_layout(axes = 'collect')
+dev.off()
+
+
+png(paste0(outputDir, "/Figures/triangle.plots.baselga.sorensen.quant.overall.matrix_genus_noarrows_2panels_speciesFix.png"),
+    width = 8000, height = 8000, res = 650)
+(triangle.overall.diff.bray <- triangle.overall.diff.bray +
+    theme(axis.title.x = element_blank(), axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(), axis.title.y = element_blank(),
+          axis.text.y = element_blank(), axis.ticks.y = element_blank()))
+dev.off()
+
+
+png(paste0(outputDir, "/Figures/triangle.plots.baselga.j.overall.matrix_genus_2panels_speciesFix.png"),
+    width = 8000, height = 8000, res = 650)
+(triangle.overall.diff.jaccard <- triangle.overall.diff.jaccard +
+    theme(axis.title.x = element_blank(), axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(), axis.title.y = element_blank(),
+          axis.text.y = element_blank(), axis.ticks.y = element_blank()))
+dev.off()
+
+
+png(paste0(outputDir, "/Figures/Biogeography_speciesFix.png"),
+    width = 500, height = 200, units = "mm", res = 350)
+pArea + pDistance + pAge_ma + plot_layout(axes = 'collect')
+dev.off()
+
+
+png(paste0(outputDir, "/Figures/Colonisation_history_speciesFix_PDUniFrac.png"),
+    width = 300, height = 360, units = "mm", res = 350)
+(p_PD + theme(axis.title.x = element_blank(), axis.text.x = element_blank(),
+              axis.line.x = element_blank(), axis.ticks.x = element_blank(),
+              strip.text.x = element_text(size = 18))) /
+  D_unifrac_uw_patch /
+  D_unifrac_w_patch +
+  plot_layout(axes = 'collect') +
+  plot_annotation(tag_levels = 'A') &
+  theme(plot.tag = element_text(size = 24, face = 'bold'))
+dev.off()
+
+
+png(paste0(outputDir, "/Figures/Biogeography_speciesFix_PD.png"),
+    width = 420, height = 198, units = "mm", res = 300)
+pArea_PD + pDistance_PD + pAge_ma_PD +
+  plot_layout(axes = "collect") +
+  plot_annotation(tag_levels = "A") &
+  theme(plot.tag = element_text(size = 32, face = "bold"))
+dev.off()
+
+
+png(paste0(outputDir, "/Figures/SupplFigS1_FaithsPDUniFrac.png"),
+    width = 400, height = 480, units = "mm", res = 350)
+(p_PD + theme(axis.title.x = element_blank(), axis.text.x = element_blank(),
+              axis.line.x = element_blank(), axis.ticks.x = element_blank(),
+              strip.text.x = element_text(size = 18))) /
+  D_unifrac_uw_patch /
+  D_unifrac_w_patch /
+  (pArea_PD + pDistance_PD + pAge_ma_PD + plot_layout(axes = "collect")) +
+  plot_layout(axes = 'collect') +
+  plot_annotation(tag_levels = 'A') &
+  theme(plot.tag = element_text(size = 24, face = 'bold'))
+dev.off()
+
+```
+
+## DIET 
+
+```{r psObject, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+diet_fr <- readRDS(paste0(dataDir, "/microb_overlap_diet_corrected.rds"))
+
+```
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+tt <- tax_table(diet_fr) %>% data.frame
+order_filt <- subset(tt, !grepl("Class", Order) & !grepl("Phylum", Order)) %>% rownames_to_column("ASV")
+diet_fr <- prune_taxa(order_filt$ASV, diet_fr)
+alpha_diet_fr <- data.frame(sample_data(diet_fr))
+
+mainland_fringilla_diet <- merge(
+  alpha_df,
+  alpha_diet_fr[, c("Shannon_diet_rare", "Observed_diet_rare"), drop = FALSE],
+  by = "row.names", all.x = TRUE)
+rownames(mainland_fringilla_diet) <- mainland_fringilla_diet$Row.names
+mainland_fringilla_diet$Row.names <- NULL
+alpha_diet_fr <- mainland_fringilla_diet[!is.na(mainland_fringilla_diet$Observed_diet_rare), ]
+
+```
+
+```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
+
+GLMM1 <- glmmTMB(Observed_sps_rare ~ Observed_diet_rare + (1 | Species_Label),
+                 data = alpha_diet_fr, na.action = na.fail, family = nbinom2)
+summary(GLMM1)
+
+GLMM1b <- glmmTMB(Observed_sps_rare ~ scale(Observed_diet_rare) + (1 | Species_Label),
+                  data = alpha_diet_fr, na.action = na.fail, family = nbinom2)
+summary(GLMM1b); confint(GLMM1b)
+
+scatter_theme <- theme(panel.border = element_blank(),
+                       panel.grid.major = element_blank(),
+                       panel.grid.minor = element_blank(),
+                       panel.background = element_blank(),
+                       axis.line = element_line(colour = "black"),
+                       axis.text.x = element_text(size = 16),
+                       axis.text.y = element_text(size = 16),
+                       axis.title = element_text(size = 20))
+
+(pDiet_richness <- ggpredict(GLMM1, terms = "Observed_diet_rare [all]") %>%
+    plot(line_size = 1.5) +
+    geom_point(data = alpha_diet_fr,
+               aes(y = Observed_sps_rare, x = Observed_diet_rare),
+               shape = 21, fill = "grey",
+               position = position_jitter(seed = 100, width = 1),
+               size = 3, alpha = 0.9, stroke = 0.25) +
+    ylab("Microbiome richness") + xlab("Diet richness") +
+    scatter_theme + ggtitle("") + sl_theme +
+    annotate(geom = "text",
+             label = build_biogeo_annot(GLMM1b,"scale(Observed_diet_rare)"),
+             parse = TRUE, x = 15, y = 240, size = 6) +
+    scale_y_continuous(breaks = seq(0, 250, by = 50)))
+
+GLMMPD <- glmmTMB(PD_integer ~ Observed_diet_rare + (1 | Species_Label),
+                  data = alpha_diet_fr, na.action = na.fail, family = nbinom2)
+summary(GLMMPD)
+
+GLMMPDb <- glmmTMB(PD_integer ~ scale(Observed_diet_rare) + (1 | Species_Label),
+                   data = alpha_diet_fr, na.action = na.fail, family = nbinom2)
+summary(GLMMPDb); confint(GLMMPDb)
+
+```

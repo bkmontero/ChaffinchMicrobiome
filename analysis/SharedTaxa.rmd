@@ -130,7 +130,7 @@ theme_nmds <- theme_bw() +
 ## Load Microbiome Data
 
 ```{r load-microbiome-data, message=FALSE, warning=FALSE}
-microb_fr <- readRDS(paste0(dataDir, "/microb_overlap_OTU99_fr_taxFix.rds"))
+microb_fr <- readRDS(paste0(dataDir, "/microb_overlap_diet_corrected.rds"))
 microb_fr <- biomeUtils::removeZeros(microb_fr)
 ```
 

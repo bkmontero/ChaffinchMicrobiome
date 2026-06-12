@@ -1,0 +1,197 @@
+---
+title: 'Triangle plots: Bray-Curtis and Jaccard partitioning across taxonomic levels'
+author: "B. K. Montero and M. Gillingham"
+date: "`r Sys.Date()`"
+output: 
+  rmdformats::downcute:
+    code_folding: hide
+    toc_depth: 2
+---
+
+## LOAD LIBRARIES
+
+```{r libraries, message=FALSE, warning=FALSE}
+rm(list = ls())
+
+library(dplyr)
+library(tidyverse)
+library(ggtern)
+library(patchwork)
+
+library(phyloseq)
+library(biomeUtils)
+library(microViz)
+
+library(adespatial)
+```
+
+## WORKING DIRECTORIES
+
+```{r source, message=FALSE, warning=FALSE}
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/workingDirectories.R")
+source("~/Dropbox/FringillaMicrobiome/05_Scripts/CleanScripts/graphics_param.R")
+```
+
+## LOAD 16S DATA AND AGGREGATE PER TAXONOMIC LEVEL
+
+```{r data, message=FALSE, warning=FALSE}
+ps_fringilla_rare <- readRDS(paste0(dataDir, "/microb_fr_corrected.rds")) %>%
+  tax_fix()
+
+ps_phylum <- speedyseq::tax_glom(ps_fringilla_rare, "Phylum") %>% biomeUtils::removeZeros()
+ps_class  <- speedyseq::tax_glom(ps_fringilla_rare, "Class")  %>% biomeUtils::removeZeros()
+ps_order  <- speedyseq::tax_glom(ps_fringilla_rare, "Order")  %>% biomeUtils::removeZeros()
+ps_family <- speedyseq::tax_glom(ps_fringilla_rare, "Family") %>% biomeUtils::removeZeros()
+ps_genus  <- speedyseq::tax_glom(ps_fringilla_rare, "Genus")  %>% biomeUtils::removeZeros()
+ps_OTU    <- ps_fringilla_rare                                %>% biomeUtils::removeZeros()
+
+Meta <- data.frame(sample_data(ps_fringilla_rare))
+```
+
+## HELPER FUNCTIONS
+
+```{r helpers, message=FALSE, warning=FALSE}
+# Convert a beta.div.comp object into a pairwise dataframe, restricted to
+# the "common chaffinch" subset (no teydea, no polatzeki) and to pairs
+# from different sites. These are the only rows needed for the triangle plots.
+extract_common_diff <- function(bd_obj, meta) {
+  pairs <- t(combn(colnames(as.matrix(bd_obj$D)), 2))
+  
+  df <- data.frame(
+    X1   = pairs[, 1],
+    X2   = pairs[, 2],
+    repl = as.matrix(bd_obj$repl)[pairs],
+    rich = as.matrix(bd_obj$rich)[pairs],
+    D    = as.matrix(bd_obj$D)[pairs]
+  )
+  
+  sl <- setNames(meta$Species_Label,
+                 paste0(meta$Lab_Code, "_", meta$Species_Label))
+  df$Species_Label_X1 <- sl[df$X1]
+  df$Species_Label_X2 <- sl[df$X2]
+  df$S                <- 1 - df$D
+  
+  blue_finches <- c("Tenerife_F_teydea", "Gran_Canaria_F_polatzeki")
+  df %>%
+    filter(!Species_Label_X1 %in% blue_finches,
+           !Species_Label_X2 %in% blue_finches,
+           Species_Label_X1 != Species_Label_X2)
+}
+
+# Build a ternary plot from a common-diff dataframe.
+make_triangle <- function(df, similarity_label, arrow_size = 1) {
+  mr <- mean(df$rich); mp <- mean(df$repl); ms <- mean(df$S)
+  
+  ggtern(data = df, aes(rich, repl, S)) +
+    geom_point(size = 4, alpha = 0.05, stroke = 0.25) +
+    geom_crosshair_tern(aes(mr, mp, ms),
+                        col = "darkred", lty = "dashed",
+                        lineend = "round", size = 2.2) +
+    geom_point(aes(mr, mp, ms), col = "darkred", size = 10) +
+    # nestedness projection
+    geom_point(aes(x = mr, y = 1 - mr, z = 0), col = "darkred", size = 10) +
+    annotate("text", x = mr, y = 1 - mr, z = 0,
+             label = round(mr * 100, 2),
+             hjust = 1, vjust = -1, size = 12, col = "darkred") +
+    # replacement projection
+    geom_point(aes(x = 0, y = mp, z = 1 - mp), col = "darkred", size = 10) +
+    annotate("text", x = 0, y = mp, z = 1 - mp,
+             label = round(mp * 100, 2),
+             hjust = -0.3, vjust = 1, size = 12, col = "darkred") +
+    # similarity projection
+    geom_point(aes(x = 1 - ms, y = 0, z = ms), col = "darkred", size = 8) +
+    annotate("text", x = 1 - ms, y = 0, z = ms,
+             label = round(ms * 100, 2),
+             hjust = 0.5, vjust = 2, size = 12, col = "darkred") +
+    theme_classic() + theme_hidetitles() + theme_nomask() +
+    theme(axis.text         = element_text(size = 24),
+          tern.axis.arrow   = element_line(size = arrow_size),
+          axis.title.x = element_blank(), axis.text.x = element_blank(),
+          axis.ticks.x = element_blank(),
+          axis.title.y = element_blank(), axis.text.y = element_blank(),
+          axis.ticks.y = element_blank()) +
+    Larrowlab("\nNestedness\n") +
+    Tarrowlab("\nReplacement\n") +
+    Rarrowlab(paste0("\nSimilarity (1-", similarity_label, ")")) +
+    theme_showarrows()
+}
+# Add a panel title in the size/style used in the original figures.
+add_title <- function(p, txt) {
+  p + ggtitle(txt) +
+    theme(plot.title = element_text(size = 36, hjust = 0.5))
+}
+
+options(tern.arrow = arrow(type = "open", length = unit(.75, "cm")))
+```
+
+## BRAY-CURTIS PARTITIONING
+
+```{r beta-div-bray, message=FALSE, warning=FALSE}
+# Percentage difference (quantitative form of Sorensen, a.k.a. Bray-Curtis)
+s_phylum <- beta.div.comp(data.frame(otu_table(ps_phylum)), coef = "BS", quant = TRUE, save.abc = FALSE)
+s_class  <- beta.div.comp(data.frame(otu_table(ps_class)),  coef = "BS", quant = TRUE, save.abc = FALSE)
+s_order  <- beta.div.comp(data.frame(otu_table(ps_order)),  coef = "BS", quant = TRUE, save.abc = FALSE)
+s_family <- beta.div.comp(data.frame(otu_table(ps_family)), coef = "BS", quant = TRUE, save.abc = FALSE)
+s_genus  <- beta.div.comp(data.frame(otu_table(ps_genus)),  coef = "BS", quant = TRUE, save.abc = FALSE)
+s_OTU    <- beta.div.comp(data.frame(otu_table(ps_OTU)),    coef = "BS", quant = TRUE, save.abc = FALSE)
+
+df_s_phylum <- extract_common_diff(s_phylum, Meta)
+df_s_class  <- extract_common_diff(s_class,  Meta)
+df_s_order  <- extract_common_diff(s_order,  Meta)
+df_s_family <- extract_common_diff(s_family, Meta)
+df_s_genus  <- extract_common_diff(s_genus,  Meta)
+df_s_OTU    <- extract_common_diff(s_OTU,    Meta)
+
+(tri_s_phylum <- make_triangle(df_s_phylum, "Bray-Curtis"))
+(tri_s_class  <- make_triangle(df_s_class,  "Bray-Curtis"))
+(tri_s_order  <- make_triangle(df_s_order,  "Bray-Curtis"))
+(tri_s_family <- make_triangle(df_s_family, "Bray-Curtis"))
+(tri_s_genus  <- make_triangle(df_s_genus,  "Bray-Curtis"))
+(tri_s_OTU    <- make_triangle(df_s_OTU,    "Bray-Curtis"))
+```
+
+## JACCARD PARTITIONING
+
+```{r beta-div-jaccard, message=FALSE, warning=FALSE}
+# Jaccard (qualitative / presence-absence)
+j_phylum <- beta.div.comp(data.frame(otu_table(ps_phylum)), coef = "BJ", quant = FALSE, save.abc = FALSE)
+j_class  <- beta.div.comp(data.frame(otu_table(ps_class)),  coef = "BJ", quant = FALSE, save.abc = FALSE)
+j_order  <- beta.div.comp(data.frame(otu_table(ps_order)),  coef = "BJ", quant = FALSE, save.abc = FALSE)
+j_family <- beta.div.comp(data.frame(otu_table(ps_family)), coef = "BJ", quant = FALSE, save.abc = FALSE)
+j_genus  <- beta.div.comp(data.frame(otu_table(ps_genus)),  coef = "BJ", quant = FALSE, save.abc = FALSE)
+j_OTU    <- beta.div.comp(data.frame(otu_table(ps_OTU)),    coef = "BJ", quant = FALSE, save.abc = FALSE)
+
+df_j_phylum <- extract_common_diff(j_phylum, Meta)
+df_j_class  <- extract_common_diff(j_class,  Meta)
+df_j_order  <- extract_common_diff(j_order,  Meta)
+df_j_family <- extract_common_diff(j_family, Meta)
+df_j_genus  <- extract_common_diff(j_genus,  Meta)
+df_j_OTU    <- extract_common_diff(j_OTU,    Meta)
+
+(tri_j_phylum <- make_triangle(df_j_phylum, "Jaccard"))
+(tri_j_class  <- make_triangle(df_j_class,  "Jaccard"))
+(tri_j_order  <- make_triangle(df_j_order,  "Jaccard"))
+(tri_j_family <- make_triangle(df_j_family, "Jaccard"))
+(tri_j_genus  <- make_triangle(df_j_genus,  "Jaccard"))
+(tri_j_OTU    <- make_triangle(df_j_OTU,    "Jaccard"))
+```
+
+## ASSEMBLE AND EXPORT FIGURES
+
+```{r export, message=FALSE, warning=FALSE}
+png(paste0(outputDir, "/Figures/triangleSorensenSupp.png"),
+    width = 990, height = 700, units = "mm", res = 300)
+
+(add_title(tri_s_phylum, "Phylum") + add_title(tri_s_class, "Class") + add_title(tri_s_order, "Order")) / (add_title(tri_s_family, "Family") + add_title(tri_s_genus, "Genus") + add_title(tri_s_OTU, "OTU"))
+
+dev.off()
+
+png(paste0(outputDir, "/Figures/triangleJaccardSupp.png"),
+    width = 990, height = 700, units = "mm", res = 300)
+
+(add_title(tri_j_phylum, "Phylum") + add_title(tri_j_class, "Class") + add_title(tri_j_order, "Order")) / (add_title(tri_j_family, "Family") + add_title(tri_j_genus, "Genus") + add_title(tri_j_OTU, "OTU"))
+
+dev.off()
+
+
+```

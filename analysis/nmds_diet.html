@@ -5,11 +5,11 @@
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
     <meta name="generator" content="pandoc" />
 
-        <meta name="author" content="B. K. Montero and M. Gillingham" />
+        <meta name="author" content="B. Karina Montero and Mark Gillingham" />
     
         <meta name="date" content="2026-05-11" />
     
-    <title>Ordination 16S data</title>
+    <title>Ordination diet</title>
 
         <script>// Pandoc 2.9 adds attributes on both header and div. We remove the former (to
 // be compatible with the behavior of Pandoc < 2.8).
@@ -1577,10 +1577,9 @@ Prism.languages.r={comment:/#.*/,string:{pattern:/(['"])(?:\\.|(?!\1)[^\\\r\n])*
             <ul>
             <li><a href="#load-libraries">LOAD LIBRARIES</a></li>
             <li><a href="#working-directories">WORKING DIRECTORIES</a></li>
-            <li><a href="#load-16s-data">LOAD 16S DATA</a></li>
-            <li><a href="#nmds-at-species-level-bray-curtis">NMDS AT SPECIES LEVEL (Bray-Curtis)</a></li>
-            <li><a href="#permanova-across-taxonomic-levels">PERMANOVA ACROSS TAXONOMIC LEVELS</a></li>
-            <li><a href="#build-combined-results-table">BUILD COMBINED RESULTS TABLE</a></li>
+            <li><a href="#load-data">LOAD DATA</a></li>
+            <li><a href="#nmds-ordinations">NMDS ORDINATIONS</a></li>
+            <li><a href="#test-effect-of-sex-and-age-permanova">TEST EFFECT OF SEX AND AGE (PERMANOVA)</a></li>
             </ul>
           </div>
           <div data-position="sidebar:post-end" class="InjectedComponents"><div class="dark-theme-toggler"><div class="toggle "><div class="toggle-track"><div class="toggle-track-check"><img src="data:image/png;base64,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" role="presentation" style="pointer-events: none;" width="16" height="16"></div> <div class="toggle-track-x"><img src="data:image/png;base64,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" role="presentation" style="pointer-events: none;" width="16" height="16"></div></div> <div class="toggle-thumb"></div></div> <input type="checkbox" aria-label="Switch between Dark and Default theme" class="toggler-screen-reader-only"></div></div>
@@ -1597,10 +1596,10 @@ Prism.languages.r={comment:/#.*/,string:{pattern:/(['"])(?:\\.|(?!\1)[^\\\r\n])*
    </div>
    
         
-      <h1 class="title">Ordination 16S data</h1>
+      <h1 class="title">Ordination diet</h1>
       
       <p class="authors">
-           <span class="glyphicon glyphicon-user"></span> B. K. Montero and M. Gillingham
+           <span class="glyphicon glyphicon-user"></span> B. Karina Montero and Mark Gillingham
       </p>
          <p class="date"><span class="glyphicon glyphicon-calendar"></span> 2026-05-11</p>
            
@@ -1616,9 +1615,10 @@ Prism.languages.r={comment:/#.*/,string:{pattern:/(['"])(?:\\.|(?!\1)[^\\\r\n])*
 
 # basics
 library(dplyr)
-library(tidyverse)
-library(stringr)
 library(ggplot2)
+library(stringr)
+library(tidyr)
+library(tidyverse)
 
 # phyloseq + diversity
 library(phyloseq)
@@ -1631,629 +1631,272 @@ library(vegan)</code></pre>
 <pre class="r"><code>source(&quot;~/Dropbox/FringillaMicrobiome/05_Scripts/workingDirectories.R&quot;)
 source(&quot;~/Dropbox/FringillaMicrobiome/05_Scripts/CleanScripts/graphics_param.R&quot;)</code></pre>
 </div>
-<div id="load-16s-data" class="section level2">
-<h2>LOAD 16S DATA</h2>
-<pre class="r"><code>microb_fr &lt;- readRDS(paste0(dataDir, &quot;/microb_fr_corrected.rds&quot;)) %&gt;%
-    biomeUtils::removeZeros()</code></pre>
-</div>
-<div id="nmds-at-species-level-bray-curtis" class="section level2">
-<h2>NMDS AT SPECIES LEVEL (Bray-Curtis)</h2>
-<pre class="r"><code>ps_fringilla &lt;- speedyseq::tax_glom(microb_fr,
-    &quot;Species&quot;) %&gt;%
-    biomeUtils::removeZeros()
+<div id="load-data" class="section level2">
+<h2>LOAD DATA</h2>
+<pre class="r"><code>diet_fr &lt;- readRDS(paste0(dataDir, &quot;/diet_fr_corrected.rds&quot;)) %&gt;%
+    subset_samples(Genus == &quot;Fringilla&quot;)
 
-set.seed(1)
-ord &lt;- metaMDS(otu_table(ps_fringilla), distance = &quot;bray&quot;,
-    k = 8, binary = FALSE)</code></pre>
+# Standardise label format
+sample_data(diet_fr)$Species_Label &lt;- gsub(&quot; &quot;,
+    &quot;_&quot;, sample_data(diet_fr)$Species_Label)
+
+# Remove samples with only 1 ASV (Lab_Codes
+# 306 and 105)
+diet_filt &lt;- diet_fr %&gt;%
+    subset_samples(!Lab_Code %in% c(&quot;306&quot;, &quot;105&quot;)) %&gt;%
+    removeZeros()
+
+# Shared factor level definition for
+# ordination panels
+species_levels &lt;- c(&quot;El_Hierro_F_c_ombriosa&quot;,
+    &quot;Flores_F_moreletti&quot;, &quot;Gran_Canaria_F_c_bakeri&quot;,
+    &quot;Gran_Canaria_F_polatzeki&quot;, &quot;La_Gomera_F_c_canariensis&quot;,
+    &quot;La_Palma_F_c_palmae&quot;, &quot;Madeira_F_maderensis&quot;,
+    &quot;Mainland_F_coelebs&quot;, &quot;Sao_Miguel_F_moreletti&quot;,
+    &quot;Tenerife_F_c_canariensis&quot;, &quot;Tenerife_F_teydea&quot;)
+
+species_labels_parsed &lt;- c(&quot;El~Hierro:~italic(&#39;F.c. ombriosa&#39;)&quot;,
+    &quot;Flores:~italic(&#39;F. moreletti&#39;)&quot;, &quot;Gran~Canaria:~italic(&#39;F.c. bakeri&#39;)&quot;,
+    &quot;Gran~Canaria:~italic(&#39;F. polatzeki&#39;)&quot;, &quot;La~Gomera:~italic(&#39;F.c. canariensis&#39;)&quot;,
+    &quot;La~Palma:~italic(&#39;F.c. palmae&#39;)&quot;, &quot;Madeira:~italic(&#39;F. maderensis&#39;)&quot;,
+    &quot;Mainland:~italic(&#39;F. coelebs&#39;)&quot;, &quot;Sao~Miguel:~italic(&#39;F. moreletti&#39;)&quot;,
+    &quot;Tenerife:~italic(&#39;F.c. canariensis&#39;)&quot;, &quot;Tenerife:~italic(&#39;F. teydea&#39;)&quot;)</code></pre>
+</div>
+<div id="nmds-ordinations" class="section level2">
+<h2>NMDS ORDINATIONS</h2>
+<pre class="r"><code># Helper that builds an NMDS plot for a
+# given distance method
+build_nmds_plot &lt;- function(ps, distance, binary,
+    seed = 1, ord_args = list()) {
+    set.seed(seed)
+
+    if (distance == &quot;raupcrick&quot;) {
+        rc_dist &lt;- raupcrick(otu_table(ps))
+        ord &lt;- do.call(metaMDS, c(list(comm = rc_dist),
+            ord_args))
+    } else {
+        ord &lt;- do.call(metaMDS, c(list(comm = otu_table(ps),
+            distance = distance, binary = binary),
+            ord_args))
+    }
+
+    scrs &lt;- scores(ord, display = &quot;sites&quot;) %&gt;%
+        as.data.frame() %&gt;%
+        mutate(Species_Label = sample_data(ps)$Species_Label)
+
+    cent &lt;- aggregate(cbind(NMDS1, NMDS2) ~ Species_Label,
+        data = scrs, FUN = mean)
+
+    ggplot(scrs, aes(x = NMDS1, y = NMDS2, fill = Species_Label,
+        shape = Species_Label)) + geom_point(alpha = 1,
+        size = 10, stroke = 1.5, color = &quot;white&quot;) +
+        geom_point(data = cent, aes(y = NMDS2,
+            x = NMDS1, fill = Species_Label),
+            size = 17, stroke = 1.5, color = &quot;black&quot;) +
+        pca_theme + SpeciesLabel.fill + scale_shape_manual(values = c(21,
+        22, 23, 21, 23, 25, 21, 21, 21, 22, 25),
+        guide = &quot;none&quot;) + guides(color = &quot;none&quot;)
+}
+
+# Jaccard
+jaccard_NMDS &lt;- build_nmds_plot(diet_filt, &quot;jaccard&quot;,
+    binary = TRUE, seed = 100)</code></pre>
 <pre><code>## Square root transformation
 ## Wisconsin double standardization
-## Run 0 stress 0.09836932 
-## Run 1 stress 0.09792143 
+## Run 0 stress 0.2142472 
+## Run 1 stress 0.2155421 
+## Run 2 stress 0.2291159 
+## Run 3 stress 0.2162326 
+## Run 4 stress 0.2141452 
 ## ... New best solution
-## ... Procrustes: rmse 0.02130248  max resid 0.09371834 
-## Run 2 stress 0.09858832 
-## Run 3 stress 0.0991731 
-## Run 4 stress 0.09837134 
-## ... Procrustes: rmse 0.01844119  max resid 0.06381256 
-## Run 5 stress 0.0996052 
-## Run 6 stress 0.09802244 
-## ... Procrustes: rmse 0.01424684  max resid 0.0628416 
-## Run 7 stress 0.09846974 
-## Run 8 stress 0.09823318 
-## ... Procrustes: rmse 0.02005818  max resid 0.09686977 
-## Run 9 stress 0.09818498 
-## ... Procrustes: rmse 0.01934323  max resid 0.1065405 
-## Run 10 stress 0.09844321 
-## Run 11 stress 0.09911149 
-## Run 12 stress 0.0979396 
-## ... Procrustes: rmse 0.01610915  max resid 0.09385687 
-## Run 13 stress 0.09807407 
-## ... Procrustes: rmse 0.02214428  max resid 0.1002099 
-## Run 14 stress 0.0985767 
-## Run 15 stress 0.09863733 
-## Run 16 stress 0.09860824 
-## Run 17 stress 0.09895406 
-## Run 18 stress 0.09849147 
-## Run 19 stress 0.09868567 
-## Run 20 stress 0.09847055 
+## ... Procrustes: rmse 0.01345993  max resid 0.1639213 
+## Run 5 stress 0.2205774 
+## Run 6 stress 0.216706 
+## Run 7 stress 0.2142191 
+## ... Procrustes: rmse 0.01656623  max resid 0.1665342 
+## Run 8 stress 0.2162748 
+## Run 9 stress 0.2142974 
+## ... Procrustes: rmse 0.01426116  max resid 0.1687194 
+## Run 10 stress 0.215951 
+## Run 11 stress 0.2176519 
+## Run 12 stress 0.2224613 
+## Run 13 stress 0.2181027 
+## Run 14 stress 0.2158714 
+## Run 15 stress 0.2223644 
+## Run 16 stress 0.2234092 
+## Run 17 stress 0.2192741 
+## Run 18 stress 0.2156979 
+## Run 19 stress 0.215485 
+## Run 20 stress 0.2143436 
+## ... Procrustes: rmse 0.01642503  max resid 0.158309 
 ## *** Best solution was not repeated -- monoMDS stopping criteria:
-##     20: no. of iterations &gt;= maxit</code></pre>
-<pre class="r"><code>scrs &lt;- scores(ord, display = &quot;sites&quot;) %&gt;%
-    as.data.frame() %&gt;%
-    mutate(Species_Label = sample_data(ps_fringilla)$Species_Label)
-
-cent &lt;- aggregate(cbind(NMDS1, NMDS2) ~ Species_Label,
-    data = scrs, FUN = mean)
-
-png(paste0(outputDir, &quot;/Figures/bray_NMDS_species_speciesFix.png&quot;),
+##      2: no. of iterations &gt;= maxit
+##     18: stress ratio &gt; sratmax</code></pre>
+<pre class="r"><code>png(paste0(outputDir, &quot;/Figures/Jaccard_NMDS_diet_PCH_clean.png&quot;),
     width = 320, height = 240, units = &quot;mm&quot;, res = 1000)
-(bray_NMDS &lt;- ggplot(scrs, aes(x = NMDS1, y = NMDS2,
-    fill = Species_Label, shape = Species_Label)) +
-    geom_point(alpha = 1, size = 10, stroke = 1.5,
-        color = &quot;white&quot;) + geom_point(data = cent,
-    aes(y = NMDS2, x = NMDS1, fill = Species_Label),
-    size = 17, stroke = 1.5, color = &quot;black&quot;) +
-    pca_theme + SpeciesLabel.fill + scale_y_continuous(labels = scales::number_format(accuracy = 0.01)) +
-    scale_shape_manual(values = c(21, 22, 23,
-        21, 23, 25, 21, 21, 21, 22, 25), guide = &quot;none&quot;) +
-    guides(color = &quot;none&quot;))
+print(jaccard_NMDS)
+dev.off()</code></pre>
+<pre><code>## png 
+##   2</code></pre>
+<pre class="r"><code># Bray-Curtis
+bray_NMDS &lt;- build_nmds_plot(diet_filt, &quot;bray&quot;,
+    binary = FALSE, seed = 1)</code></pre>
+<pre><code>## Square root transformation
+## Wisconsin double standardization
+## Run 0 stress 0.2249606 
+## Run 1 stress 0.2283196 
+## Run 2 stress 0.226016 
+## Run 3 stress 0.2265964 
+## Run 4 stress 0.238886 
+## Run 5 stress 0.2289723 
+## Run 6 stress 0.2296477 
+## Run 7 stress 0.2254355 
+## ... Procrustes: rmse 0.01629121  max resid 0.1474105 
+## Run 8 stress 0.2303431 
+## Run 9 stress 0.2286762 
+## Run 10 stress 0.2333299 
+## Run 11 stress 0.2331916 
+## Run 12 stress 0.2264614 
+## Run 13 stress 0.2281654 
+## Run 14 stress 0.2330365 
+## Run 15 stress 0.2297754 
+## Run 16 stress 0.2279107 
+## Run 17 stress 0.2316105 
+## Run 18 stress 0.2255849 
+## Run 19 stress 0.2288782 
+## Run 20 stress 0.2274486 
+## *** Best solution was not repeated -- monoMDS stopping criteria:
+##      3: no. of iterations &gt;= maxit
+##     17: stress ratio &gt; sratmax</code></pre>
+<pre class="r"><code>png(paste0(outputDir, &quot;/Figures/bray_NMDS_diet_PCH_clean.png&quot;),
+    width = 320, height = 240, units = &quot;mm&quot;, res = 1000)
+print(bray_NMDS)
+dev.off()</code></pre>
+<pre><code>## png 
+##   2</code></pre>
+<pre class="r"><code># Raup-Crick
+raupcrick_NMDS &lt;- build_nmds_plot(diet_filt, &quot;raupcrick&quot;,
+    binary = NA, seed = 1)</code></pre>
+<pre><code>## Run 0 stress 0.2267367 
+## Run 1 stress 0.2268588 
+## ... Procrustes: rmse 0.009671465  max resid 0.1130502 
+## Run 2 stress 0.2271176 
+## ... Procrustes: rmse 0.01490152  max resid 0.2112713 
+## Run 3 stress 0.2280758 
+## Run 4 stress 0.2360597 
+## Run 5 stress 0.2303077 
+## Run 6 stress 0.2308656 
+## Run 7 stress 0.2541512 
+## Run 8 stress 0.229372 
+## Run 9 stress 0.2278384 
+## Run 10 stress 0.2281729 
+## Run 11 stress 0.2280979 
+## Run 12 stress 0.226719 
+## ... New best solution
+## ... Procrustes: rmse 0.005979923  max resid 0.07331646 
+## Run 13 stress 0.2289225 
+## Run 14 stress 0.2393327 
+## Run 15 stress 0.2269819 
+## ... Procrustes: rmse 0.01162293  max resid 0.1528865 
+## Run 16 stress 0.2269698 
+## ... Procrustes: rmse 0.01428719  max resid 0.2223123 
+## Run 17 stress 0.226846 
+## ... Procrustes: rmse 0.01079056  max resid 0.1135975 
+## Run 18 stress 0.226562 
+## ... New best solution
+## ... Procrustes: rmse 0.008542014  max resid 0.1141032 
+## Run 19 stress 0.2300714 
+## Run 20 stress 0.2308649 
+## *** Best solution was not repeated -- monoMDS stopping criteria:
+##      2: no. of iterations &gt;= maxit
+##     17: stress ratio &gt; sratmax
+##      1: scale factor of the gradient &lt; sfgrmin</code></pre>
+<pre class="r"><code>png(paste0(outputDir, &quot;/Figures/raupcrick_NMDS_diet_PCH_clean.png&quot;),
+    width = 320, height = 240, units = &quot;mm&quot;, res = 1000)
+print(raupcrick_NMDS)
 dev.off()</code></pre>
 <pre><code>## png 
 ##   2</code></pre>
 </div>
-<div id="permanova-across-taxonomic-levels" class="section level2">
-<h2>PERMANOVA ACROSS TAXONOMIC LEVELS</h2>
-<pre class="r"><code># Runs four distance metrics (Jaccard,
-# Bray-Curtis, unweighted UniFrac, weighted
-# UniFrac) for a given taxonomic level.
-# Returns a named list of adonis2 results.
-permanova_at_level &lt;- function(ps_base, level,
+<div id="test-effect-of-sex-and-age-permanova" class="section level2">
+<h2>TEST EFFECT OF SEX AND AGE (PERMANOVA)</h2>
+<pre class="r"><code># Create age category
+sample_data(diet_filt)$Age_cat &lt;- ifelse(sample_data(diet_filt)$Age &gt;
+    3, &quot;adult&quot;, &quot;fledging&quot;)
+
+# Keep only samples with non-missing age and
+# sex
+diet_clean_noNA &lt;- diet_filt %&gt;%
+    subset_samples(Genus == &quot;Fringilla&quot; &amp; Age &gt;
+        0 &amp; !is.na(Sex)) %&gt;%
+    removeZeros()
+
+# Helper that runs PERMANOVA for a given
+# distance metric
+run_permanova &lt;- function(ps, dist_method, binary = FALSE,
     seed = 42) {
-    ps &lt;- if (level == &quot;OTU99&quot;)
-        ps_base else speedyseq::tax_glom(ps_base, level)
-    ps &lt;- ps %&gt;%
-        biomeUtils::removeZeros() %&gt;%
-        subset_samples(Genus == &quot;Fringilla&quot; &amp;
-            !is.na(Sex) &amp; Age &gt; 0) %&gt;%
-        biomeUtils::removeZeros()
-
-    jac_dist &lt;- vegdist(otu_table(ps), method = &quot;jaccard&quot;,
-        binary = TRUE)
-    bray_dist &lt;- vegdist(otu_table(ps), method = &quot;bray&quot;,
-        binary = FALSE)
-    uw_dist &lt;- UniFrac(ps, weighted = FALSE)
-    w_dist &lt;- UniFrac(ps, weighted = TRUE)
-
-    formula &lt;- ~Species_Label + Age_cat + Sex
-
+    if (dist_method == &quot;raupcrick&quot;) {
+        d &lt;- raupcrick(otu_table(ps))
+    } else {
+        d &lt;- vegdist(otu_table(ps), method = dist_method,
+            binary = binary)
+    }
     set.seed(seed)
-    jac &lt;- adonis2(update(formula, jac_dist ~
-        .), data = meta(ps), by = &quot;margin&quot;, permutations = 9999)
-    set.seed(seed)
-    bray &lt;- adonis2(update(formula, bray_dist ~
-        .), data = meta(ps), by = &quot;margin&quot;, permutations = 9999)
-    set.seed(seed)
-    uw &lt;- adonis2(update(formula, uw_dist ~ .),
+    adonis2(d ~ Species_Label + Age_cat + Sex,
         data = meta(ps), by = &quot;margin&quot;, permutations = 9999)
-    set.seed(seed)
-    w &lt;- adonis2(update(formula, w_dist ~ .),
-        data = meta(ps), by = &quot;margin&quot;, permutations = 9999)
-
-    list(Jaccard = jac, `Bray-Curtis` = bray,
-        `Unweighted UniFrac` = uw, `Weighted UniFrac` = w)
-}</code></pre>
-<pre class="r"><code>tax_levels &lt;- c(&quot;Phylum&quot;, &quot;Class&quot;, &quot;Order&quot;, &quot;Family&quot;,
-    &quot;Genus&quot;, &quot;Species&quot;, &quot;OTU99&quot;)
-
-results_by_level &lt;- lapply(tax_levels, function(lvl) {
-    message(&quot;Running PERMANOVA at level: &quot;, lvl)
-    permanova_at_level(microb_fr, lvl)
-})
-names(results_by_level) &lt;- tax_levels
-
-# Print everything for inspection
-results_by_level</code></pre>
-<pre><code>## $Phylum
-## $Phylum$Jaccard
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, jac_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    5.002 0.13207 3.3617 0.0001 ***
-## Age_cat         1    0.308 0.00812 2.0676 0.0487 *  
-## Sex             1    0.241 0.00635 1.6164 0.1223    
-## Residual      214   31.845 0.84076                  
-## Total         226   37.876 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Phylum$`Bray-Curtis`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, bray_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    9.722 0.19918 5.4709 0.0001 ***
-## Age_cat         1    0.088 0.00180 0.4945 0.7738    
-## Sex             1    0.098 0.00201 0.5527 0.7242    
-## Residual      214   38.028 0.77910                  
-## Total         226   48.810 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Phylum$`Unweighted UniFrac`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, uw_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    5.012 0.12778 3.2307 0.0001 ***
-## Age_cat         1    0.303 0.00773 1.9551 0.0649 .  
-## Sex             1    0.239 0.00610 1.5433 0.1500    
-## Residual      214   33.198 0.84643                  
-## Total         226   39.221 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Phylum$`Weighted UniFrac`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, w_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    7.967 0.22448 6.3361 0.0001 ***
-## Age_cat         1    0.069 0.00193 0.5460 0.6906    
-## Sex             1    0.049 0.00137 0.3873 0.8216    
-## Residual      214   26.909 0.75818                  
-## Total         226   35.491 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## 
-## $Class
-## $Class$Jaccard
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, jac_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    5.832 0.12864 3.2525 0.0001 ***
-## Age_cat         1    0.328 0.00724 1.8301 0.0427 *  
-## Sex             1    0.262 0.00578 1.4621 0.1217    
-## Residual      214   38.369 0.84636                  
-## Total         226   45.334 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Class$`Bray-Curtis`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, bray_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10   10.944 0.19508 5.3747 0.0001 ***
-## Age_cat         1    0.074 0.00133 0.3656 0.8993    
-## Sex             1    0.132 0.00235 0.6465 0.6750    
-## Residual      214   43.576 0.77672                  
-## Total         226   56.103 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Class$`Unweighted UniFrac`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, uw_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    5.361 0.12473 3.1399 0.0001 ***
-## Age_cat         1    0.316 0.00736 1.8519 0.0510 .  
-## Sex             1    0.259 0.00604 1.5196 0.1210    
-## Residual      214   36.541 0.85011                  
-## Total         226   42.984 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Class$`Weighted UniFrac`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, w_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    8.682 0.21737 6.1247 0.0001 ***
-## Age_cat         1    0.068 0.00171 0.4819 0.7697    
-## Sex             1    0.063 0.00157 0.4418 0.8036    
-## Residual      214   30.334 0.75951                  
-## Total         226   39.939 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## 
-## $Order
-## $Order$Jaccard
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, jac_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    7.842 0.12613 3.1652 0.0001 ***
-## Age_cat         1    0.281 0.00452 1.1350 0.2597    
-## Sex             1    0.279 0.00449 1.1268 0.2694    
-## Residual      214   53.020 0.85279                  
-## Total         226   62.173 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Order$`Bray-Curtis`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, bray_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10   11.456 0.15886 4.1982 0.0001 ***
-## Age_cat         1    0.232 0.00322 0.8509 0.5480    
-## Sex             1    0.239 0.00331 0.8743 0.5250    
-## Residual      214   58.397 0.80978                  
-## Total         226   72.115 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Order$`Unweighted UniFrac`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, uw_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    7.168 0.12859 3.2415 0.0001 ***
-## Age_cat         1    0.284 0.00509 1.2823 0.1609    
-## Sex             1    0.259 0.00464 1.1704 0.2423    
-## Residual      214   47.320 0.84896                  
-## Total         226   55.739 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Order$`Weighted UniFrac`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, w_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    9.038 0.18709 5.0852 0.0001 ***
-## Age_cat         1    0.155 0.00320 0.8704 0.5064    
-## Sex             1    0.171 0.00355 0.9648 0.4266    
-## Residual      214   38.037 0.78733                  
-## Total         226   48.311 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## 
-## $Family
-## $Family$Jaccard
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, jac_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    8.562 0.12179 3.0295 0.0001 ***
-## Age_cat         1    0.301 0.00428 1.0656 0.3182    
-## Sex             1    0.272 0.00387 0.9616 0.5135    
-## Residual      214   60.482 0.86033                  
-## Total         226   70.301 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Family$`Bray-Curtis`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, bray_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10   14.359 0.17093 4.5761 0.0001 ***
-## Age_cat         1    0.232 0.00276 0.7391 0.7353    
-## Sex             1    0.324 0.00385 1.0312 0.3765    
-## Residual      214   67.147 0.79934                  
-## Total         226   84.003 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Family$`Unweighted UniFrac`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, uw_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    7.746 0.12655 3.1735 0.0001 ***
-## Age_cat         1    0.297 0.00486 1.2183 0.1688    
-## Sex             1    0.252 0.00411 1.0307 0.3828    
-## Residual      214   52.237 0.85339                  
-## Total         226   61.211 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Family$`Weighted UniFrac`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, w_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    9.778 0.19048 5.1925 0.0001 ***
-## Age_cat         1    0.150 0.00292 0.7948 0.5929    
-## Sex             1    0.173 0.00338 0.9203 0.4732    
-## Residual      214   40.299 0.78503                  
-## Total         226   51.334 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## 
-## $Genus
-## $Genus$Jaccard
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, jac_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    9.775 0.10958 2.6846 0.0001 ***
-## Age_cat         1    0.363 0.00407 0.9980 0.4460    
-## Sex             1    0.361 0.00404 0.9907 0.4577    
-## Residual      214   77.925 0.87348                  
-## Total         226   89.212 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Genus$`Bray-Curtis`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, bray_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10   14.912 0.15689 4.1282 0.0001 ***
-## Age_cat         1    0.344 0.00362 0.9520 0.4683    
-## Sex             1    0.474 0.00498 1.3109 0.1226    
-## Residual      214   77.300 0.81330                  
-## Total         226   95.046 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Genus$`Unweighted UniFrac`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, uw_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    8.401 0.12015 2.9886 0.0001 ***
-## Age_cat         1    0.304 0.00435 1.0824 0.2817    
-## Sex             1    0.279 0.00399 0.9923 0.4369    
-## Residual      214   60.155 0.86033                  
-## Total         226   69.921 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Genus$`Weighted UniFrac`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, w_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    9.899 0.18658 5.0685 0.0001 ***
-## Age_cat         1    0.159 0.00300 0.8157 0.5903    
-## Sex             1    0.198 0.00373 1.0132 0.3839    
-## Residual      214   41.797 0.78777                  
-## Total         226   53.057 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## 
-## $Species
-## $Species$Jaccard
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, jac_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    9.777 0.10449 2.5433 0.0001 ***
-## Age_cat         1    0.375 0.00401 0.9763 0.5266    
-## Sex             1    0.377 0.00403 0.9819 0.4952    
-## Residual      214   82.264 0.87920                  
-## Total         226   93.567 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Species$`Bray-Curtis`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, bray_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10   15.177 0.15677 4.1150 0.0001 ***
-## Age_cat         1    0.343 0.00354 0.9299 0.5118    
-## Sex             1    0.446 0.00461 1.2097 0.1684    
-## Residual      214   78.925 0.81529                  
-## Total         226   96.806 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Species$`Unweighted UniFrac`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, uw_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    8.395 0.11737 2.9094 0.0001 ***
-## Age_cat         1    0.312 0.00436 1.0801 0.2772    
-## Sex             1    0.287 0.00402 0.9960 0.4341    
-## Residual      214   61.746 0.86331                  
-## Total         226   71.523 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $Species$`Weighted UniFrac`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, w_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    9.899 0.18635 5.0611 0.0001 ***
-## Age_cat         1    0.161 0.00303 0.8240 0.5825    
-## Sex             1    0.198 0.00373 1.0128 0.3841    
-## Residual      214   41.857 0.78796                  
-## Total         226   53.121 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## 
-## $OTU99
-## $OTU99$Jaccard
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, jac_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    8.800 0.08086 1.9100 0.0001 ***
-## Age_cat         1    0.483 0.00443 1.0473 0.1723    
-## Sex             1    0.475 0.00436 1.0306 0.2566    
-## Residual      214   98.601 0.90600                  
-## Total         226  108.831 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $OTU99$`Bray-Curtis`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, bray_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10   13.885 0.13356 3.3926 0.0001 ***
-## Age_cat         1    0.506 0.00487 1.2358 0.1213    
-## Sex             1    0.428 0.00412 1.0468 0.2997    
-## Residual      214   87.581 0.84250                  
-## Total         226  103.955 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $OTU99$`Unweighted UniFrac`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, uw_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    8.608 0.11011 2.7042 0.0001 ***
-## Age_cat         1    0.338 0.00432 1.0615 0.2848    
-## Sex             1    0.338 0.00432 1.0618 0.2847    
-## Residual      214   68.119 0.87140                  
-## Total         226   78.172 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
-## 
-## $OTU99$`Weighted UniFrac`
-## Permutation test for adonis under reduced model
-## Marginal effects of terms
-## Permutation: free
-## Number of permutations: 9999
-## 
-## adonis2(formula = update(formula, w_dist ~ .), data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
-##                Df SumOfSqs      R2      F Pr(&gt;F)    
-## Species_Label  10    9.861 0.18416 4.9884 0.0001 ***
-## Age_cat         1    0.171 0.00320 0.8656 0.5362    
-## Sex             1    0.201 0.00376 1.0186 0.3760    
-## Residual      214   42.304 0.79001                  
-## Total         226   53.549 1.00000                  
-## ---
-## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
-</div>
-<div id="build-combined-results-table" class="section level2">
-<h2>BUILD COMBINED RESULTS TABLE</h2>
-<pre class="r"><code># Helper to extract a tidy data frame from
-# one adonis2 result
-extract_adonis &lt;- function(adonis_result, distance_metric,
-    taxonomic_level) {
-    df &lt;- as.data.frame(adonis_result)
-    df$Predictor &lt;- rownames(df)
-    df &lt;- df[!df$Predictor %in% c(&quot;Residual&quot;,
-        &quot;Total&quot;), ]
-
-    data.frame(`Distance metric` = distance_metric,
-        `Taxonomic Level` = taxonomic_level, Predictor = df$Predictor,
-        R2 = round(df$R2, 3), F = round(df$F,
-            3), pvalue = df$`Pr(&gt;F)`, check.names = FALSE,
-        stringsAsFactors = FALSE)
 }
 
-# Flatten all results into one table,
-# ordered: Jaccard, Bray, UW UniFrac, W
-# UniFrac within each taxonomic level
-permanova_table &lt;- bind_rows(lapply(tax_levels,
-    function(lvl) {
-        bind_rows(extract_adonis(results_by_level[[lvl]]$Jaccard,
-            &quot;Jaccard&quot;, lvl), extract_adonis(results_by_level[[lvl]]$`Bray-Curtis`,
-            &quot;Bray-Curtis&quot;, lvl), extract_adonis(results_by_level[[lvl]]$`Unweighted UniFrac`,
-            &quot;Unweighted UniFrac&quot;, lvl), extract_adonis(results_by_level[[lvl]]$`Weighted UniFrac`,
-            &quot;Weighted UniFrac&quot;, lvl))
-    }))
+ad_jac &lt;- run_permanova(diet_clean_noNA, &quot;jaccard&quot;,
+    binary = TRUE)
+ad_bray &lt;- run_permanova(diet_clean_noNA, &quot;bray&quot;,
+    binary = FALSE)
+ad_rc &lt;- run_permanova(diet_clean_noNA, &quot;raupcrick&quot;)
 
-# Format p-values
-permanova_table$pvalue &lt;- ifelse(permanova_table$pvalue &lt;
-    0.001, &quot;&lt;0.001&quot;, formatC(permanova_table$pvalue,
-    format = &quot;f&quot;, digits = 3))
-
-write.csv(permanova_table, file = paste0(outputDir,
-    &quot;/permanova_results_full.csv&quot;), row.names = FALSE)
-
-# To access individual results from R:
-# results_by_level[[&#39;Family&#39;]][[&#39;Bray-Curtis&#39;]]</code></pre>
+ad_jac</code></pre>
+<pre><code>## Permutation test for adonis under reduced model
+## Marginal effects of terms
+## Permutation: free
+## Number of permutations: 9999
+## 
+## adonis2(formula = d ~ Species_Label + Age_cat + Sex, data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
+##                Df SumOfSqs      R2      F Pr(&gt;F)    
+## Species_Label  10   21.586 0.19457 6.2808 0.0001 ***
+## Age_cat         1    0.435 0.00392 1.2655 0.1205    
+## Sex             1    0.311 0.00280 0.9043 0.6202    
+## Residual      253   86.950 0.78374                  
+## Total         265  110.943 1.00000                  
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
+<pre class="r"><code>ad_bray</code></pre>
+<pre><code>## Permutation test for adonis under reduced model
+## Marginal effects of terms
+## Permutation: free
+## Number of permutations: 9999
+## 
+## adonis2(formula = d ~ Species_Label + Age_cat + Sex, data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
+##                Df SumOfSqs      R2      F Pr(&gt;F)    
+## Species_Label  10   27.744 0.23819 8.1640 0.0001 ***
+## Age_cat         1    0.455 0.00391 1.3389 0.1453    
+## Sex             1    0.320 0.00275 0.9422 0.4850    
+## Residual      253   85.978 0.73814                  
+## Total         265  116.479 1.00000                  
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
+<pre class="r"><code>ad_rc</code></pre>
+<pre><code>## Permutation test for adonis under reduced model
+## Marginal effects of terms
+## Permutation: free
+## Number of permutations: 9999
+## 
+## adonis2(formula = d ~ Species_Label + Age_cat + Sex, data = meta(ps), permutations = 9999, by = &quot;margin&quot;)
+##                Df SumOfSqs       R2       F Pr(&gt;F)    
+## Species_Label  10   33.074  0.51166 29.8094 0.0001 ***
+## Age_cat         1    0.204  0.00316  1.8417 0.1828    
+## Sex             1   -0.053 -0.00082 -0.4802 0.9631    
+## Residual      253   28.070  0.43426                   
+## Total         265   64.640  1.00000                   
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1</code></pre>
 </div>
 </div>
 

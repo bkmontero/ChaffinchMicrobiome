@@ -2,13 +2,16 @@
 title: 'Ordination diet'
 author: "B. Karina Montero and Mark Gillingham"
 date: "`r Sys.Date()`"
-#output: pdf_document
-output: html_document
+output: 
+  rmdformats::downcute:
+    code_folding: hide
+    toc_depth: 2
 ---
-## Loading libraries
 
+## LOAD LIBRARIES
 
 ```{r libraries, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, results="hide"}
+
 rm(list = ls())
 
 # basics
@@ -16,36 +19,20 @@ library(dplyr)
 library(ggplot2)
 library(stringr)
 library(tidyr)
-library(ggpubr)
 library(tidyverse)
-library(ggtext)
-library(ggrepel)
 
-# phyloseq section
+# phyloseq + diversity
 library(phyloseq)
-library(decontam)
 library(biomeUtils)
+library(microbiome)
 library(vegan)
-
-#devtools::install_github("gmteunisse/fantaxtic")
-library(fantaxtic)
-library(ggtext)
-
-# models
-library(mgcv)
-library(glmmTMB) 
-library(lme4)
-library(MuMIn)
-library(MASS)
-library(nlme)
-library(ggeffects)
-library(multcomp)
-library(car)
 
 ```
 
 ## WORKING DIRECTORIES
+
 ```{r workingDir, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE, results="hide"}
+
 source("~/Dropbox/FringillaMicrobiome/05_Scripts/workingDirectories.R")
 source("~/Dropbox/FringillaMicrobiome/05_Scripts/CleanScripts/graphics_param.R")
 
@@ -53,180 +40,119 @@ source("~/Dropbox/FringillaMicrobiome/05_Scripts/CleanScripts/graphics_param.R")
 
 ## LOAD DATA
 
-Rarefied data
-
 ```{r psObject, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
 
-diet_fr <- readRDS(paste0(dataDir, "/diet_overlap_OTU99_fr.rds"))
+diet_fr <- readRDS(paste0(dataDir, "/diet_fr_corrected.rds")) %>%
+  subset_samples(Genus == "Fringilla")
+
+# Standardise label format
+sample_data(diet_fr)$Species_Label <- gsub(" ", "_", sample_data(diet_fr)$Species_Label)
+
+# Remove samples with only 1 ASV (Lab_Codes 306 and 105)
+diet_filt <- diet_fr %>%
+  subset_samples(!Lab_Code %in% c("306", "105")) %>%
+  removeZeros()
+
+# Shared factor level definition for ordination panels
+species_levels <- c("El_Hierro_F_c_ombriosa", "Flores_F_moreletti",
+                    "Gran_Canaria_F_c_bakeri", "Gran_Canaria_F_polatzeki",
+                    "La_Gomera_F_c_canariensis", "La_Palma_F_c_palmae",
+                    "Madeira_F_maderensis", "Mainland_F_coelebs",
+                    "Sao_Miguel_F_moreletti", "Tenerife_F_c_canariensis",
+                    "Tenerife_F_teydea")
+
+species_labels_parsed <- c(
+  "El~Hierro:~italic('F.c. ombriosa')", "Flores:~italic('F. moreletti')",
+  "Gran~Canaria:~italic('F.c. bakeri')", "Gran~Canaria:~italic('F. polatzeki')",
+  "La~Gomera:~italic('F.c. canariensis')", "La~Palma:~italic('F.c. palmae')",
+  "Madeira:~italic('F. maderensis')", "Mainland:~italic('F. coelebs')",
+  "Sao~Miguel:~italic('F. moreletti')", "Tenerife:~italic('F.c. canariensis')",
+  "Tenerife:~italic('F. teydea')")
 
 ```
 
+## NMDS ORDINATIONS
 
-## NDMS
+```{r nmds, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
 
-```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
-
-#remove sample 306 and 105 with only 1 ASV  (ASV293, ASV19)
-diet_filt <- diet_fr   %>% subset_samples(Lab_Code != "306" & Lab_Code !="105")  %>% removeZeros()
-diet_fr  %>% sample_data %>% head
-
-
-set.seed(100)
-ord <- metaMDS(otu_table(diet_filt), distance = "jaccard", binary = TRUE)
-
-scrs <- scores(ord, display = 'sites')
-
-scrs <- cbind(as.data.frame(scrs), Species_Label = sample_data(diet_filt)$Species_Label)
-
-cent <- aggregate(cbind(NMDS1, NMDS2) ~ Species_Label, data = scrs, FUN = mean)
-
-segs <- merge(scrs, setNames(cent, c('Species_Label','oNMDS1','oNMDS2')),
-              by = 'Species_Label', sort = FALSE)
-
-
-cent$fSpecies_Label <- factor(cent$Species_Label, levels = c("El_Hierro_F_c_ombriosa", "Flores_F_moreletti", "Gran_Canaria_F_c_bakeri", "Gran_Canaria_F_polatzeki", "La_Gomera_F_c_canariensis", "La_Palma_F_c_palmae", "Madeira_F_maderensis" , "Mainland_F_coelebs", "Sao_Miguel_F_moreletti", "Tenerife_F_c_canariensis", "Tenerife_F_teydea"), labels = c("El~Hierro:~italic('F.c. ombriosa')","Flores:~italic('F. moreletti')","Gran~Canaria:~italic('F.c. bakeri')","Gran~Canaria:~italic('F. polatzeki')","La~Gomera:~italic('F.c. canariensis')","La~Palma:~italic('F.c. palmae')","Madeira:~italic('F. maderensis')","Mainland:~italic('F. coelebs')","Sao~Miguel:~italic('F. moreletti')","Tenerife:~italic('F.c. canariensis')","Tenerife:~italic('F. teydea')"))
-
-class(segs)
-names(segs)
-head(segs)
-tail(segs)
-
-head(scrs)
-
-
-png(paste0(outputDir, "/Figures/Jaccard_NMDS_diet_PCH_clean.png"), width = 320, height = 240, units = "mm", res = 1000)
-
-(jaccard_NMDS <- ggplot(scrs, aes(x = NMDS1, y = NMDS2, fill = Species_Label,  shape= Species_Label)) +
-    geom_point(alpha=1,size=10, stroke =1.5,  color = "white") + 
-    geom_point(data=cent, aes(y=NMDS2,x=NMDS1,fill=Species_Label),size=17, stroke =1.5, color = "black") +
-  pca_theme + SpeciesLabel.fill + 
- scale_shape_manual(values = c(21,22,23,21, 23, 25, 21,21, 21, 22, 25), guide = "none")+
-  guides(color = "none"))
-
-dev.off()
-
-#Bray
-set.seed(1)
-ord <- metaMDS(otu_table(diet_filt), distance = "bray", binary = FALSE)
-
-scrs <- scores(ord, display = 'sites')
-head(scrs)
-scrs <- cbind(as.data.frame(scrs), Species_Label = sample_data(diet_filt)$Species_Label)
-
-cent <- aggregate(cbind(NMDS1, NMDS2) ~ Species_Label, data = scrs, FUN = mean)
-
-segs <- merge(scrs, setNames(cent, c('Species_Label','oNMDS1','oNMDS2')),
-              by = 'Species_Label', sort = FALSE)
-head(segs)
-
-cent$fSpecies_Label <- factor(cent$Species_Label, levels = c("El_Hierro_F_c_ombriosa", "Flores_F_moreletti", "Gran_Canaria_F_c_bakeri", "Gran_Canaria_F_polatzeki", "La_Gomera_F_c_canariensis", "La_Palma_F_c_palmae", "Madeira_F_maderensis" , "Mainland_F_coelebs", "Sao_Miguel_F_moreletti", "Tenerife_F_c_canariensis", "Tenerife_F_teydea"), labels = c("El~Hierro:~italic('F.c. ombriosa')","Flores:~italic('F. moreletti')","Gran~Canaria:~italic('F.c. bakeri')","Gran~Canaria:~italic('F. polatzeki')","La~Gomera:~italic('F.c. canariensis')","La~Palma:~italic('F.c. palmae')","Madeira:~italic('F. maderensis')","Mainland:~italic('F. coelebs')","Sao~Miguel:~italic('F. moreletti')","Tenerife:~italic('F.c. canariensis')","Tenerife:~italic('F. teydea')"))
-
-
-png(paste0(outputDir, "/Figures/bray_NMDS_diet_PCH_clean.png"),width = 320, height = 240, units = "mm", res = 1000)
-
-(bray_NMDS <- ggplot(scrs, aes(x = NMDS1, y = NMDS2, fill = Species_Label,  shape= Species_Label)) +
-  #geom_segment(data = segs, mapping = aes(xend = oNMDS1, yend = oNMDS2), alpha = 0.2) + # spiders
-    geom_point(alpha=1,size=10, stroke =1.5,  color = "white") + 
-    geom_point(data=cent, aes(y=NMDS2,x=NMDS1,fill=Species_Label),size=17, stroke =1.5, color = "black") +
-  pca_theme + SpeciesLabel.fill + 
- scale_shape_manual(values = c(21,22,23,21, 23, 25, 21,21, 21, 22, 25), guide = "none")+
-  #scale_x_continuous(limits = c(-1, 0.8)) +
-  #scale_y_continuous(limits = c(-0.5, 0.8)) +
-  #geom_label_repel(data = cent, aes(label = fSpecies_Label,color = Species_Label), size=rel(5), nudge_y = 0.0005, nudge_x = 0.0005, fill = "white", parse = TRUE) +
-  guides(color = "none"))
-
-dev.off()
-```
-
-
-## Test effect of sex and age
-
-```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
-
-# create Age (juvenile and adult) category
-sample_data(diet_clean)$Age_cat <- ifelse(sample_data(diet_clean)$Age > 3, "adult", "fledging")
-
-diet_clean_noNA <- diet_clean  %>% subset_samples(Genus == "Fringilla") %>%  subset_samples(Age > 0) %>% subset_samples(!is.na(Sex)) %>% removeZeros()
+# Helper that builds an NMDS plot for a given distance method
+build_nmds_plot <- function(ps, distance, binary, seed = 1, ord_args = list()) {
+  set.seed(seed)
+  
+  if (distance == "raupcrick") {
+    rc_dist <- raupcrick(otu_table(ps))
+    ord <- do.call(metaMDS, c(list(comm = rc_dist), ord_args))
+  } else {
+    ord <- do.call(metaMDS,
+                   c(list(comm = otu_table(ps), distance = distance, binary = binary),
+                     ord_args))
+  }
+  
+  scrs <- scores(ord, display = 'sites') %>%
+    as.data.frame() %>%
+    mutate(Species_Label = sample_data(ps)$Species_Label)
+  
+  cent <- aggregate(cbind(NMDS1, NMDS2) ~ Species_Label, data = scrs, FUN = mean)
+  
+  ggplot(scrs, aes(x = NMDS1, y = NMDS2, fill = Species_Label, shape = Species_Label)) +
+    geom_point(alpha = 1, size = 10, stroke = 1.5, color = "white") +
+    geom_point(data = cent, aes(y = NMDS2, x = NMDS1, fill = Species_Label),
+               size = 17, stroke = 1.5, color = "black") +
+    pca_theme + SpeciesLabel.fill +
+    scale_shape_manual(values = c(21, 22, 23, 21, 23, 25, 21, 21, 21, 22, 25), guide = "none") +
+    guides(color = "none")
+}
 
 # Jaccard
-jaccard_dist <- vegdist(otu_table(diet_clean_noNA), method = "jaccard", binary = TRUE)
+jaccard_NMDS <- build_nmds_plot(diet_filt, "jaccard", binary = TRUE, seed = 100)
+png(paste0(outputDir, "/Figures/Jaccard_NMDS_diet_PCH_clean.png"),
+    width = 320, height = 240, units = "mm", res = 1000)
+print(jaccard_NMDS); dev.off()
 
-set.seed(42)
-(ad <- adonis2(jaccard_dist~ Species_Label + Age_cat + Sex, data = meta(diet_clean_noNA),by = "margin", permutations = 9999))
+# Bray-Curtis
+bray_NMDS <- build_nmds_plot(diet_filt, "bray", binary = FALSE, seed = 1)
+png(paste0(outputDir, "/Figures/bray_NMDS_diet_PCH_clean.png"),
+    width = 320, height = 240, units = "mm", res = 1000)
+print(bray_NMDS); dev.off()
 
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10   17.306 0.20524 5.0282 0.0001 ***
-#Age_cat         1    0.456 0.00541 1.3248 0.0795 .  
-#Sex             1    0.291 0.00345 0.8448 0.7523    
-#Residual      189   65.050 0.77146                  
-#Total         201   84.320 1.00000   
-
-(ad <- adonis2(jaccard_dist~ Species + Age_cat + Sex, data = meta(diet_clean_noNA),by = "margin", permutations = 9999))
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5    9.525 0.11296 5.0742 0.0001 ***
-#Age_cat    1    1.327 0.01574 3.5354 0.0001 ***
-#Sex        1    0.288 0.00341 0.7669 0.8819    
-#Residual 194   72.831 0.86374                  
-#Total    201   84.320 1.00000  
-
-bray_dist <- vegdist(otu_table(diet_clean_noNA), method = "bray", binary = FALSE)
-
-set.seed(42)
-(ad <- adonis2(bray_dist~ Species_Label + Age_cat + Sex, data = meta(diet_clean_noNA),by = "margin", permutations = 9999))
-#               Df SumOfSqs      R2      F Pr(>F)    
-#Species_Label  10   20.578 0.23061 5.8462 0.0001 ***
-#Age_cat         1    0.427 0.00479 1.2137 0.2102    
-#Sex             1    0.315 0.00353 0.8938 0.5790    
-#Residual      189   66.528 0.74553                  
-#Total         201   89.236 1.00000    
-
-(ad <- adonis2(bray_dist~ Species + Age_cat + Sex, data = meta(diet_clean_noNA),by = "margin", permutations = 9999))
-#          Df SumOfSqs      R2      F Pr(>F)    
-#Species    5   12.181 0.13650 6.3078 0.0001 ***
-#Age_cat    1    1.341 0.01503 3.4730 0.0002 ***
-#Sex        1    0.316 0.00354 0.8189 0.6811    
-#Residual 194   74.926 0.83963                  
-#Total    201   89.236 1.00000    
-
-
-
-# Test across taxonomic levels
-
-diet_fr <- readRDS(paste0(dataDir, "/ps_OTU99_wAlpha_fr.rds" ))  %>% removeZeros()
-
-#diet_fr <- speedyseq::tax_glom(diet_fr, "Phylum")
-#diet_fr <- speedyseq::tax_glom(diet_fr, "Class")
-#diet_fr <- speedyseq::tax_glom(diet_fr, "Order")
-#ps_fringilla <- speedyseq::tax_glom(ps_fringilla, "Family")
-#ps_fringilla <- speedyseq::tax_glom(ps_fringilla, "Genus")
-
-ps_fringilla <- ps_fringilla  %>% subset_samples(Genus == "Fringilla") %>% subset_samples(!is.na(Sex)) %>% subset_samples(Age > 0) %>% removeZeros()
-
-# Jaccard
-jaccard_dist <- vegdist(otu_table(ps_fringilla), method = "jaccard", binary = TRUE)
-
-set.seed(42)
-(ad <- adonis2(jaccard_dist~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-(ad <- adonis2(jaccard_dist~ Species + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-bray_dist <- vegdist(otu_table(ps_fringilla), method = "bray", binary = FALSE)
-
-set.seed(42)
-(ad <- adonis2(bray_dist~ Species_Label + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-(ad <- adonis2(bray_dist~ Species + Age_cat + Sex, data = meta(ps_fringilla),by = "margin", permutations = 9999))
-
-
+# Raup-Crick
+raupcrick_NMDS <- build_nmds_plot(diet_filt, "raupcrick", binary = NA, seed = 1)
+png(paste0(outputDir, "/Figures/raupcrick_NMDS_diet_PCH_clean.png"),
+    width = 320, height = 240, units = "mm", res = 1000)
+print(raupcrick_NMDS); dev.off()
 
 ```
 
+## TEST EFFECT OF SEX AND AGE (PERMANOVA)
 
+```{r permanova, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
 
+# Create age category
+sample_data(diet_filt)$Age_cat <- ifelse(sample_data(diet_filt)$Age > 3, "adult", "fledging")
 
+# Keep only samples with non-missing age and sex
+diet_clean_noNA <- diet_filt %>%
+  subset_samples(Genus == "Fringilla" & Age > 0 & !is.na(Sex)) %>%
+  removeZeros()
 
+# Helper that runs PERMANOVA for a given distance metric
+run_permanova <- function(ps, dist_method, binary = FALSE, seed = 42) {
+  if (dist_method == "raupcrick") {
+    d <- raupcrick(otu_table(ps))
+  } else {
+    d <- vegdist(otu_table(ps), method = dist_method, binary = binary)
+  }
+  set.seed(seed)
+  adonis2(d ~ Species_Label + Age_cat + Sex,
+          data = meta(ps), by = "margin", permutations = 9999)
+}
 
+ad_jac  <- run_permanova(diet_clean_noNA, "jaccard", binary = TRUE)
+ad_bray <- run_permanova(diet_clean_noNA, "bray",    binary = FALSE)
+ad_rc   <- run_permanova(diet_clean_noNA, "raupcrick")
 
+ad_jac
+ad_bray
+ad_rc
 
-
-
-
+```
