@@ -57,7 +57,7 @@ varpart_out <- read.csv(paste0(dataDir, "/output_varpart.csv"))
 #mantel_out <- read.csv(paste0(dataDir, "/output_mantel_weightedfst.csv"))
 mantel_out <- read.csv(paste0(dataDir, "/mantel_resampled_summary.csv")) %>%
   filter(data == "all", test == "partial-mantel")
-glmm_out <- read.csv(paste0(dataDir, "/glmm_fst_roh_output_miss0.5_mac3_noZ_speciesFix.csv"))
+glmm_out <- read.csv(paste0(dataDir, "/glmm_fst_roh_output_miss0.5_mac3_noZ_speciesFix_100kb_1Mb.csv"))
 
 ```
 
@@ -313,8 +313,9 @@ jaccard_div <- compute_divergence(microb_overlap_species, "jaccard", binary = TR
 
 metadata <- read_delim(paste0(dataDir, "/WGS_Fringilla_samples.tsv"), delim = ",")
 
-froh <- read_delim(paste0(dataDir, "/fringilla_microbiome_roh_rg_filtered.csv"), delim = ",")
-names(froh) <- c("TipID_microbiome", "total_length_bp", "froh")
+froh <- read_delim(paste0(dataDir, "/fringilla_microbiome_froh_100kb_1Mb.csv"), delim = ",")
+names(froh)[names(froh) == "file_id"] <- "TipID_microbiome"
+
 
 froh_meta <- left_join(froh, metadata, by = "TipID_microbiome")
 
@@ -390,7 +391,7 @@ fig4_themeB <- theme(
 
 ```
 
-## MANTEL R BARPLOT
+## Partial MANTEL PLOT
 
 ```{r mantel-plot, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
 
@@ -444,71 +445,6 @@ glmm_fill_colors <- c("< 0.05" = "#999999", "< 0.005" = "#333333",
 ```
 
 ## FST SCATTER PLOT
-
-```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
-## ============================================================
-## Median pop-pair distances across 1000 subsamples
-## ============================================================
-## Currently the F_ST scatter shows pop-pair distances from a 
-## single seeded subsample, while the partial-Mantel forest 
-## summarises 1000 draws. Recompute the scatter y-values as the
-## median pop-pair Bray and Jaccard distance across the same
-## resampling, so both panels share a consistent estimator.
-
-# helper: one subsample + merge, returns pairwise Bray and Jaccard
-# vectors. Vector order matches lower-triangle of dist_mat, which
-# matches as.vector(fst_dist).
-#make_pop_dist_vec <- function(ps_level, n_per_pop = 9) {
-  
-#  ElHierro    <- sample_ps(subset_samples(ps_level, Species_Label == "El_Hierro_F_c_ombriosa"),   size = n_per_pop)
-#  Flores      <- sample_ps(subset_samples(ps_level, Species_Label == "Flores_F_moreletti"),        size = n_per_pop)
-#  GranCanaria <- sample_ps(subset_samples(ps_level, Species_Label == "Gran_Canaria_F_c_bakeri"),   size = n_per_pop)
-#  Polatzeki   <- sample_ps(subset_samples(ps_level, Species_Label == "Gran_Canaria_F_polatzeki"),  size = n_per_pop)
-#  LaGomera    <- sample_ps(subset_samples(ps_level, Species_Label == "La_Gomera_F_c_canariensis"), size = n_per_pop)
-#  LaPalma     <- sample_ps(subset_samples(ps_level, Species_Label == "La_Palma_F_c_palmae"),       size = n_per_pop)
-#  Madeira     <- sample_ps(subset_samples(ps_level, Species_Label == "Madeira_F_maderensis"),      size = n_per_pop)
-#  Mainland    <- sample_ps(subset_samples(ps_level, Species_Label == "Mainland_F_coelebs"),        size = n_per_pop)
-#  SaoMiguel   <- sample_ps(subset_samples(ps_level, Species_Label == "Sao_Miguel_F_moreletti"),    size = n_per_pop)
-#  Tenerife    <- sample_ps(subset_samples(ps_level, Species_Label == "Tenerife_F_c_canariensis"),  size = n_per_pop)
-#  Teydea      <- sample_ps(subset_samples(ps_level, Species_Label == "Tenerife_F_teydea"),         size = n_per_pop)
-  
-#  ps_sub <- merge_phyloseq(ElHierro, Flores, GranCanaria, Polatzeki, LaGomera, LaPalma,
-#                            Madeira, Mainland, SaoMiguel, Tenerife, Teydea) %>%
-#            biomeUtils::removeZeros()
-#  ps_merged <- phyloseq::merge_samples(ps_sub, "Species_Label", fun = sum)
-#  otu <- otu_table(ps_merged)[rownames(dist_mat), ]
-  
-#  list(
-#    bray = as.vector(vegdist(otu, method = "bray")),
-#    jacc = as.vector(vegdist(otu, method = "jaccard", binary = TRUE))
-#  )
-#}
-
-
-#N_ITER <- 1000
-#set.seed(42)
-#dist_draws <- lapply(seq_len(N_ITER),
-#                       function(i) make_pop_dist_vec(microb_overlap_species))
-
-# stack into matrices: rows = iterations, cols = pop pairs (lower-triangle order)
-#bray_mat <- do.call(rbind, lapply(dist_draws, `[[`, "bray"))
-#jacc_mat <- do.call(rbind, lapply(dist_draws, `[[`, "jacc"))
-
-# median + 95% interval per pair, paired with FST in matching order
-#pair_summary <- data.frame(
-#  fst      = as.vector(fst_dist),
-#  bray_med = apply(bray_mat, 2, median),
-#  bray_lo  = apply(bray_mat, 2, quantile, 0.025),
-#  bray_hi  = apply(bray_mat, 2, quantile, 0.975),
-#  jacc_med = apply(jacc_mat, 2, median),
-#  jacc_lo  = apply(jacc_mat, 2, quantile, 0.025),
-#  jacc_hi  = apply(jacc_mat, 2, quantile, 0.975)
-#)
-
-#write.csv(pair_summary, paste0(dataDir, "/dist_fst_resampled_summary.csv"),
-#          row.names = FALSE)
-
-```
 
 ```{r, message=FALSE, warning=FALSE, tidy=TRUE, tidy.opts=list(width.cutoff=45), paged.print=FALSE}
 pair_summary <- read.csv(paste0(dataDir, "/dist_fst_resampled_summary.csv"))
@@ -635,6 +571,6 @@ glmm_fill_colors <- c("< 0.05" = "#999999", "< 0.005" = "#333333",
   plot_annotation(tag_levels = list(c("A", "", "", "B", "", "C", ""))) &
   theme(plot.tag = element_text(size = 18, face = "bold"))
 
-ggsave(paste0(outputDir, "/Figures/Figure4_diet_rc.png"),
+ggsave(paste0(outputDir, "/Figures/Figure4_diet_rc_roh_100kb_1Mb.png"),
        width = 10.5, height = 15, units = "in", dpi = 300)
 ```
