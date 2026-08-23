@@ -50,7 +50,7 @@ roh_autoscaf <- roh_raw %>%
   filter(chr != "OY740727")            # removes Z chromosome
 
 # Filter based on quality (minimum of 30), ROH length (minimum of 10kb) and number of SNPs within the ROH (minimum of 100) 
-roh_clean <- subset(roh_autoscaf, qual > 30 & length >= 10000 & nsnp >= 100) 
+roh_clean <- subset(roh_autoscaf, qual > 30 & length >= 10000 & < 100000 & nsnp >= 100) 
 
 # Calculate Froh (sum the total length of all ROHs for all individuals and divide it by the total autosomal genome length)
 #Autosomal genome length: 1005935441 bp
@@ -76,7 +76,7 @@ ggplot(roh_meta, aes(froh)) +
 
 # Write to file
 
-write.csv(froh, paste0(dataDir, "/fringilla_microbiome_roh_rg_filtered.csv"), row.names=FALSE)
+write.csv(froh, paste0(dataDir, "/fringilla_microbiome_froh_100kb_1Mb.csv"), row.names=FALSE)
 
 
 

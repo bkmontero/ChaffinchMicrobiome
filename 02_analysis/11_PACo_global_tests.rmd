@@ -416,7 +416,6 @@ H_PCo <- paco_data$H_PCo
 P_PCo <- paco_data$P_PCo
 
 y_nonneutral <- vegan::protest(X = H_PCo, Y = P_PCo, symmetric = TRUE)
-++++++++++++++++
 
 #Procrustes Sum of Squares (m12 squared):        0.9952 
 #Correlation in a symmetric Procrustes rotation: 0.06912 

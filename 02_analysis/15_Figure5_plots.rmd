@@ -22,6 +22,7 @@ library(data.table)
 library(ggplot2)
 library(ggpubr)
 require(ape)
+library(patchwork)
 
 # phyloseq section
 library(phyloseq)
@@ -573,7 +574,7 @@ names(paco_output)
 table(paco_output$Phylum)
 
 paco_output$prediction <- ifelse(paco_output$fit_class == "As predicted", "Neutral", "Non-neutral")
-
+#paco_output$prediction <- ifelse(paco_output$fit_class == "As predicted", "Neutral", ifelse(paco_output$fit_class == "Above prediction", "Above", "Below"))
 
 ```
 
@@ -588,7 +589,7 @@ library(ggtext)
 
 df <- paco_output %>%
   mutate(
-    BoldLabel = if_else(p_adj_bonferroni > 0.05, glue("<p>{Family_edit}</p>"), glue("<b>{Family_edit}</b>")))
+    BoldLabel = if_else(p_adj_bonferroni > 0.05, glue("<p>{Family_edit}</p>"), glue("<b>{Family_edit}*</b>")))
 
 
 paco_label <- df %>%
@@ -611,7 +612,7 @@ df_txt <- data.frame(
         theme(legend.position="none", 
           axis.title.x = element_text(size = 18),
           axis.title.y = element_text(size = 18),
-          axis.text.x = element_text(size = 16, hjust=1),
+          axis.text.x = element_text(size = 16, angle = 45, hjust=1),
           #axis.text.x = element_text(angle = 90,  size = 12), 
           axis.text.y = ggtext::element_markdown(angle = 0,  size = 16), 
           legend.title=element_text(size=18), 
@@ -624,8 +625,32 @@ df_txt <- data.frame(
         coord_flip()+
         ylab(bquote("PACo"~ R^2)))
   
-png(paste0(outputDir, "/Figures/paco_taxplot_familyFix.png") ,width=700, height=1200,res=100)
-p_tax_annot + theme( legend.position= "none")
+
+(p_sppcount <- ggplot(paco_label, aes(x = BoldLabel, y= n_Spp_overall)) +
+    geom_bar(stat ="identity", fill = "grey", alpha = 0.9) +
+     xlab("") +
+    guides(color = guide_legend(override.aes = list(linewidth = 12))) +
+      theme(legend.position="none", 
+          axis.title.x = element_text(size = 18, angle = 0),
+          axis.title.y = element_text(size = 18),
+          axis.text.x = element_text(size = 16, angle = 45, hjust =1), 
+          axis.text.y = element_blank(), 
+          legend.title=element_text(size=18), 
+          legend.text=element_text(size=16), 
+          panel.spacing = unit(2, "lines"),
+          strip.placement =  "outside",
+          strip.background = element_rect(fill = "white", color = "white"),
+          strip.text = element_blank())+
+        facet_grid(factor(prediction)~.,  scales = "free", space = "free", switch = "y") +
+        coord_flip() + 
+        ylab("N species"))
+
+# Side by side
+(p_combined <- p_tax_annot + p_sppcount +
+  plot_layout(widths = c(3, 3))
+)
+png(paste0(outputDir, "/Figures/paco_taxplot_familyFix.png") ,width=720, height=1000,res=100)
+p_combined + theme( legend.position= "none")
 dev.off()
 
 ```
