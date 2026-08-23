@@ -30,8 +30,8 @@ Scripts are numbered by stage below; run them in this order, as later scripts re
 
 
   ### 2. Preprocessing genomic data (`preprocessing/wgs_data/`)
-   Run on the HPC cluster; both shell scripts contain cluster-specific paths
-  that must be edited.
+  Run on the HPC cluster; both shell scripts contain cluster-specific paths
+  that must be edited. All fastq files have been deposited in ENA sequence read archive under the accession number ERP150413.
   1. `run_genotyping_cesga.sh` — run variant calling pipeline [v.2.2.4] (https://github.com/EcoEvoGenomics/XENO/tree/main)
   2. `filterVCF_chaffinch.sh` — filter vcf file
   3. `generate_consensus_depthFreq_mask.sh` — generate  mitochondrial consensus genomes
@@ -135,109 +135,109 @@ ChaffinchMicrobiome/
 ```
 
 ## R Environment
-**R version:** 4.5.2
+**R version:** 4.6.1
 
 | Package | Version |
 | :------ | :------ |
-| `adespatial` | 0.3.28 |
-| `ANCOMBC` | 2.10.1 |
+| `adespatial` | 0.3.29 |
+| `ANCOMBC` | 2.14.0 |
 | `ape` | 5.8.1 |
 | `betapart` | 1.6.1 |
-| `biohelper` | not installed |
+| `biohelper` | 0.0.24.0 |
 | `biomeUtils` | 0.22 |
-| `Biostrings` | 2.76.0 |
-| `car` | 3.1.3 |
+| `Biostrings` | 2.80.1 |
+| `car` | 3.1.5 |
 | `cowplot` | 1.2.0 |
-| `dada2` | 1.36.0 |
+| `dada2` | 1.40.0 |
 | `data.table` | 1.18.4 |
-| `DECIPHER` | 3.4.0 |
-| `decontam` | not installed |
+| `DECIPHER` | 3.8.0 |
+| `decontam` | 1.32.0 |
 | `details` | 0.4.0 |
-| `devtools` | 2.4.6 |
+| `devtools` | 2.5.2 |
 | `doParallel` | 1.0.17 |
 | `dplyr` | 1.2.1 |
 | `ecodist` | 2.1.3 |
-| `effects` | 4.2.4 |
-| `eulerr` | 7.0.4 |
+| `effects` | 4.2.5 |
+| `eulerr` | 7.1.0 |
 | `fantaxtic` | 0.2.1 |
-| `fastqcr` | 0.1.3.999 |
-| `future` | 1.67.0 |
-| `future.apply` | 1.20.0 |
+| `fastqcr` | 0.1.3 |
+| `future` | 1.70.0 |
+| `future.apply` | 1.20.2 |
 | `gdata` | 3.0.1 |
-| `geosphere` | 1.5.20 |
-| `ggeffects` | 2.3.1 |
+| `geosphere` | 1.6.8 |
+| `ggeffects` | 2.3.2 |
 | `ggforce` | 0.5.0 |
 | `ggh4x` | 0.3.1 |
-| `ggmagnify` | 0.4.1.9000 |
+| `ggmagnify` | 0.4.2 |
 | `ggnewscale` | 0.5.2 |
-| `ggpattern` | 1.2.1 |
+| `ggpattern` | 1.3.1 |
 | `ggplot2` | 4.0.3 |
-| `ggpubr` | 0.6.2 |
-| `ggrepel` | 0.9.6 |
+| `ggpubr` | 1.0.0 |
+| `ggrepel` | 0.9.8 |
 | `ggstar` | 1.0.6 |
-| `ggtern` | 3.5.0 |
+| `ggtern` | 4.0.0 |
 | `ggtext` | 0.1.2 |
-| `ggtree` | 3.16.3 |
-| `ggtreeExtra` | 1.19.0 |
-| `glmmTMB` | 1.1.13 |
+| `ggtree` | 4.2.0 |
+| `ggtreeExtra` | 1.22.0 |
+| `glmmTMB` | 1.1.14 |
 | `glue` | 1.8.1 |
-| `gplots` | 3.2.0 |
-| `gridExtra` | 2.3 |
+| `gplots` | 3.3.0 |
+| `gridExtra` | 2.3.1 |
 | `gtable` | 0.3.6 |
 | `hilldiv` | 1.5.3 |
-| `Hmisc` | 5.2.4 |
-| `iNEXT` | not installed |
+| `Hmisc` | 5.2.6 |
+| `iNEXT` | 3.0.2 |
 | `kableExtra` | 1.4.0 |
 | `knitr` | 1.51 |
 | `magrittr` | 2.0.5 |
-| `MASS` | 7.3.65 |
-| `metagMisc` | 0.5.0 |
-| `MicEco` | 0.9.19 |
-| `microbiome` | 1.30.0 |
-| `microViz` | 0.12.7 |
+| `MASS` | 7.3.66 |
+| `metagMisc` | 0.6.0.9000 |
+| `MicEco` | 0.10.0 |
+| `microbiome` | 1.31.3 |
+| `microViz` | 0.13.1 |
 | `minpack.lm` | 1.2.4 |
 | `mirlyn` | 1.4.2 |
-| `MKinfer` | not installed |
-| `modEvA` | 3.40 |
-| `multcomp` | 1.4.29 |
-| `MuMIn` | 1.48.11 |
-| `paco` | 0.4.2 |
+| `MKinfer` | 1.3 |
+| `modEvA` | 3.45 |
+| `multcomp` | 1.4.30 |
+| `MuMIn` | 1.48.19 |
+| `paco` | 0.5.0 |
 | `patchwork` | 1.3.2 |
 | `phangorn` | 2.12.1 |
 | `phylobase` | 0.8.12 |
-| `phyloseq` | 1.52.0 |
+| `phyloseq` | 1.56.0 |
 | `phylosmith` | 1.0.8 |
 | `phytools` | 2.5.2 |
 | `plyr` | 1.8.9 |
-| `png` | 0.1.8 |
-| `primers` | not installed |
+| `png` | 0.1.9 |
+| `primers` | 1.2.1 |
 | `purrr` | 1.2.2 |
 | `RColorBrewer` | 1.1.3 |
 | `Rcpp` | 1.1.2 |
 | `readxl` | 1.5.0 |
 | `RInSp` | 1.2.5 |
 | `rlist` | 0.4.6.2 |
-| `rmdformats` | not installed |
+| `rmdformats` | 1.0.4 |
 | `RVAideMemoire` | 0.9.83.12 |
 | `scales` | 1.4.0 |
 | `seqateurs` | 0.0.0.9000 |
 | `sessioninfo` | 1.2.3 |
-| `sf` | 1.0.21 |
-| `ShortRead` | 1.66.0 |
+| `sf` | 1.1.1 |
+| `ShortRead` | 1.70.0 |
 | `speedyseq` | 0.5.3.9021 |
 | `stringr` | 1.6.0 |
-| `TDbook` | not installed |
+| `TDbook` | 0.0.6 |
 | `tibble` | 3.3.1 |
 | `tidyr` | 1.3.2 |
-| `tidytree` | 0.4.6.2 |
+| `tidytree` | 0.4.7 |
 | `tidyverse` | 2.0.0 |
 | `treedata.table` | 0.1.1 |
 | `treedataverse` | 0.0.1 |
-| `treeio` | 1.33.0 |
+| `treeio` | 1.36.1 |
 | `tsiR` | 0.4.3 |
 | `tyRa` | 0.1.0 |
-| `vegan` | 2.7.2 |
-| `VennDiagram` | 1.7.3 |
+| `vegan` | 2.7.5 |
+| `VennDiagram` | 1.8.2 |
 
 ---
 *README generated with READMEBuilder on 23 August 2026.*
